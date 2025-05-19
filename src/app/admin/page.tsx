@@ -2,7 +2,7 @@
 "use client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Layers, BarChart3, Settings } from "lucide-react";
+import { Users, Layers, BarChart3, Settings, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
@@ -100,3 +100,4 @@ export default function AdminOverviewPage() {
     </div>
   );
 }
+
