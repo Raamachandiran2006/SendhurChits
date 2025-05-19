@@ -9,7 +9,7 @@ import { doc, getDoc, collection, query, where, getDocs } from "firebase/firesto
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Loader2, ArrowLeft, Users as GroupIcon, User as UserIcon, Info, AlertTriangle, Phone, Mail, CalendarDays, Landmark } from "lucide-react";
+import { Loader2, ArrowLeft, Users as GroupIcon, User as UserIcon, Info, AlertTriangle, Phone, Mail, CalendarDays, Landmark, Users } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
