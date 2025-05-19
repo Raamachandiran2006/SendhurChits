@@ -42,6 +42,22 @@ export default function AdminUsersPage() {
     );
   }
 
+  const formatDateSafe = (dateString: string | undefined | null) => {
+    if (!dateString) {
+      return "N/A";
+    }
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return "N/A";
+      }
+      return format(date, "dd MMM yyyy");
+    } catch (e) {
+      return "N/A";
+    }
+  };
+
   return (
     <div className="container mx-auto py-8">
       <Card className="shadow-xl">
@@ -78,7 +94,7 @@ export default function AdminUsersPage() {
                       <TableCell className="font-medium">{user.username}</TableCell>
                       <TableCell>{user.fullname}</TableCell>
                       <TableCell>{user.phone}</TableCell>
-                      <TableCell>{format(new Date(user.dob), "dd MMM yyyy")}</TableCell>
+                      <TableCell>{formatDateSafe(user.dob)}</TableCell>
                       <TableCell>
                         {user.isAdmin || user.username === 'admin' ? (
                           <Badge variant="destructive">Admin</Badge>
