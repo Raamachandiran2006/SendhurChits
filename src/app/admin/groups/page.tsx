@@ -11,6 +11,7 @@ import Link from "next/link";
 import { Loader2, Layers, PlusCircle, Users, Landmark } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export default function AdminGroupsPage() {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -76,39 +77,41 @@ export default function AdminGroupsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {groups.map((group) => (
-            <Card key={group.id} className="shadow-lg flex flex-col">
-              <CardHeader>
-                <CardTitle className="text-xl text-primary">{group.groupName}</CardTitle>
-                <CardDescription className="h-16 overflow-y-auto text-sm">{group.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 flex-grow">
-                <div className="flex items-center text-sm">
-                  <Users className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <span>Capacity: {group.totalPeople} members</span>
-                </div>
-                <div className="flex items-center text-sm">
-                  <Landmark className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <span>Total Amount: ₹{group.totalAmount.toLocaleString()}</span>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium mb-1">Members ({group.members.length}):</h4>
-                  {group.members.length > 0 ? (
-                    <ScrollArea className="h-20 rounded-md border p-2">
-                      <div className="flex flex-wrap gap-1">
-                        {group.members.map(memberUsername => (
-                          <Badge key={memberUsername} variant="secondary">{memberUsername}</Badge>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">No members yet.</p>
-                  )}
-                </div>
-              </CardContent>
-              <CardContent className="border-t pt-4">
-                <p className="text-xs text-muted-foreground">Group ID: {group.id}</p>
-              </CardContent>
-            </Card>
+            <Link key={group.id} href={`/admin/groups/${group.id}`} className="block">
+              <Card className="shadow-lg flex flex-col h-full hover:shadow-xl transition-shadow duration-300 cursor-pointer">
+                <CardHeader>
+                  <CardTitle className="text-xl text-primary">{group.groupName}</CardTitle>
+                  <CardDescription className="h-16 overflow-y-auto text-sm">{group.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 flex-grow">
+                  <div className="flex items-center text-sm">
+                    <Users className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <span>Capacity: {group.totalPeople} members</span>
+                  </div>
+                  <div className="flex items-center text-sm">
+                    <Landmark className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <span>Total Amount: ₹{group.totalAmount.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium mb-1">Members ({group.members.length}):</h4>
+                    {group.members.length > 0 ? (
+                      <ScrollArea className="h-20 rounded-md border p-2">
+                        <div className="flex flex-wrap gap-1">
+                          {group.members.map(memberUsername => (
+                            <Badge key={memberUsername} variant="secondary">{memberUsername}</Badge>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No members yet.</p>
+                    )}
+                  </div>
+                </CardContent>
+                <CardContent className="border-t pt-4 mt-auto">
+                  <p className="text-xs text-muted-foreground">Group ID: {group.id}</p>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       )}
