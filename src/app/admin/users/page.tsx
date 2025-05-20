@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Loader2, Users, PlusCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -16,13 +17,13 @@ import { format } from "date-fns";
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchUsers = async () => {
       setLoading(true);
       try {
         const usersRef = collection(db, "users");
-        // Order by fullname now as username is internal
         const q = query(usersRef, orderBy("fullname")); 
         const querySnapshot = await getDocs(q);
         const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
@@ -42,18 +43,19 @@ export default function AdminUsersPage() {
     }
     try {
       const date = new Date(dateString);
-      // Check if the date is valid
       if (isNaN(date.getTime())) {
         return "N/A";
       }
       return format(date, "dd MMM yyyy");
     } catch (e) {
-      // Catch any other errors during date parsing or formatting
       console.warn("Date formatting error for:", dateString, e);
       return "N/A";
     }
   };
 
+  const handleUserRowClick = (userId: string) => {
+    router.push(`/admin/users/${userId}`);
+  };
 
   if (loading) {
     return (
@@ -94,11 +96,29 @@ export default function AdminUsersPage() {
             <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
-                  <TableRow><TableHead>Full Name</TableHead><TableHead>Username (ID)</TableHead><TableHead>Phone Number</TableHead><TableHead>Date of Birth</TableHead><TableHead>Role</TableHead><TableHead className="text-right">Groups Joined</TableHead></TableRow>
+                  <TableRow>
+                    <TableHead>Full Name</TableHead>
+                    <TableHead>Username (ID)</TableHead>
+                    <TableHead>Phone Number</TableHead>
+                    <TableHead>Date of Birth</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead className="text-right">Groups Joined</TableHead>
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
                   {users.map((user) => (
-                    <TableRow key={user.id}><TableCell className="font-medium">{user.fullname}</TableCell><TableCell>{user.username}</TableCell><TableCell>{user.phone}</TableCell><TableCell>{formatDateSafe(user.dob)}</TableCell><TableCell>{user.isAdmin || user.username === 'admin' ? (<Badge variant="destructive">Admin</Badge>) : (<Badge variant="secondary">User</Badge>)}</TableCell><TableCell className="text-right">{user.groups?.length || 0}</TableCell></TableRow>
+                    <TableRow 
+                      key={user.id} 
+                      onClick={() => handleUserRowClick(user.id)}
+                      className="cursor-pointer hover:bg-muted/70 transition-colors"
+                    >
+                      <TableCell className="font-medium">{user.fullname}</TableCell>
+                      <TableCell>{user.username}</TableCell>
+                      <TableCell>{user.phone}</TableCell>
+                      <TableCell>{formatDateSafe(user.dob)}</TableCell>
+                      <TableCell>{user.isAdmin || user.username === 'admin' ? (<Badge variant="destructive">Admin</Badge>) : (<Badge variant="secondary">User</Badge>)}</TableCell>
+                      <TableCell className="text-right">{user.groups?.length || 0}</TableCell>
+                    </TableRow>
                   ))}
                 </TableBody>
               </Table>
