@@ -39,7 +39,7 @@ import { Separator } from "@/components/ui/separator";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -47,7 +47,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertTitle, AlertDescription as AlertDescriptionUI } from "@/components/ui/alert"; // Renamed AlertDescription to avoid conflict
 
 // Helper function to format date safely
 const formatDateSafe = (dateString: string | Date | undefined | null): string => {
@@ -159,13 +159,18 @@ export default function AdminUserDetailPage() {
 
       if (userData.groups && userData.groups.length > 0) {
         const groupsRef = collection(db, "groups");
-        const groupIds = userData.groups.slice(0, 30);
+        // Firestore 'in' query supports up to 30 elements.
+        const groupIds = userData.groups.slice(0, 30); 
         if (groupIds.length > 0) {
           const q = query(groupsRef, where(documentId(), "in", groupIds));
           const querySnapshot = await getDocs(q);
           const fetchedGroups = querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Group));
           setUserGroups(fetchedGroups);
+        } else {
+          setUserGroups([]);
         }
+      } else {
+        setUserGroups([]);
       }
     } catch (err) {
       console.error("Error fetching user details:", err);
@@ -181,22 +186,34 @@ export default function AdminUserDetailPage() {
 
   const requestCameraPermission = useCallback(async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setHasCameraPermission(false); return;
+      setHasCameraPermission(false); 
+      toast({ variant: 'destructive', title: 'Camera Not Supported', description: 'Your browser does not support camera access.' });
+      return;
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       setHasCameraPermission(true);
       if (videoRef.current) videoRef.current.srcObject = stream;
     } catch (error) {
-      console.error("Error accessing camera:", error); setHasCameraPermission(false);
+      console.error("Error accessing camera:", error); 
+      setHasCameraPermission(false);
+      toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'Please enable camera permissions in your browser settings.' });
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
-    if (showCamera && hasCameraPermission === null) requestCameraPermission();
+    let stream: MediaStream | null = null;
+    if (showCamera && hasCameraPermission === null) {
+      requestCameraPermission();
+    }
+    
+    if (videoRef.current && videoRef.current.srcObject) {
+        stream = videoRef.current.srcObject as MediaStream;
+    }
+
     return () => {
-      if (videoRef.current && videoRef.current.srcObject) {
-        (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
       }
     };
   }, [showCamera, requestCameraPermission, hasCameraPermission]);
@@ -215,7 +232,8 @@ export default function AdminUserDetailPage() {
         setShowCamera(false);
         if (videoRef.current?.srcObject) {
             (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
-            setHasCameraPermission(null);
+            videoRef.current.srcObject = null; // Explicitly nullify to release camera
+            setHasCameraPermission(null); // Reset to allow re-request if needed
         }
       }
     }
@@ -224,7 +242,8 @@ export default function AdminUserDetailPage() {
   const handleRetake = () => {
     setCapturedImage(user?.photoUrl || null); // Reset to original or null
     form.setValue("recentPhotographWebcamDataUrl", null);
-    setShowCamera(true); setHasCameraPermission(null);
+    setShowCamera(true); 
+    setHasCameraPermission(null); // Will trigger permission request again
   };
 
   const dataURLtoFile = (dataurl: string, filename: string): File => {
@@ -272,8 +291,9 @@ export default function AdminUserDetailPage() {
         isAdmin: values.isAdmin,
       };
 
+      // WARNING: Password update is not secure. Implement proper password hashing.
       if (values.password && values.password.length >= 6) {
-        updatedUserData.password = values.password; // WARNING: Plain text password
+        updatedUserData.password = values.password; 
       }
 
       if (values.aadhaarCard) {
@@ -282,10 +302,11 @@ export default function AdminUserDetailPage() {
       if (values.panCard) {
         updatedUserData.panCardUrl = await uploadFile(values.panCard, `userFiles/${user.phone}/pan/${values.panCard.name}`);
       }
+      
+      // Handle photograph update
       if (values.recentPhotographFile) {
         updatedUserData.photoUrl = await uploadFile(values.recentPhotographFile, `userFiles/${user.phone}/photo/${values.recentPhotographFile.name}`);
       } else if (values.recentPhotographWebcamDataUrl && values.recentPhotographWebcamDataUrl !== user.photoUrl) {
-         // Only upload if webcam data is new and different from existing photoUrl
         const photoFile = dataURLtoFile(values.recentPhotographWebcamDataUrl, `webcam_photo_${Date.now()}.jpg`);
         updatedUserData.photoUrl = await uploadFile(photoFile, `userFiles/${user.phone}/photo/${photoFile.name}`);
       }
@@ -392,15 +413,15 @@ export default function AdminUserDetailPage() {
                 <Card>
                   <CardHeader><CardTitle className="text-lg">Update Documents (Optional)</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
-                    <FormField control={form.control} name="aadhaarCard" render={({ field: { onChange, ...rest }}) => (
+                    <FormField control={form.control} name="aadhaarCard" render={({ field: { onChange, onBlur, name, ref }}) => (
                       <FormItem><FormLabel>Aadhaar Card (Upload new to replace)</FormLabel>
                         {user.aadhaarCardUrl && <p className="text-xs text-muted-foreground">Current: <a href={user.aadhaarCardUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Aadhaar</a></p>}
-                        <FormControl><Input type="file" onChange={(e) => onChange(e.target.files?.[0])} accept=".pdf,image/jpeg,image/png" {...rest} /></FormControl><FormMessage />
+                        <FormControl><Input type="file" onChange={(e) => onChange(e.target.files?.[0])} onBlur={onBlur} name={name} ref={ref} accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
                       </FormItem>)} />
-                    <FormField control={form.control} name="panCard" render={({ field: { onChange, ...rest }}) => (
+                    <FormField control={form.control} name="panCard" render={({ field: { onChange, onBlur, name, ref }}) => (
                       <FormItem><FormLabel>PAN Card (Upload new to replace)</FormLabel>
                          {user.panCardUrl && <p className="text-xs text-muted-foreground">Current: <a href={user.panCardUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View PAN</a></p>}
-                        <FormControl><Input type="file" onChange={(e) => onChange(e.target.files?.[0])} accept=".pdf,image/jpeg,image/png" {...rest} /></FormControl><FormMessage />
+                        <FormControl><Input type="file" onChange={(e) => onChange(e.target.files?.[0])} onBlur={onBlur} name={name} ref={ref} accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
                       </FormItem>)} />
                   </CardContent>
                 </Card>
@@ -416,26 +437,48 @@ export default function AdminUserDetailPage() {
                       )}
                     {!showCamera && (
                       <>
-                        <FormField control={form.control} name="recentPhotographFile" render={({ field: { onChange, ...rest }}) => (
+                        <FormField control={form.control} name="recentPhotographFile" render={({ field: { onChange, onBlur, name, ref }}) => (
                           <FormItem><FormLabel>Upload New Photo</FormLabel>
-                            <FormControl><Input type="file" onChange={(e) => { const file = e.target.files?.[0]; onChange(file || null); if(file) {form.setValue("recentPhotographWebcamDataUrl", null); setCapturedImage(URL.createObjectURL(file));} else {setCapturedImage(user.photoUrl || null);}}} accept="image/jpeg,image/png" {...rest} /></FormControl><FormMessage />
+                            <FormControl><Input type="file" 
+                              onChange={(e) => { 
+                                const file = e.target.files?.[0]; 
+                                onChange(file || null); 
+                                if(file) {
+                                  form.setValue("recentPhotographWebcamDataUrl", null); 
+                                  setCapturedImage(URL.createObjectURL(file));
+                                } else {
+                                  setCapturedImage(user.photoUrl || null);
+                                }
+                              }} 
+                              onBlur={onBlur} name={name} ref={ref}
+                              accept="image/jpeg,image/png" /></FormControl><FormMessage />
                           </FormItem>)} />
                         <div className="text-center my-2 text-sm text-muted-foreground">OR</div>
-                        <Button type="button" variant="outline" className="w-full" onClick={() => {setShowCamera(true); setCapturedImage(null); form.setValue("recentPhotographFile", null); }}>
+                        <Button type="button" variant="outline" className="w-full" onClick={() => {setShowCamera(true); setCapturedImage(null); form.setValue("recentPhotographFile", null); requestCameraPermission(); }}>
                           <Camera className="mr-2 h-4 w-4" /> Capture with Webcam
                         </Button>
                       </>
                     )}
-                    {showCamera && hasCameraPermission === false && <Alert variant="destructive"><AlertTitle>Camera Access Denied</AlertTitle><AlertDescription>Please enable camera permissions.</AlertDescription></Alert>}
-                    {showCamera && hasCameraPermission && (
+                    {showCamera && hasCameraPermission === false && <Alert variant="destructive"><AlertTitle>Camera Access Denied</AlertTitle><AlertDescriptionUI>Please enable camera permissions.</AlertDescriptionUI></Alert>}
+                    
+                    <video ref={videoRef} className={cn("w-full aspect-video rounded-md border bg-muted", { 'hidden': !showCamera || hasCameraPermission !== true })} autoPlay playsInline muted />
+                    
+                    {showCamera && hasCameraPermission === true && (
                       <div className="space-y-2">
-                        <video ref={videoRef} className="w-full aspect-video rounded-md border bg-muted" autoPlay playsInline muted />
                         <Button type="button" className="w-full" onClick={handleCapturePhoto}><ImageIconLucide className="mr-2 h-4 w-4" /> Capture Photo</Button>
-                        <Button type="button" variant="ghost" className="w-full" onClick={() => {setShowCamera(false); setCapturedImage(user.photoUrl || null);}}>Cancel Webcam</Button>
+                        <Button type="button" variant="ghost" className="w-full" onClick={() => {
+                            setShowCamera(false); 
+                            setCapturedImage(user.photoUrl || null);
+                            if (videoRef.current && videoRef.current.srcObject) {
+                                (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+                                videoRef.current.srcObject = null;
+                                setHasCameraPermission(null);
+                            }
+                            }}>Cancel Webcam</Button>
                       </div>
                     )}
-                     {capturedImage && showCamera && ( /* Show retake only when camera was active and image captured */
-                       <Button type="button" variant="outline" onClick={handleRetake}><RefreshCw className="mr-2 h-4 w-4" /> Retake Photo</Button>
+                     {capturedImage && !showCamera && ( // Show retake only if an image is captured/exists and camera is now closed
+                       <Button type="button" variant="outline" onClick={handleRetake} className="w-full"><RefreshCw className="mr-2 h-4 w-4" /> Retake Photo</Button>
                      )}
                     <canvas ref={canvasRef} className="hidden"></canvas>
                   </CardContent>
@@ -505,6 +548,3 @@ export default function AdminUserDetailPage() {
     </div>
   );
 }
-
-
-    
