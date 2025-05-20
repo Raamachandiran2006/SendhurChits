@@ -17,7 +17,7 @@ import { CalendarIcon, Loader2, UploadCloud, Camera, RefreshCw, Image as ImageIc
 import { Calendar } from "@/components/ui/calendar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, subYears } from "date-fns";
 import { storage } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import Image from "next/image";
@@ -215,6 +215,9 @@ export function SignupForm() {
     }
   }
 
+  const today = new Date();
+  const hundredYearsAgo = subYears(today, 100);
+
   return (
     <Card className="shadow-xl w-full max-w-2xl mx-auto my-8">
       <CardHeader>
@@ -279,11 +282,12 @@ export function SignupForm() {
                       <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
+                          captionLayout="dropdown-buttons"
                           selected={field.value}
                           onSelect={field.onChange}
-                          disabled={(date) =>
-                            date > new Date() || date < new Date("1900-01-01")
-                          }
+                          fromDate={hundredYearsAgo}
+                          toDate={today}
+                          disabled={(date) => date > new Date() || date < hundredYearsAgo}
                           initialFocus
                         />
                       </PopoverContent>
@@ -477,3 +481,4 @@ export function SignupForm() {
     </Card>
   );
 }
+
