@@ -181,29 +181,11 @@ export default function AdminGroupDetailPage() {
             <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Full Name</TableHead>
-                    <TableHead>Username</TableHead>
-                    <TableHead>Phone Number</TableHead>
-                    <TableHead>Date of Birth</TableHead>
-                  </TableRow>
+                  <TableRow><TableHead>Full Name</TableHead><TableHead>Username</TableHead><TableHead>Phone Number</TableHead><TableHead>Date of Birth</TableHead></TableRow>
                 </TableHeader>
                 <TableBody>
                   {membersDetails.map((member) => (
-                    <TableRow key={member.id}>
-                      <TableCell className="font-medium">{member.fullname}</TableCell>
-                      <TableCell>{member.username}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center">
-                           <Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}
-                        </div>
-                      </TableCell>
-                       <TableCell>
-                        <div className="flex items-center">
-                          <CalendarDays className="mr-2 h-3 w-3 text-muted-foreground" /> {formatDateSafe(member.dob)}
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                    <TableRow key={member.id}><TableCell className="font-medium">{member.fullname}</TableCell><TableCell>{member.username}</TableCell><TableCell><div className="flex items-center"><Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}</div></TableCell><TableCell><div className="flex items-center"><CalendarDays className="mr-2 h-3 w-3 text-muted-foreground" /> {formatDateSafe(member.dob)}</div></TableCell></TableRow>
                   ))}
                 </TableBody>
               </Table>
@@ -214,4 +196,3 @@ export default function AdminGroupDetailPage() {
     </div>
   );
 }
-

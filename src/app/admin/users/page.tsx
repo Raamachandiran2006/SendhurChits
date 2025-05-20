@@ -36,20 +36,24 @@ export default function AdminUsersPage() {
     fetchUsers();
   }, []);
 
-  const formatDateSafe = (dateString: string | undefined | null) => {
+  const formatDateSafe = (dateString: string | undefined | null): string => {
     if (!dateString) {
       return "N/A";
     }
     try {
       const date = new Date(dateString);
+      // Check if the date is valid
       if (isNaN(date.getTime())) {
         return "N/A";
       }
       return format(date, "dd MMM yyyy");
     } catch (e) {
+      // Catch any other errors during date parsing or formatting
+      console.warn("Date formatting error for:", dateString, e);
       return "N/A";
     }
   };
+
 
   if (loading) {
     return (
@@ -90,31 +94,11 @@ export default function AdminUsersPage() {
             <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Full Name</TableHead>
-                    <TableHead>Username (ID)</TableHead>
-                    <TableHead>Phone Number</TableHead>
-                    <TableHead>Date of Birth</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead className="text-right">Groups Joined</TableHead>
-                  </TableRow>
+                  <TableRow><TableHead>Full Name</TableHead><TableHead>Username (ID)</TableHead><TableHead>Phone Number</TableHead><TableHead>Date of Birth</TableHead><TableHead>Role</TableHead><TableHead className="text-right">Groups Joined</TableHead></TableRow>
                 </TableHeader>
                 <TableBody>
                   {users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.fullname}</TableCell>
-                      <TableCell>{user.username}</TableCell> {/* Display internal username */}
-                      <TableCell>{user.phone}</TableCell>
-                      <TableCell>{formatDateSafe(user.dob)}</TableCell>
-                      <TableCell>
-                        {user.isAdmin || user.username === 'admin' ? (
-                          <Badge variant="destructive">Admin</Badge>
-                        ) : (
-                          <Badge variant="secondary">User</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">{user.groups?.length || 0}</TableCell>
-                    </TableRow>
+                    <TableRow key={user.id}><TableCell className="font-medium">{user.fullname}</TableCell><TableCell>{user.username}</TableCell><TableCell>{user.phone}</TableCell><TableCell>{formatDateSafe(user.dob)}</TableCell><TableCell>{user.isAdmin || user.username === 'admin' ? (<Badge variant="destructive">Admin</Badge>) : (<Badge variant="secondary">User</Badge>)}</TableCell><TableCell className="text-right">{user.groups?.length || 0}</TableCell></TableRow>
                   ))}
                 </TableBody>
               </Table>
