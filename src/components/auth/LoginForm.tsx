@@ -13,7 +13,7 @@ import Link from "next/link";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
-  username: z.string().min(1, "Username is required"),
+  username: z.string().min(1, "Username is required"), // This should be phone
   password: z.string().min(1, "Password is required"),
 });
 
@@ -22,20 +22,20 @@ export function LoginForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      username: "",
+      username: "", // Will be used for phone input
       password: "",
     },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    await login(values.username, values.password);
+    await login(values.username, values.password); // Pass username as phone
   }
 
   return (
     <Card className="shadow-xl">
       <CardHeader>
         <CardTitle className="text-3xl font-bold text-center text-primary">ChitConnect Login</CardTitle>
-        <CardDescription className="text-center">Enter your username and password to access your account.</CardDescription>
+        <CardDescription className="text-center">Enter your phone number and password to access your account.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -45,9 +45,9 @@ export function LoginForm() {
               name="username"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Username</FormLabel>
+                  <FormLabel>Phone Number</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., user001" {...field} />
+                    <Input type="tel" placeholder="e.g., 9876543210" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -73,14 +73,7 @@ export function LoginForm() {
           </form>
         </Form>
       </CardContent>
-      <CardFooter className="flex-col">
-        <p className="text-sm text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Button variant="link" asChild className="px-0 text-primary">
-            <Link href="/signup">Sign up</Link>
-          </Button>
-        </p>
-      </CardFooter>
+      {/* Footer with signup link removed */}
     </Card>
   );
 }
