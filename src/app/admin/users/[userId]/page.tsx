@@ -378,7 +378,16 @@ export default function AdminUserDetailPage() {
                 </div>
                 <FormField control={form.control} name="password" render={({ field }) => (<FormItem><FormLabel>New Password (optional)</FormLabel><FormControl><Input type="password" placeholder="Leave blank to keep current password" {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="address" render={({ field }) => (<FormItem><FormLabel>Address</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="referralPerson" render={({ field }) => (<FormItem><FormLabel>Referral Person (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="referralPerson" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Referral Person (Optional)</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value ?? ""} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} 
+                />
                 
                 <Card>
                   <CardHeader><CardTitle className="text-lg">Update Documents (Optional)</CardTitle></CardHeader>
