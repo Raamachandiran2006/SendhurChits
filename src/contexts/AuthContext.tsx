@@ -12,9 +12,7 @@ import {
   getDocs,
   doc,
   setDoc,
-  getDoc,
   runTransaction,
-  Timestamp,
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
@@ -22,7 +20,7 @@ interface AuthContextType {
   user: User | null;
   isAdmin: boolean;
   loading: boolean;
-  login: (usernameOrPhone: string, passwordInput: string) => Promise<void>;
+  login: (phone: string, passwordInput: string) => Promise<void>;
   signup: (userData: Omit<User, "id" | "username" | "groups" | "isAdmin" | "password"> & {password: string}) => Promise<void>;
   logout: () => void;
 }
@@ -41,20 +39,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser) as User;
       setUser(parsedUser);
-      setIsAdmin(parsedUser.username === "admin" || !!parsedUser.isAdmin); // 'admin' is always admin
+      // Admin check: specific username 'admin' OR isAdmin flag is true
+      setIsAdmin(parsedUser.username === "admin" || !!parsedUser.isAdmin);
     }
     setLoading(false);
   }, []);
 
-  const login = async (usernameInput: string, passwordInput: string) => {
+  const login = async (phoneInput: string, passwordInput: string) => {
     setLoading(true);
     try {
       const usersRef = collection(db, "users");
-      const q = query(usersRef, where("username", "==", usernameInput));
+      // Login using phone number
+      const q = query(usersRef, where("phone", "==", phoneInput));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        toast({ title: "Login Failed", description: "Invalid username or password.", variant: "destructive" });
+        toast({ title: "Login Failed", description: "Invalid phone number or password.", variant: "destructive" });
         setLoading(false);
         return;
       }
@@ -62,8 +62,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userData = querySnapshot.docs[0].data() as Omit<User, "id">;
       const userId = querySnapshot.docs[0].id;
 
-      if (userData.password !== passwordInput) { // Direct password comparison (NOT SECURE for production)
-        toast({ title: "Login Failed", description: "Invalid username or password.", variant: "destructive" });
+      // WARNING: Plain text password comparison. NOT FOR PRODUCTION.
+      if (userData.password !== passwordInput) { 
+        toast({ title: "Login Failed", description: "Invalid phone number or password.", variant: "destructive" });
         setLoading(false);
         return;
       }
@@ -100,14 +101,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const counterRef = doc(db, "metadata", "counters");
-      let newUsername = "";
+      let newUsername = ""; // This will be the auto-generated user00X ID
 
       await runTransaction(db, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
         let userCount = 0;
         if (!counterDoc.exists()) {
-          transaction.set(counterRef, { userCount: 1 });
-          userCount = 0;
+          // Initialize counter if it doesn't exist
+          transaction.set(counterRef, { userCount: 1 }); // Start with 1, so first user is user001
+          userCount = 0; // Next user will be user001
         } else {
           userCount = counterDoc.data().userCount;
           transaction.update(counterRef, { userCount: userCount + 1 });
@@ -115,17 +117,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         newUsername = `user${String(userCount + 1).padStart(3, "0")}`;
       });
       
-      const newUserDocRef = doc(collection(db, "users"));
+      const newUserDocRef = doc(collection(db, "users")); // Auto-generate Firestore document ID
       const newUser: Omit<User, "id"> = {
-        ...userData,
-        username: newUsername,
-        groups: [],
-        isAdmin: newUsername === "admin", // First user or 'admin' could be admin
+        username: newUsername, // Store the generated user00X ID
+        fullname: userData.fullname,
+        phone: userData.phone, // Store phone, used for login
+        dob: userData.dob,
+        password: userData.password, // WARNING: Plain text password. NOT FOR PRODUCTION.
+        address: userData.address,
+        referralPerson: userData.referralPerson || "",
+        aadhaarCardUrl: userData.aadhaarCardUrl || "",
+        panCardUrl: userData.panCardUrl || "",
+        photoUrl: userData.photoUrl || "",
+        groups: [], // Initialize with empty groups array
+        isAdmin: newUsername === "admin", // Special case for 'admin' username
       };
 
       await setDoc(newUserDocRef, newUser);
       
-      toast({ title: "Signup Successful", description: `Welcome, ${newUser.fullname}! Your username is ${newUser.username}.` });
+      toast({ title: "Signup Successful", description: `Welcome, ${newUser.fullname}! You can now log in with your phone number.` });
       router.push("/login");
     } catch (error) {
       console.error("Signup error:", error);
