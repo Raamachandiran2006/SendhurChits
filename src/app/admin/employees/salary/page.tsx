@@ -11,10 +11,14 @@ import Link from "next/link";
 import { Loader2, DollarSign, PlusCircle, ArrowLeft, ListChecks } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, parseISO } from "date-fns";
+import { useSearchParams } from "next/navigation"; // Import useSearchParams
 
 export default function SalaryManagementPage() {
   const [salaryHistory, setSalaryHistory] = useState<SalaryRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const searchParams = useSearchParams(); // Get search params
+
+  const refreshId = searchParams.get('refreshId'); // Get the refreshId
 
   useEffect(() => {
     const fetchSalaryHistory = async () => {
@@ -33,7 +37,7 @@ export default function SalaryManagementPage() {
       }
     };
     fetchSalaryHistory();
-  }, []);
+  }, [refreshId]); // Add refreshId to the dependency array
 
   const formatDateSafe = (dateString: string | undefined | null): string => {
     if (!dateString) return "N/A";

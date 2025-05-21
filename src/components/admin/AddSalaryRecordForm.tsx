@@ -88,8 +88,7 @@ export function AddSalaryRecordForm() {
       });
 
       toast({ title: "Salary Record Added", description: `Salary for ${selectedEmployee.fullname} recorded successfully.` });
-      router.push("/admin/employees/salary");
-      router.refresh(); // Force a refresh of the target route
+      router.push(`/admin/employees/salary?refreshId=${Date.now()}`);
     } catch (error) {
       console.error("Salary record submission error:", error);
       toast({ title: "Error", description: "Could not add salary record. " + (error as Error).message, variant: "destructive" });
