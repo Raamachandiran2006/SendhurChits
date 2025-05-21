@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Layers, PlusCircle, LogOut, Settings } from "lucide-react";
+import { Home, Users, Layers, PlusCircle, LogOut, Briefcase } from "lucide-react"; // Added Briefcase for Employees
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,22 +15,21 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
-  SidebarProvider,
-  SidebarTrigger
-} from "@/components/ui/sidebar"; // Assuming sidebar is installed and configured
+} from "@/components/ui/sidebar"; 
 import Image from "next/image";
 
 
 const navItems = [
   { href: "/admin", label: "Overview", icon: Home },
-  { href: "/admin/users", label: "View Users", icon: Users },
-  { href: "/admin/groups", label: "View Groups", icon: Layers },
-  { href: "/admin/groups/create", label: "Create Group", icon: PlusCircle },
+  { href: "/admin/users", label: "Manage Users", icon: Users },
+  { href: "/admin/groups", label: "Manage Groups", icon: Layers },
+  { href: "/admin/employees", label: "Manage Employees", icon: Briefcase }, // New Employee Link
+  { href: "/admin/groups/create", label: "Create Group", icon: PlusCircle, className: "mt-auto pt-2 border-t border-sidebar-border" }, // Moved create group lower
 ];
 
 export function AdminSidebar() {
   const pathname = usePathname();
-  const { logout, user } = useAuth();
+  const { logout } = useAuth();
 
   return (
      <Sidebar className="border-r" collapsible="icon">
@@ -45,10 +44,10 @@ export function AdminSidebar() {
             <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">ChitConnect</span>
           </Link>
         </SidebarHeader>
-        <SidebarContent className="p-2">
-          <SidebarMenu>
+        <SidebarContent className="p-2 flex flex-col">
+          <SidebarMenu className="flex-grow">
             {navItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
+              <SidebarMenuItem key={item.href} className={item.className}>
                 <SidebarMenuButton
                   asChild
                   isActive={pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))}

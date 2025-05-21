@@ -2,7 +2,7 @@
 "use client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Layers, BarChart3, Settings, PlusCircle } from "lucide-react";
+import { Users, Layers, BarChart3, PlusCircle, Briefcase } from "lucide-react"; // Added Briefcase
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
@@ -13,6 +13,7 @@ export default function AdminOverviewPage() {
   const { user } = useAuth();
   const [userCount, setUserCount] = useState(0);
   const [groupCount, setGroupCount] = useState(0);
+  const [employeeCount, setEmployeeCount] = useState(0); // Placeholder for employee count
 
   useEffect(() => {
     const fetchData = async () => {
@@ -21,6 +22,9 @@ export default function AdminOverviewPage() {
         setUserCount(usersSnapshot.size);
         const groupsSnapshot = await getDocs(collection(db, "groups"));
         setGroupCount(groupsSnapshot.size);
+        // Fetch employee count (assuming 'employees' collection)
+        const employeesSnapshot = await getDocs(collection(db, "employees"));
+        setEmployeeCount(employeesSnapshot.size);
       } catch (error) {
         console.error("Error fetching admin overview data:", error);
       }
@@ -54,6 +58,16 @@ export default function AdminOverviewPage() {
         </Card>
         <Card className="shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
+            <Briefcase className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{employeeCount}</div>
+            <p className="text-xs text-muted-foreground">Registered employees</p>
+          </CardContent>
+        </Card>
+         <Card className="shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">System Status</CardTitle>
             <BarChart3 className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
@@ -77,6 +91,9 @@ export default function AdminOverviewPage() {
             <Button asChild className="w-full justify-start" variant="outline">
               <Link href="/admin/groups"><Layers className="mr-2 h-4 w-4" /> Manage Groups</Link>
             </Button>
+            <Button asChild className="w-full justify-start" variant="outline">
+              <Link href="/admin/employees"><Briefcase className="mr-2 h-4 w-4" /> Manage Employees</Link>
+            </Button>
             <Button asChild className="w-full justify-start" variant="default">
               <Link href="/admin/groups/create"><PlusCircle className="mr-2 h-4 w-4" /> Create New Group</Link>
             </Button>
@@ -91,6 +108,7 @@ export default function AdminOverviewPage() {
             <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
               <li>Regularly review user activity.</li>
               <li>Ensure group details are accurate and up-to-date.</li>
+              <li>Monitor employee activities and performance.</li>
               <li>Monitor system performance and report any issues.</li>
               <li>Keep your admin credentials secure.</li>
             </ul>
@@ -100,4 +118,3 @@ export default function AdminOverviewPage() {
     </div>
   );
 }
-
