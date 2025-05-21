@@ -24,4 +24,8 @@ export interface Group {
   members: string[]; // Array of usernames (the auto-generated ones)
   tenure?: number; // Number of months
   startDate?: string; // YYYY-MM-DD
+  rate?: number; // Optional: e.g., interest rate or dividend rate percentage
+  commission?: number; // Optional: foreman commission percentage
+  biddingType?: "auction" | "random" | "pre-fixed"; // Optional: type of bidding
+  minBid?: number; // Optional: minimum bid amount
 }

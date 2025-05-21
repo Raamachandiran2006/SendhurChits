@@ -9,7 +9,7 @@ import { doc, getDoc, collection, query, where, getDocs } from "firebase/firesto
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Loader2, ArrowLeft, Users as GroupIcon, User as UserIcon, Info, AlertTriangle, Phone, Mail, CalendarDays, Landmark, Users, Clock } from "lucide-react";
+import { Loader2, ArrowLeft, Users as GroupIcon, User as UserIcon, Info, AlertTriangle, Phone, Mail, CalendarDays, Landmark, Users, Clock, Percent, Tag, LandmarkIcon, SearchCode } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
@@ -18,9 +18,7 @@ import { format, parseISO } from "date-fns";
 const formatDateSafe = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
   if (!dateString) return "N/A";
   try {
-    // Check if the dateString is already in 'yyyy-MM-dd' format from Firestore
-    // or if it's a full ISO string that might come from other date objects.
-    const date = dateString.includes('T') ? parseISO(dateString) : new Date(dateString + 'T00:00:00'); // Assume UTC if only date part
+    const date = dateString.includes('T') ? parseISO(dateString) : new Date(dateString + 'T00:00:00');
     if (isNaN(date.getTime())) return "N/A";
     return format(date, outputFormat);
   } catch (e) {
@@ -28,6 +26,15 @@ const formatDateSafe = (dateString: string | undefined | null, outputFormat: str
   }
 };
 
+const getBiddingTypeLabel = (type: string | undefined) => {
+  if (!type) return "N/A";
+  switch (type) {
+    case "auction": return "Auction Based";
+    case "random": return "Random Draw";
+    case "pre-fixed": return "Pre-fixed";
+    default: return type; // Or "N/A" if unrecognized
+  }
+};
 
 export default function AdminGroupDetailPage() {
   const params = useParams();
@@ -50,7 +57,6 @@ export default function AdminGroupDetailPage() {
       setLoading(true);
       setError(null);
       try {
-        // Fetch group details
         const groupDocRef = doc(db, "groups", groupId);
         const groupDocSnap = await getDoc(groupDocRef);
 
@@ -62,11 +68,10 @@ export default function AdminGroupDetailPage() {
         const groupData = { id: groupDocSnap.id, ...groupDocSnap.data() } as Group;
         setGroup(groupData);
 
-        // Fetch members details if group has members
         if (groupData.members && groupData.members.length > 0) {
           const memberUsernames = groupData.members;
           const fetchedMembers: User[] = [];
-          const batchSize = 30; // Firestore 'in' query limit (actually 30 per array, but good practice)
+          const batchSize = 30; 
 
           for (let i = 0; i < memberUsernames.length; i += batchSize) {
             const batchUsernames = memberUsernames.slice(i, i + batchSize);
@@ -167,6 +172,30 @@ export default function AdminGroupDetailPage() {
               <Info className="mr-2 h-4 w-4 text-muted-foreground" />
               <span>Group ID: {group.id}</span>
             </div>
+            {group.rate !== undefined && (
+              <div className="flex items-center">
+                <Percent className="mr-2 h-4 w-4 text-muted-foreground" />
+                <span>Rate: {group.rate}%</span>
+              </div>
+            )}
+            {group.commission !== undefined && (
+              <div className="flex items-center">
+                <Tag className="mr-2 h-4 w-4 text-muted-foreground" />
+                <span>Commission: {group.commission}%</span>
+              </div>
+            )}
+            {group.biddingType && (
+              <div className="flex items-center">
+                <SearchCode className="mr-2 h-4 w-4 text-muted-foreground" />
+                <span>Bidding Type: {getBiddingTypeLabel(group.biddingType)}</span>
+              </div>
+            )}
+            {group.minBid !== undefined && (
+              <div className="flex items-center">
+                <LandmarkIcon className="mr-2 h-4 w-4 text-muted-foreground" /> {/* Reusing for Min Bid */}
+                <span>Min Bid Amount: ₹{group.minBid.toLocaleString()}</span>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

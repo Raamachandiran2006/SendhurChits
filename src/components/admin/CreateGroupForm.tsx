@@ -17,9 +17,10 @@ import { useEffect, useState } from "react";
 import type { User } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, PlusCircle, Users, CalendarIcon, CalendarDays, Clock } from "lucide-react";
+import { Loader2, PlusCircle, Users, CalendarIcon, Percent, Tag, LandmarkIcon, SearchCode } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { format, subYears } from "date-fns";
 
@@ -32,6 +33,21 @@ const groupFormSchema = z.object({
   memberUsernames: z.array(z.string()).min(1, "At least one member must be selected"),
   tenure: z.coerce.number().int().min(1, "Tenure must be at least 1 month"),
   startDate: z.date({ required_error: "Start date is required." }),
+  rate: z.preprocess(
+    (val) => (val === "" ? undefined : val),
+    z.coerce.number({ invalid_type_error: "Rate must be a number" }).positive("Rate must be a positive number").optional()
+  ),
+  commission: z.preprocess(
+    (val) => (val === "" ? undefined : val),
+    z.coerce.number({ invalid_type_error: "Commission must be a number" }).positive("Commission must be a positive number").optional()
+  ),
+  biddingType: z.enum(["auction", "random", "pre-fixed"], {
+    errorMap: () => ({ message: "Please select a valid bidding type." }),
+  }).optional(),
+  minBid: z.preprocess(
+    (val) => (val === "" ? undefined : val),
+    z.coerce.number({ invalid_type_error: "Minimum bid must be a number" }).positive("Minimum bid must be a positive number").optional()
+  ),
 });
 
 export function CreateGroupForm() {
@@ -49,8 +65,12 @@ export function CreateGroupForm() {
       totalPeople: 10,
       totalAmount: 100000,
       memberUsernames: [],
-      tenure: 10, // Default to 10 months
+      tenure: 10,
       startDate: new Date(),
+      rate: undefined,
+      commission: undefined,
+      biddingType: undefined,
+      minBid: undefined,
     },
   });
 
@@ -58,7 +78,6 @@ export function CreateGroupForm() {
     const fetchUsers = async () => {
       setLoadingUsers(true);
       try {
-        // Fetch non-admin users
         const usersRef = collection(db, "users");
         const q = query(usersRef, where("isAdmin", "!=", true)); 
         const querySnapshot = await getDocs(q);
@@ -77,16 +96,24 @@ export function CreateGroupForm() {
   async function onSubmit(values: z.infer<typeof groupFormSchema>) {
     setIsSubmitting(true);
     try {
-      const newGroupRef = await addDoc(collection(db, "groups"), {
+      const groupData: any = { // Use any for type flexibility before passing to Firestore
         groupName: values.groupName,
         description: values.description,
         totalPeople: values.totalPeople,
         totalAmount: values.totalAmount,
         members: values.memberUsernames, 
-        tenure: values.tenure, // Store as number
+        tenure: values.tenure,
         startDate: format(values.startDate, "yyyy-MM-dd"),
-      });
+      };
 
+      // Add optional fields only if they have a value
+      if (values.rate !== undefined && values.rate !== null && !isNaN(values.rate)) groupData.rate = values.rate;
+      if (values.commission !== undefined && values.commission !== null && !isNaN(values.commission)) groupData.commission = values.commission;
+      if (values.biddingType) groupData.biddingType = values.biddingType;
+      if (values.minBid !== undefined && values.minBid !== null && !isNaN(values.minBid)) groupData.minBid = values.minBid;
+
+
+      const newGroupRef = await addDoc(collection(db, "groups"), groupData);
       const groupId = newGroupRef.id;
 
       const batch = writeBatch(db);
@@ -129,55 +156,35 @@ export function CreateGroupForm() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="groupName"
-              render={({ field }) => (
+            <FormField control={form.control} name="groupName" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Group Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., January 2025 Chit" {...field} />
-                  </FormControl>
+                  <FormControl><Input placeholder="e.g., January 2025 Chit" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
+            <FormField control={form.control} name="description" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Chit Details (Description)</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Describe the chit group, rules, etc." {...field} />
-                  </FormControl>
+                  <FormControl><Textarea placeholder="Describe the chit group, rules, etc." {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="totalPeople"
-                render={({ field }) => (
+              <FormField control={form.control} name="totalPeople" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Total Number of People</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="10" {...field} />
-                    </FormControl>
+                    <FormControl><Input type="number" placeholder="10" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="totalAmount"
-                render={({ field }) => (
+              <FormField control={form.control} name="totalAmount" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Group Total Amount (₹)</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="100000" {...field} />
-                    </FormControl>
+                    <FormControl><Input type="number" placeholder="100000" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -185,57 +192,28 @@ export function CreateGroupForm() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="tenure"
-                render={({ field }) => (
+              <FormField control={form.control} name="tenure" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tenure</FormLabel>
                     <div className="flex items-center gap-2">
-                      <FormControl>
-                        <Input type="number" placeholder="10" {...field} className="w-1/2"/>
-                      </FormControl>
+                      <FormControl><Input type="number" placeholder="10" {...field} className="w-1/2"/></FormControl>
                       <span className="text-muted-foreground">months</span>
                     </div>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="startDate"
-                render={({ field }) => (
+              <FormField control={form.control} name="startDate" render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Start Date</FormLabel>
                     <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
+                      <PopoverTrigger asChild><FormControl>
+                          <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
+                          </Button></FormControl></PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          captionLayout="dropdown-buttons"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          fromDate={subYears(today, 1)} 
-                          toDate={fiveYearsFromNow} 
-                          initialFocus
-                        />
+                        <Calendar mode="single" captionLayout="dropdown-buttons" selected={field.value} onSelect={field.onChange} fromDate={subYears(today, 1)} toDate={fiveYearsFromNow} initialFocus />
                       </PopoverContent>
                     </Popover>
                     <FormMessage />
@@ -243,17 +221,67 @@ export function CreateGroupForm() {
                 )}
               />
             </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField control={form.control} name="rate" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Rate (%)</FormLabel>
+                        <div className="flex items-center gap-2">
+                            <FormControl><Input type="number" placeholder="e.g., 5" {...field} value={field.value ?? ''} /></FormControl>
+                             <Percent className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+                <FormField control={form.control} name="commission" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Commission (%)</FormLabel>
+                         <div className="flex items-center gap-2">
+                            <FormControl><Input type="number" placeholder="e.g., 2" {...field} value={field.value ?? ''} /></FormControl>
+                            <Percent className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+            </div>
 
-            <FormField
-              control={form.control}
-              name="memberUsernames"
-              render={() => (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField control={form.control} name="biddingType" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Bidding Type</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select bidding type" />
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                <SelectItem value="auction">Auction Based</SelectItem>
+                                <SelectItem value="random">Random Draw</SelectItem>
+                                <SelectItem value="pre-fixed">Pre-fixed</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+                <FormField control={form.control} name="minBid" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Min Bid Amount (₹)</FormLabel>
+                        <div className="flex items-center gap-2">
+                          <LandmarkIcon className="h-4 w-4 text-muted-foreground" />
+                          <FormControl><Input type="number" placeholder="e.g., 1000" {...field} value={field.value ?? ''} /></FormControl>
+                        </div>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+            </div>
+
+
+            <FormField control={form.control} name="memberUsernames" render={() => (
                 <FormItem>
                   <div className="mb-4">
                     <FormLabel className="text-base">Select Members</FormLabel>
-                    <FormDescription>
-                      Choose users to add to this group.
-                    </FormDescription>
+                    <FormDescription>Choose users to add to this group.</FormDescription>
                   </div>
                   {loadingUsers ? (
                      <div className="flex items-center space-x-2">
@@ -266,19 +294,12 @@ export function CreateGroupForm() {
                     <ScrollArea className="h-64 rounded-md border p-4">
                       <div className="space-y-2">
                       {users.map((user) => (
-                        <FormField
-                          key={user.id}
-                          control={form.control}
-                          name="memberUsernames"
+                        <FormField key={user.id} control={form.control} name="memberUsernames"
                           render={({ field }) => {
                             return (
-                              <FormItem
-                                key={user.id}
-                                className="flex flex-row items-start space-x-3 space-y-0"
-                              >
+                              <FormItem key={user.id} className="flex flex-row items-start space-x-3 space-y-0">
                                 <FormControl>
-                                  <Checkbox
-                                    checked={field.value?.includes(user.username)}
+                                  <Checkbox checked={field.value?.includes(user.username)}
                                     onCheckedChange={(checked) => {
                                       return checked
                                         ? field.onChange([...(field.value || []), user.username])
@@ -290,9 +311,7 @@ export function CreateGroupForm() {
                                     }}
                                   />
                                 </FormControl>
-                                <FormLabel className="font-normal">
-                                  {user.fullname} (@{user.username})
-                                </FormLabel>
+                                <FormLabel className="font-normal">{user.fullname} (@{user.username})</FormLabel>
                               </FormItem>
                             );
                           }}
