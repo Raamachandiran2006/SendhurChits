@@ -5,13 +5,14 @@ import { useEffect, useState } from "react";
 import type { Group } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Loader2, Layers, PlusCircle, Users, Landmark } from "lucide-react";
+import { Loader2, Layers, PlusCircle, Users, Landmark, CalendarClock, Megaphone, Clock, CalendarDays, Info } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 export default function AdminGroupsPage() {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -61,6 +62,46 @@ export default function AdminGroupsPage() {
         </Button>
       </div>
 
+      <Card className="mb-8 shadow-lg">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <Megaphone className="h-6 w-6 text-primary" />
+            <CardTitle className="text-xl">Upcoming Auctions Details</CardTitle>
+          </div>
+          <CardDescription>Information about the next scheduled auction events.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div className="flex items-center p-3 bg-secondary/50 rounded-md">
+            <CalendarClock className="mr-3 h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="font-semibold text-foreground">Auction Month</p>
+              <p className="text-muted-foreground">{format(new Date(), "MMMM yyyy")}</p> {/* Placeholder: Current month */}
+            </div>
+          </div>
+          <div className="flex items-center p-3 bg-secondary/50 rounded-md">
+            <CalendarDays className="mr-3 h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="font-semibold text-foreground">Scheduled Date</p>
+              <p className="text-muted-foreground">15th {format(new Date(), "MMMM yyyy")}</p> {/* Placeholder */}
+            </div>
+          </div>
+          <div className="flex items-center p-3 bg-secondary/50 rounded-md">
+            <Clock className="mr-3 h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="font-semibold text-foreground">Scheduled Time</p>
+              <p className="text-muted-foreground">02:00 PM IST</p> {/* Placeholder */}
+            </div>
+          </div>
+          <div className="flex items-center p-3 bg-secondary/50 rounded-md">
+            <Info className="mr-3 h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="font-semibold text-foreground">Latest Auction</p>
+              <p className="text-muted-foreground">Group Alpha - Bid at ₹85,000</p> {/* Placeholder */}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {groups.length === 0 ? (
         <Card className="text-center py-10 shadow-lg">
           <CardHeader>
@@ -107,9 +148,9 @@ export default function AdminGroupsPage() {
                     )}
                   </div>
                 </CardContent>
-                <CardContent className="border-t pt-4 mt-auto">
+                <CardFooter className="border-t pt-4 mt-auto">
                   <p className="text-xs text-muted-foreground">Group ID: {group.id}</p>
-                </CardContent>
+                </CardFooter>
               </Card>
             </Link>
           ))}
