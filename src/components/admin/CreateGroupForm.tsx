@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 import type { User } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, PlusCircle, Users, CalendarIcon, Percent, Tag, LandmarkIcon, SearchCode } from "lucide-react";
+import { Loader2, PlusCircle, Users, CalendarIcon, Tag, LandmarkIcon, SearchCode } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -33,9 +33,9 @@ const groupFormSchema = z.object({
   memberUsernames: z.array(z.string()).min(1, "At least one member must be selected"),
   tenure: z.coerce.number().int().min(1, "Tenure must be at least 1 month"),
   startDate: z.date({ required_error: "Start date is required." }),
-  rate: z.preprocess(
+  rate: z.preprocess( // Now "Monthly Installment (₹)"
     (val) => (val === "" ? undefined : val),
-    z.coerce.number({ invalid_type_error: "Rate must be a number" }).positive("Rate must be a positive number").optional()
+    z.coerce.number({ invalid_type_error: "Monthly Installment must be a number" }).positive("Monthly Installment must be a positive number").optional()
   ),
   commission: z.preprocess(
     (val) => (val === "" ? undefined : val),
@@ -67,7 +67,7 @@ export function CreateGroupForm() {
       memberUsernames: [],
       tenure: 10,
       startDate: new Date(),
-      rate: undefined,
+      rate: undefined, // Monthly Installment
       commission: undefined,
       biddingType: undefined,
       minBid: undefined,
@@ -96,7 +96,7 @@ export function CreateGroupForm() {
   async function onSubmit(values: z.infer<typeof groupFormSchema>) {
     setIsSubmitting(true);
     try {
-      const groupData: any = { // Use any for type flexibility before passing to Firestore
+      const groupData: any = { 
         groupName: values.groupName,
         description: values.description,
         totalPeople: values.totalPeople,
@@ -106,8 +106,7 @@ export function CreateGroupForm() {
         startDate: format(values.startDate, "yyyy-MM-dd"),
       };
 
-      // Add optional fields only if they have a value
-      if (values.rate !== undefined && values.rate !== null && !isNaN(values.rate)) groupData.rate = values.rate;
+      if (values.rate !== undefined && values.rate !== null && !isNaN(values.rate)) groupData.rate = values.rate; // Monthly Installment
       if (values.commission !== undefined && values.commission !== null && !isNaN(values.commission)) groupData.commission = values.commission;
       if (values.biddingType) groupData.biddingType = values.biddingType;
       if (values.minBid !== undefined && values.minBid !== null && !isNaN(values.minBid)) groupData.minBid = values.minBid;
@@ -223,12 +222,12 @@ export function CreateGroupForm() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField control={form.control} name="rate" render={({ field }) => (
+                <FormField control={form.control} name="rate" render={({ field }) => ( // Renamed label for 'rate'
                     <FormItem>
-                        <FormLabel>Rate (%)</FormLabel>
+                        <FormLabel>Monthly Installment (₹)</FormLabel>
                         <div className="flex items-center gap-2">
-                            <FormControl><Input type="number" placeholder="e.g., 5" {...field} value={field.value ?? ''} /></FormControl>
-                             <Percent className="h-4 w-4 text-muted-foreground" />
+                            <LandmarkIcon className="h-4 w-4 text-muted-foreground" />
+                            <FormControl><Input type="number" placeholder="e.g., 5000" {...field} value={field.value ?? ''} /></FormControl>
                         </div>
                         <FormMessage />
                     </FormItem>
@@ -238,7 +237,7 @@ export function CreateGroupForm() {
                         <FormLabel>Commission (%)</FormLabel>
                          <div className="flex items-center gap-2">
                             <FormControl><Input type="number" placeholder="e.g., 2" {...field} value={field.value ?? ''} /></FormControl>
-                            <Percent className="h-4 w-4 text-muted-foreground" />
+                            <Tag className="h-4 w-4 text-muted-foreground" /> 
                         </div>
                         <FormMessage />
                     </FormItem>
@@ -334,3 +333,5 @@ export function CreateGroupForm() {
     </Card>
   );
 }
+
+    

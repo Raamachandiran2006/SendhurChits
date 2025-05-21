@@ -32,7 +32,7 @@ const getBiddingTypeLabel = (type: string | undefined) => {
     case "auction": return "Auction Based";
     case "random": return "Random Draw";
     case "pre-fixed": return "Pre-fixed";
-    default: return type; // Or "N/A" if unrecognized
+    default: return type; 
   }
 };
 
@@ -172,10 +172,10 @@ export default function AdminGroupDetailPage() {
               <Info className="mr-2 h-4 w-4 text-muted-foreground" />
               <span>Group ID: {group.id}</span>
             </div>
-            {group.rate !== undefined && (
+            {group.rate !== undefined && ( // Changed from rate (%) to Monthly Installment (₹)
               <div className="flex items-center">
-                <Percent className="mr-2 h-4 w-4 text-muted-foreground" />
-                <span>Rate: {group.rate}%</span>
+                <LandmarkIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                <span>Monthly Installment: ₹{group.rate.toLocaleString()}</span>
               </div>
             )}
             {group.commission !== undefined && (
@@ -192,7 +192,7 @@ export default function AdminGroupDetailPage() {
             )}
             {group.minBid !== undefined && (
               <div className="flex items-center">
-                <LandmarkIcon className="mr-2 h-4 w-4 text-muted-foreground" /> {/* Reusing for Min Bid */}
+                <LandmarkIcon className="mr-2 h-4 w-4 text-muted-foreground" />
                 <span>Min Bid Amount: ₹{group.minBid.toLocaleString()}</span>
               </div>
             )}
@@ -232,3 +232,5 @@ export default function AdminGroupDetailPage() {
     </div>
   );
 }
+
+    
