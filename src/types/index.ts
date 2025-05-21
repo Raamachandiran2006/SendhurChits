@@ -45,3 +45,14 @@ export interface Employee {
   joiningDate: string; // YYYY-MM-DD
   salary?: number; // Optional monthly salary
 }
+
+export interface SalaryRecord {
+  id: string; // Firestore document ID
+  employeeDocId: string; // Firestore document ID of the employee from 'employees' collection
+  employeeReadableId: string; // Human-readable employeeId (e.g., EMP001)
+  employeeName: string; // Full name of the employee for easier display
+  amount: number;
+  paymentDate: string; // YYYY-MM-DD
+  remarks?: string;
+  recordedAt: import('firebase/firestore').Timestamp; // Firestore Timestamp
+}

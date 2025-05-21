@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Briefcase, Users, PlusCircle, Eye } from "lucide-react";
+import { Briefcase, Users, PlusCircle, Eye, DollarSign } from "lucide-react";
 import Link from "next/link";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -62,22 +62,25 @@ export default function AdminEmployeesPage() {
           <CardTitle>Employee Actions</CardTitle>
           <CardDescription>Manage your workforce efficiently.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Button asChild className="w-full sm:w-auto bg-accent text-accent-foreground hover:bg-accent/90">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
             <Link href="/admin/employees/add">
               <PlusCircle className="mr-2 h-4 w-4" /> Add New Employee
             </Link>
           </Button>
-          <Button asChild variant="outline" className="w-full sm:w-auto ml-0 sm:ml-4">
+          <Button asChild variant="outline">
             <Link href="/admin/employees/view">
               <Eye className="mr-2 h-4 w-4" /> View All Employees
             </Link>
           </Button>
-          {/* More options can be added here later */}
+          <Button asChild variant="outline">
+            <Link href="/admin/employees/salary">
+              <DollarSign className="mr-2 h-4 w-4" /> Manage Salary
+            </Link>
+          </Button>
         </CardContent>
       </Card>
 
-      {/* Placeholder for future content like recent activity or pending tasks */}
       <div className="mt-8">
         {/* Example: <EmployeeActivityFeed /> */}
       </div>
