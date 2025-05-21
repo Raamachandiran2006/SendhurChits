@@ -24,25 +24,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { format, subYears } from "date-fns";
 
-// Helper for parsing optional positive integer fields
-const optionalPositiveIntegerField = (fieldName: string) => z.preprocess(
-  (val) => {
-    if (val === "" || val === null || val === undefined) return undefined;
-    return String(val).trim();
-  },
-  z.string()
-    .optional()
-    .transform(valStr => {
-      if (valStr === undefined) return undefined;
-      // Ensure it's a string of digits before parsing
-      if (!/^\d+$/.test(valStr)) return NaN; 
-      return parseInt(valStr, 10);
-    })
-    .refine(val => val === undefined || (!isNaN(val) && val > 0), {
-      message: `${fieldName} must be a positive whole number.`,
-    })
-);
-
 const groupFormSchema = z.object({
   groupName: z.string().min(3, "Group name must be at least 3 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
@@ -51,12 +32,12 @@ const groupFormSchema = z.object({
   memberUsernames: z.array(z.string()).min(1, "At least one member must be selected"),
   tenure: z.coerce.number().int().min(1, "Tenure must be at least 1 month"),
   startDate: z.date({ required_error: "Start date is required." }),
-  rate: optionalPositiveIntegerField("Monthly Installment"),
-  commission: optionalPositiveIntegerField("Commission"),
+  rate: z.number().int("Monthly Installment must be a whole number.").positive("Monthly Installment must be positive.").optional(),
+  commission: z.number().int("Commission must be a whole number.").positive("Commission must be positive.").optional(),
   biddingType: z.enum(["auction", "random", "pre-fixed"], {
     errorMap: () => ({ message: "Please select a valid bidding type." }),
   }).optional(),
-  minBid: optionalPositiveIntegerField("Min Bid Amount"),
+  minBid: z.number().int("Min Bid Amount must be a whole number.").positive("Min Bid Amount must be positive.").optional(),
 });
 
 export function CreateGroupForm() {
@@ -76,7 +57,7 @@ export function CreateGroupForm() {
       memberUsernames: [],
       tenure: 10,
       startDate: new Date(),
-      rate: undefined, // Monthly Installment
+      rate: undefined,
       commission: undefined,
       biddingType: undefined,
       minBid: undefined,
@@ -155,6 +136,20 @@ export function CreateGroupForm() {
   
   const today = new Date();
   const fiveYearsFromNow = subYears(today, -5); 
+
+
+  const handleNumericInputChange = (event: React.ChangeEvent<HTMLInputElement>, field: any) => {
+    const strVal = event.target.value;
+    if (strVal.trim() === '') {
+      field.onChange(undefined);
+    } else if (/^\d+$/.test(strVal.trim())) {
+      field.onChange(parseInt(strVal.trim(), 10));
+    } else {
+      // Keep current value or set to NaN for Zod to catch as invalid if not purely numeric
+      // Or, pass the string directly if Zod schema handles non-numeric string validation
+      field.onChange(strVal); // Let Zod handle non-numeric strings if schema allows
+    }
+  };
 
 
   return (
@@ -243,7 +238,15 @@ export function CreateGroupForm() {
                         <FormLabel>Monthly Installment (₹)</FormLabel>
                         <div className="flex items-center gap-2">
                             <LandmarkIcon className="h-4 w-4 text-muted-foreground" />
-                            <FormControl><Input type="number" placeholder="e.g., 5000" {...field} value={field.value === undefined ? '' : String(field.value)} onChange={e => field.onChange(e.target.value === '' ? undefined : e.target.value)} /></FormControl>
+                            <FormControl>
+                              <Input 
+                                type="text" 
+                                placeholder="e.g., 5000" 
+                                {...field} 
+                                value={field.value === undefined ? '' : String(field.value)} 
+                                onChange={e => handleNumericInputChange(e, field)}
+                              />
+                            </FormControl>
                         </div>
                         <FormMessage />
                     </FormItem>
@@ -252,7 +255,15 @@ export function CreateGroupForm() {
                     <FormItem>
                         <FormLabel>Commission (%)</FormLabel>
                          <div className="flex items-center gap-2">
-                            <FormControl><Input type="number" placeholder="e.g., 2" {...field} value={field.value === undefined ? '' : String(field.value)} onChange={e => field.onChange(e.target.value === '' ? undefined : e.target.value)} /></FormControl>
+                            <FormControl>
+                              <Input 
+                                type="text" 
+                                placeholder="e.g., 2" 
+                                {...field} 
+                                value={field.value === undefined ? '' : String(field.value)} 
+                                onChange={e => handleNumericInputChange(e, field)}
+                              />
+                            </FormControl>
                             <Tag className="h-4 w-4 text-muted-foreground" /> 
                         </div>
                         <FormMessage />
@@ -284,7 +295,15 @@ export function CreateGroupForm() {
                         <FormLabel>Min Bid Amount (₹)</FormLabel>
                         <div className="flex items-center gap-2">
                           <LandmarkIcon className="h-4 w-4 text-muted-foreground" />
-                          <FormControl><Input type="number" placeholder="e.g., 1000" {...field} value={field.value === undefined ? '' : String(field.value)} onChange={e => field.onChange(e.target.value === '' ? undefined : e.target.value)} /></FormControl>
+                          <FormControl>
+                            <Input 
+                              type="text" 
+                              placeholder="e.g., 1000" 
+                              {...field} 
+                              value={field.value === undefined ? '' : String(field.value)} 
+                              onChange={e => handleNumericInputChange(e, field)}
+                            />
+                          </FormControl>
                         </div>
                         <FormMessage />
                     </FormItem>
@@ -349,5 +368,3 @@ export function CreateGroupForm() {
     </Card>
   );
 }
-
-      
