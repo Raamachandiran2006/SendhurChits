@@ -24,6 +24,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { format, subYears } from "date-fns";
 
+// Helper for parsing optional positive integer fields
+const optionalPositiveIntegerField = (fieldName: string) => z.preprocess(
+  (val) => {
+    if (val === "" || val === null || val === undefined) return undefined;
+    return String(val).trim();
+  },
+  z.string()
+    .optional()
+    .transform(valStr => {
+      if (valStr === undefined) return undefined;
+      // Ensure it's a string of digits before parsing
+      if (!/^\d+$/.test(valStr)) return NaN; 
+      return parseInt(valStr, 10);
+    })
+    .refine(val => val === undefined || (!isNaN(val) && val > 0), {
+      message: `${fieldName} must be a positive whole number.`,
+    })
+);
 
 const groupFormSchema = z.object({
   groupName: z.string().min(3, "Group name must be at least 3 characters"),
@@ -33,30 +51,12 @@ const groupFormSchema = z.object({
   memberUsernames: z.array(z.string()).min(1, "At least one member must be selected"),
   tenure: z.coerce.number().int().min(1, "Tenure must be at least 1 month"),
   startDate: z.date({ required_error: "Start date is required." }),
-  rate: z.preprocess( // Now "Monthly Installment (₹)"
-    (val) => (val === "" ? undefined : val),
-    z.coerce.number({ invalid_type_error: "Monthly Installment must be a number" })
-     .int({ message: "Monthly Installment must be a whole number." })
-     .positive("Monthly Installment must be a positive number")
-     .optional()
-  ),
-  commission: z.preprocess(
-    (val) => (val === "" ? undefined : val),
-    z.coerce.number({ invalid_type_error: "Commission must be a number" })
-     .int({ message: "Commission must be a whole number." })
-     .positive("Commission must be a positive number")
-     .optional()
-  ),
+  rate: optionalPositiveIntegerField("Monthly Installment"),
+  commission: optionalPositiveIntegerField("Commission"),
   biddingType: z.enum(["auction", "random", "pre-fixed"], {
     errorMap: () => ({ message: "Please select a valid bidding type." }),
   }).optional(),
-  minBid: z.preprocess(
-    (val) => (val === "" ? undefined : val),
-    z.coerce.number({ invalid_type_error: "Minimum bid must be a number" })
-     .int({ message: "Minimum bid must be a whole number." })
-     .positive("Minimum bid must be a positive number")
-     .optional()
-  ),
+  minBid: optionalPositiveIntegerField("Min Bid Amount"),
 });
 
 export function CreateGroupForm() {
@@ -115,19 +115,18 @@ export function CreateGroupForm() {
         startDate: format(values.startDate, "yyyy-MM-dd"),
       };
 
-      if (values.rate !== undefined && values.rate !== null && !isNaN(values.rate)) {
-        groupData.rate = Math.round(values.rate);
+      if (values.rate !== undefined) {
+        groupData.rate = values.rate;
       }
-      if (values.commission !== undefined && values.commission !== null && !isNaN(values.commission)) {
-        groupData.commission = Math.round(values.commission);
+      if (values.commission !== undefined) {
+        groupData.commission = values.commission;
       }
       if (values.biddingType) {
         groupData.biddingType = values.biddingType;
       }
-      if (values.minBid !== undefined && values.minBid !== null && !isNaN(values.minBid)) {
-        groupData.minBid = Math.round(values.minBid);
+      if (values.minBid !== undefined) {
+        groupData.minBid = values.minBid;
       }
-
 
       const newGroupRef = await addDoc(collection(db, "groups"), groupData);
       const groupId = newGroupRef.id;
@@ -244,7 +243,7 @@ export function CreateGroupForm() {
                         <FormLabel>Monthly Installment (₹)</FormLabel>
                         <div className="flex items-center gap-2">
                             <LandmarkIcon className="h-4 w-4 text-muted-foreground" />
-                            <FormControl><Input type="number" placeholder="e.g., 5000" {...field} value={field.value ?? ''} /></FormControl>
+                            <FormControl><Input type="number" placeholder="e.g., 5000" {...field} value={field.value === undefined ? '' : String(field.value)} onChange={e => field.onChange(e.target.value === '' ? undefined : e.target.value)} /></FormControl>
                         </div>
                         <FormMessage />
                     </FormItem>
@@ -253,7 +252,7 @@ export function CreateGroupForm() {
                     <FormItem>
                         <FormLabel>Commission (%)</FormLabel>
                          <div className="flex items-center gap-2">
-                            <FormControl><Input type="number" placeholder="e.g., 2" {...field} value={field.value ?? ''} /></FormControl>
+                            <FormControl><Input type="number" placeholder="e.g., 2" {...field} value={field.value === undefined ? '' : String(field.value)} onChange={e => field.onChange(e.target.value === '' ? undefined : e.target.value)} /></FormControl>
                             <Tag className="h-4 w-4 text-muted-foreground" /> 
                         </div>
                         <FormMessage />
@@ -285,7 +284,7 @@ export function CreateGroupForm() {
                         <FormLabel>Min Bid Amount (₹)</FormLabel>
                         <div className="flex items-center gap-2">
                           <LandmarkIcon className="h-4 w-4 text-muted-foreground" />
-                          <FormControl><Input type="number" placeholder="e.g., 1000" {...field} value={field.value ?? ''} /></FormControl>
+                          <FormControl><Input type="number" placeholder="e.g., 1000" {...field} value={field.value === undefined ? '' : String(field.value)} onChange={e => field.onChange(e.target.value === '' ? undefined : e.target.value)} /></FormControl>
                         </div>
                         <FormMessage />
                     </FormItem>
@@ -350,3 +349,5 @@ export function CreateGroupForm() {
     </Card>
   );
 }
+
+      
