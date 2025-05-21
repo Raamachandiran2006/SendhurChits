@@ -21,4 +21,6 @@ export interface Group {
   totalPeople: number;
   totalAmount: number;
   members: string[]; // Array of usernames (the auto-generated ones)
+  tenure?: string; // e.g., "10 months", "1 year"
+  startDate?: string; // YYYY-MM-DD
 }

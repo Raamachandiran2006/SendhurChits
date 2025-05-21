@@ -17,7 +17,12 @@ import { useEffect, useState } from "react";
 import type { User } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, PlusCircle, Users } from "lucide-react";
+import { Loader2, PlusCircle, Users, CalendarIcon, CalendarDays } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format, subYears } from "date-fns";
+
 
 const groupFormSchema = z.object({
   groupName: z.string().min(3, "Group name must be at least 3 characters"),
@@ -25,6 +30,8 @@ const groupFormSchema = z.object({
   totalPeople: z.coerce.number().int().positive("Total people must be a positive number"),
   totalAmount: z.coerce.number().positive("Total amount must be a positive number"),
   memberUsernames: z.array(z.string()).min(1, "At least one member must be selected"),
+  tenure: z.string().min(1, "Tenure is required (e.g., 10 months, 1 year)"),
+  startDate: z.date({ required_error: "Start date is required." }),
 });
 
 export function CreateGroupForm() {
@@ -42,6 +49,8 @@ export function CreateGroupForm() {
       totalPeople: 10,
       totalAmount: 100000,
       memberUsernames: [],
+      tenure: "10 months",
+      startDate: new Date(),
     },
   });
 
@@ -74,6 +83,8 @@ export function CreateGroupForm() {
         totalPeople: values.totalPeople,
         totalAmount: values.totalAmount,
         members: values.memberUsernames, // Store usernames
+        tenure: values.tenure,
+        startDate: format(values.startDate, "yyyy-MM-dd"),
       });
 
       const groupId = newGroupRef.id;
@@ -101,6 +112,10 @@ export function CreateGroupForm() {
       setIsSubmitting(false);
     }
   }
+  
+  const today = new Date();
+  const fiveYearsFromNow = subYears(today, -5); // allow start dates up to 5 years in future
+
 
   return (
     <Card className="shadow-xl w-full max-w-2xl mx-auto">
@@ -165,6 +180,63 @@ export function CreateGroupForm() {
                     <FormControl>
                       <Input type="number" placeholder="100000" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="tenure"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tenure</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., 10 months, 1 year" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="startDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Start Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          captionLayout="dropdown-buttons"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          fromDate={subYears(today, 1)} // Can select start date from 1 year ago
+                          toDate={fiveYearsFromNow} // Up to 5 years in the future
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}

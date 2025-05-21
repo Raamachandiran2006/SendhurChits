@@ -9,18 +9,20 @@ import { doc, getDoc, collection, query, where, getDocs } from "firebase/firesto
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Loader2, ArrowLeft, Users as GroupIcon, User as UserIcon, Info, AlertTriangle, Phone, Mail, CalendarDays, Landmark, Users } from "lucide-react";
+import { Loader2, ArrowLeft, Users as GroupIcon, User as UserIcon, Info, AlertTriangle, Phone, Mail, CalendarDays, Landmark, Users, Clock } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 
 // Helper function to format date safely
-const formatDateSafe = (dateString: string | undefined | null) => {
+const formatDateSafe = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
   if (!dateString) return "N/A";
   try {
-    const date = new Date(dateString);
+    // Check if the dateString is already in 'yyyy-MM-dd' format from Firestore
+    // or if it's a full ISO string that might come from other date objects.
+    const date = dateString.includes('T') ? parseISO(dateString) : new Date(dateString + 'T00:00:00'); // Assume UTC if only date part
     if (isNaN(date.getTime())) return "N/A";
-    return format(date, "dd MMM yyyy");
+    return format(date, outputFormat);
   } catch (e) {
     return "N/A";
   }
@@ -62,8 +64,6 @@ export default function AdminGroupDetailPage() {
 
         // Fetch members details if group has members
         if (groupData.members && groupData.members.length > 0) {
-          // Firestore 'in' query supports up to 30 elements. Batch if necessary.
-          // For simplicity, we'll query in batches of 30 if needed, though usually not for typical group sizes.
           const memberUsernames = groupData.members;
           const fetchedMembers: User[] = [];
           const batchSize = 30;
@@ -124,7 +124,6 @@ export default function AdminGroupDetailPage() {
   }
 
   if (!group) {
-    // Should be caught by error state, but as a fallback
     return <div className="container mx-auto py-8 text-center text-muted-foreground">Group data not available.</div>;
   }
 
@@ -155,6 +154,14 @@ export default function AdminGroupDetailPage() {
             <div className="flex items-center">
               <Landmark className="mr-2 h-4 w-4 text-muted-foreground" />
               <span>Total Amount: ₹{group.totalAmount.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center">
+              <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
+              <span>Tenure: {group.tenure || "N/A"}</span>
+            </div>
+            <div className="flex items-center">
+              <CalendarDays className="mr-2 h-4 w-4 text-muted-foreground" />
+              <span>Start Date: {formatDateSafe(group.startDate)}</span>
             </div>
              <div className="flex items-center">
               <Info className="mr-2 h-4 w-4 text-muted-foreground" />
