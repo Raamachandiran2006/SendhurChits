@@ -11,9 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Loader2, Camera, RefreshCw, Image as ImageIconLucide, UserPlus, Briefcase } from "lucide-react"; // Changed ImageIcon to ImageIconLucide
+import { CalendarIcon, Loader2, Camera, RefreshCw, Image as ImageIconLucide, UserPlus, Briefcase, DollarSign } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
-import { Alert, AlertTitle, AlertDescription as AlertDescriptionUI } from "@/components/ui/alert"; // Renamed AlertDescription
+import { Alert, AlertTitle, AlertDescription as AlertDescriptionUI } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { format, subYears } from "date-fns";
 import { db, storage } from "@/lib/firebase";
@@ -46,6 +46,7 @@ const createEmployeeFormSchema = z.object({
   recentPhotographWebcamDataUrl: z.string().nullable().optional(),
   role: z.string().min(2, "Role must be at least 2 characters (e.g., Agent)"),
   joiningDate: z.date({ required_error: "Joining date is required." }),
+  salary: z.coerce.number().positive("Salary must be a positive number").optional().nullable(),
 }).superRefine((data, ctx) => {
   if (!data.recentPhotographFile && !data.recentPhotographWebcamDataUrl) {
     ctx.addIssue({
@@ -83,6 +84,7 @@ export function CreateEmployeeForm() {
       role: "",
       joiningDate: new Date(),
       dob: subYears(new Date(), 18), // Default to 18 years ago
+      salary: null,
     },
   });
 
@@ -120,7 +122,6 @@ export function CreateEmployeeForm() {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
-       // Ensure camera is released if component unmounts while camera is active
       if (showCamera && videoRef.current && videoRef.current.srcObject) {
         (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
         videoRef.current.srcObject = null;
@@ -208,12 +209,12 @@ export function CreateEmployeeForm() {
       });
       
       const newEmployeeDocRef = doc(collection(db, "employees"));
-      const newEmployeePayload = {
+      const newEmployeePayload: any = {
         employeeId: newEmployeeId,
         fullname: values.fullname,
         phone: values.phone,
         dob: format(values.dob, "yyyy-MM-dd"),
-        password: values.password, // WARNING: Plain text password.
+        password: values.password,
         address: values.address,
         aadhaarNumber: values.aadhaarNumber || "",
         panCardNumber: values.panCardNumber?.toUpperCase() || "",
@@ -221,11 +222,15 @@ export function CreateEmployeeForm() {
         role: values.role,
         joiningDate: format(values.joiningDate, "yyyy-MM-dd"),
       };
+      if (values.salary !== null && values.salary !== undefined) {
+        newEmployeePayload.salary = values.salary;
+      }
+
 
       await setDoc(newEmployeeDocRef, newEmployeePayload);
       
       toast({ title: "Employee Created", description: `Employee ${values.fullname} created successfully with ID ${newEmployeeId}.` });
-      router.push("/admin/employees");
+      router.push("/admin/employees/view");
 
     } catch (error) {
       console.error("Employee creation error:", error);
@@ -285,14 +290,14 @@ export function CreateEmployeeForm() {
               <CardContent className="space-y-4">
                 {!showCamera && !capturedImage && (
                   <>
-                    <FormField control={form.control} name="recentPhotographFile" render={({ field: { onChange, value, ...rest }}) => (
+                    <FormField control={form.control} name="recentPhotographFile" render={({ field: { onChange, onBlur, name, ref }}) => (
                         <FormItem><FormLabel>Upload Photo</FormLabel>
-                          <FormControl><Input type="file" onChange={(e) => { const file = e.target.files?.[0]; onChange(file || null); if (file) setValue("recentPhotographWebcamDataUrl", null);}} accept="image/jpeg,image/png" {...rest} /></FormControl>
+                          <FormControl><Input type="file" onChange={(e) => { const file = e.target.files?.[0]; onChange(file || null); if (file) setValue("recentPhotographWebcamDataUrl", null);}} onBlur={onBlur} name={name} ref={ref} accept="image/jpeg,image/png" /></FormControl>
                           {watchPhotoFile && <FormDescription className="text-xs">{watchPhotoFile.name}</FormDescription>}
                           <FormMessage />
                         </FormItem>)} />
                     <div className="text-center my-2 text-sm text-muted-foreground">OR</div>
-                    <Button type="button" variant="outline" className="w-full" onClick={() => {setShowCamera(true); setCapturedImage(null); setValue("recentPhotographFile", null); }}>
+                    <Button type="button" variant="outline" className="w-full" onClick={() => {setShowCamera(true); setCapturedImage(null); setValue("recentPhotographFile", null); requestCameraPermission(); }}>
                       <Camera className="mr-2 h-4 w-4" /> Capture with Webcam
                     </Button>
                   </>
@@ -315,7 +320,7 @@ export function CreateEmployeeForm() {
                 {capturedImage && !showCamera && (
                   <div className="space-y-2 items-center flex flex-col">
                     <FormLabel>Captured Photograph:</FormLabel>
-                    <Image src={capturedImage} alt="Captured employee photo" width={200} height={150} className="rounded-md border" data-ai-hint="employee profile" />
+                    <Image src={capturedImage} alt="Captured employee photo" width={200} height={150} className="rounded-md border" data-ai-hint="employee profile"/>
                     <Button type="button" variant="outline" onClick={handleRetake}><RefreshCw className="mr-2 h-4 w-4" /> Retake Photo</Button>
                     <Button type="button" variant="outline" className="w-full" onClick={() => { setCapturedImage(null); setValue("recentPhotographWebcamDataUrl", null); }}>Use File Upload Instead</Button>
                   </div>
@@ -340,6 +345,26 @@ export function CreateEmployeeForm() {
                         </Popover><FormMessage />
                     </FormItem>)} />
             </div>
+            
+            <FormField control={form.control} name="salary" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Salary (₹ Per Month - Optional)</FormLabel>
+                <FormControl>
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-muted-foreground" />
+                    <Input 
+                      type="number" 
+                      placeholder="e.g., 25000" 
+                      {...field} 
+                      value={field.value ?? ""}
+                      onChange={e => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
+                    />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
 
             <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

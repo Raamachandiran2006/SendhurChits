@@ -43,4 +43,5 @@ export interface Employee {
   photoUrl?: string;
   role: string; // e.g., "Manager", "Agent", "Accountant"
   joiningDate: string; // YYYY-MM-DD
+  salary?: number; // Optional monthly salary
 }
