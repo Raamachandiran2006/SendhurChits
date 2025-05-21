@@ -5,8 +5,8 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { Employee } from "@/types";
 import { db, storage } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, query, where, getDocs, collection } from "firebase/firestore";
-import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { doc, getDoc, updateDoc, query, where, getDocs, collection, deleteDoc } from "firebase/firestore";
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -46,6 +46,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Alert, AlertTitle, AlertDescription as AlertDescriptionUI } from "@/components/ui/alert";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription as AlertDialogDescriptionRoot, // Renamed to avoid conflict
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle, 
+  AlertDialogTrigger 
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
 
@@ -98,6 +109,8 @@ export default function AdminEmployeeDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
 
   const [showCamera, setShowCamera] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
@@ -270,8 +283,26 @@ export default function AdminEmployeeDetailPage() {
       }
 
       if (values.recentPhotographFile) {
+        // Delete old photo if it exists and a new one is uploaded
+        if (employee.photoUrl) {
+          try {
+            const oldPhotoRef = storageRef(storage, employee.photoUrl);
+            await deleteObject(oldPhotoRef);
+          } catch (storageError) {
+            console.warn("Could not delete old photo from storage:", storageError);
+            // Non-critical, proceed with upload
+          }
+        }
         updatedEmployeeData.photoUrl = await uploadFile(values.recentPhotographFile, `employeeFiles/${employee.phone}/photo/${values.recentPhotographFile.name}`);
       } else if (values.recentPhotographWebcamDataUrl && values.recentPhotographWebcamDataUrl !== employee.photoUrl) {
+         if (employee.photoUrl) {
+          try {
+            const oldPhotoRef = storageRef(storage, employee.photoUrl);
+            await deleteObject(oldPhotoRef);
+          } catch (storageError) {
+             console.warn("Could not delete old photo from storage:", storageError);
+          }
+        }
         const photoFile = dataURLtoFile(values.recentPhotographWebcamDataUrl, `webcam_photo_emp_${Date.now()}.jpg`);
         updatedEmployeeData.photoUrl = await uploadFile(photoFile, `employeeFiles/${employee.phone}/photo/${photoFile.name}`);
       }
@@ -289,6 +320,42 @@ export default function AdminEmployeeDetailPage() {
       setIsSubmitting(false);
     }
   }
+
+  const handleDeleteEmployee = async () => {
+    if (!employee || deleteConfirmationText !== "delete") return;
+    setIsDeleting(true);
+    try {
+      // Delete photo from storage if it exists
+      if (employee.photoUrl) {
+        try {
+          const photoRef = storageRef(storage, employee.photoUrl);
+          await deleteObject(photoRef);
+        } catch (storageError) {
+          console.warn("Could not delete employee photo from storage:", storageError);
+          // Non-critical, proceed with Firestore document deletion
+        }
+      }
+      
+      const employeeDocRef = doc(db, "employees", employeeDocId);
+      await deleteDoc(employeeDocRef);
+
+      toast({
+        title: "Employee Deleted",
+        description: `Employee "${employee.fullname}" has been successfully deleted.`,
+      });
+      router.push("/admin/employees/view");
+    } catch (err) {
+      console.error("Error deleting employee:", err);
+      toast({
+        title: "Error Deleting Employee",
+        description: "Failed to delete the employee. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmationText("");
+    }
+  };
   
   const today = new Date();
   const hundredYearsAgo = subYears(today, 100);
@@ -334,9 +401,41 @@ export default function AdminEmployeeDetailPage() {
             <Button variant="outline" onClick={() => setIsEditing(true)}> 
                 <Edit3 className="mr-2 h-4 w-4" /> Edit Employee
             </Button>
-            <Button variant="destructive" disabled>
-                <Trash2 className="mr-2 h-4 w-4" /> Delete Employee
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive">
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete Employee
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogDescriptionRoot>
+                    This action cannot be undone. This will permanently delete the employee
+                    <strong className="text-foreground"> {employee.fullname}</strong>. 
+                    Type "delete" to confirm.
+                  </AlertDialogDescriptionRoot>
+                </AlertDialogHeader>
+                <Input 
+                  type="text"
+                  placeholder='Type "delete" to confirm'
+                  value={deleteConfirmationText}
+                  onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                  className="my-2"
+                />
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setDeleteConfirmationText("")}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteEmployee}
+                    disabled={deleteConfirmationText !== "delete" || isDeleting}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Confirm Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
         </div>
         )}
       </div>
@@ -361,7 +460,7 @@ export default function AdminEmployeeDetailPage() {
                             <CalendarDays className="ml-auto h-4 w-4 opacity-50" />
                           </Button></FormControl></PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" captionLayout="dropdown-buttons" selected={field.value} onSelect={field.onChange} fromDate={hundredYearsAgo} toDate={eighteenYearsAgo} defaultMonth={parseISO(employee.dob)} initialFocus />
+                        <Calendar mode="single" captionLayout="dropdown-buttons" selected={field.value} onSelect={field.onChange} fromDate={hundredYearsAgo} toDate={eighteenYearsAgo} defaultMonth={field.value || parseISO(employee.dob)} initialFocus />
                       </PopoverContent>
                     </Popover><FormMessage />
                   </FormItem>)} />
@@ -382,7 +481,7 @@ export default function AdminEmployeeDetailPage() {
                               <CalendarDays className="ml-auto h-4 w-4 opacity-50" />
                             </Button></FormControl></PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar mode="single" captionLayout="dropdown-buttons" selected={field.value} onSelect={field.onChange} fromDate={subYears(today, 10)} toDate={fiveYearsFuture} defaultMonth={parseISO(employee.joiningDate)} initialFocus />
+                          <Calendar mode="single" captionLayout="dropdown-buttons" selected={field.value} onSelect={field.onChange} fromDate={subYears(today, 10)} toDate={fiveYearsFuture} defaultMonth={field.value || parseISO(employee.joiningDate)} initialFocus />
                         </PopoverContent>
                       </Popover><FormMessage />
                     </FormItem>)} />
@@ -541,3 +640,5 @@ export default function AdminEmployeeDetailPage() {
     </div>
   );
 }
+
+    
