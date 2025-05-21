@@ -26,8 +26,8 @@ import {
   LandmarkIcon as GroupLandmarkIcon, 
   SearchCode,
   Trash2,
-  Megaphone, // Added for auction card
-  CalendarClock // Added for auction card
+  Megaphone, 
+  CalendarClock 
 } from "lucide-react";
 import { 
   AlertDialog, 
@@ -314,6 +314,40 @@ export default function AdminGroupDetailPage() {
       <Card className="shadow-xl">
         <CardHeader>
           <div className="flex items-center gap-3">
+            <UserIcon className="h-8 w-8 text-primary" />
+            <div>
+              <CardTitle className="text-2xl font-bold text-foreground">Group Members</CardTitle>
+              <CardDescription>Details of users in this group.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {membersDetails.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">No members have been added to this group yet.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow><TableHead>Full Name</TableHead><TableHead>Username</TableHead><TableHead>Phone Number</TableHead><TableHead>Date of Birth</TableHead></TableRow>
+                </TableHeader>
+                <TableBody>
+                  {membersDetails.map((member) => (
+                    <TableRow key={member.id}>{/* Compacted JSX below */}
+                      <TableCell className="font-medium">{member.fullname}</TableCell><TableCell>{member.username}</TableCell><TableCell><div className="flex items-center"><Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}</div></TableCell><TableCell><div className="flex items-center"><CalendarDays className="mr-2 h-3 w-3 text-muted-foreground" /> {formatDateSafe(member.dob)}</div></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      
+      <Separator />
+
+      <Card className="shadow-xl">
+        <CardHeader>
+          <div className="flex items-center gap-3">
             <Megaphone className="h-6 w-6 text-primary" />
             <CardTitle className="text-xl font-bold text-foreground">Group Auction Details</CardTitle>
           </div>
@@ -348,38 +382,6 @@ export default function AdminGroupDetailPage() {
               <p className="text-muted-foreground">To be determined</p> {/* Placeholder */}
             </div>
           </div>
-        </CardContent>
-      </Card>
-      <Separator />
-      <Card className="shadow-xl">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <UserIcon className="h-8 w-8 text-primary" />
-            <div>
-              <CardTitle className="text-2xl font-bold text-foreground">Group Members</CardTitle>
-              <CardDescription>Details of users in this group.</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {membersDetails.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">No members have been added to this group yet.</p>
-          ) : (
-            <div className="overflow-x-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow><TableHead>Full Name</TableHead><TableHead>Username</TableHead><TableHead>Phone Number</TableHead><TableHead>Date of Birth</TableHead></TableRow>
-                </TableHeader>
-                <TableBody>
-                  {membersDetails.map((member) => (
-                    <TableRow key={member.id}>{/* Compacted JSX below */}
-                      <TableCell className="font-medium">{member.fullname}</TableCell><TableCell>{member.username}</TableCell><TableCell><div className="flex items-center"><Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}</div></TableCell><TableCell><div className="flex items-center"><CalendarDays className="mr-2 h-3 w-3 text-muted-foreground" /> {formatDateSafe(member.dob)}</div></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>
