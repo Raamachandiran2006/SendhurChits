@@ -85,32 +85,55 @@ const getBiddingTypeLabel = (type: string | undefined) => {
 const auctionDetailsFormSchema = z.object({
   auctionMonth: z.string().optional().or(z.literal('')),
   auctionScheduledDate: z.string().optional().or(z.literal('')),
-  auctionScheduledTime: z.string().optional().or(z.literal('')), // Stored as string (can be HH:mm or user input)
+  auctionScheduledTime: z.string().optional().or(z.literal('')),
   lastAuctionWinner: z.string().optional().or(z.literal('')),
 });
 
 type AuctionDetailsFormValues = z.infer<typeof auctionDetailsFormSchema>;
 
-// Helper to convert various time string formats to HH:mm for input type="time"
-const convertTo24HourFormat = (timeString?: string): string => {
-  if (!timeString || timeString.trim() === "") return "";
-  
-  // Check if it's already HH:mm (e.g., "15:00")
-  if (/^([01]\d|2[0-3]):([0-5]\d)$/.test(timeString)) {
-    return timeString;
+// Converts "HH:mm" (24h) to "hh:mm AM/PM" (12h)
+const convert24hTo12hFormat = (time24?: string): string => {
+  if (!time24 || !/^([01]\d|2[0-3]):([0-5]\d)$/.test(time24)) {
+    // If it's not in HH:mm format, it might already be 12h or invalid.
+    // For safety, return as is. If it's an empty string or other, it'll pass through.
+    return time24 || ""; 
+  }
+  const [hoursStr, minutesStr] = time24.split(':');
+  let hours = parseInt(hoursStr, 10);
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12; // the hour '0' should be '12'
+  const hours12Str = String(hours).padStart(2, '0');
+  return `${hours12Str}:${minutesStr} ${ampm}`;
+};
+
+// Converts "hh:mm AM/PM" (and other variants) to "HH:mm" (24h) for time input
+const convert12hTo24hFormat = (time12?: string): string => {
+  if (!time12 || time12.trim() === "") return "";
+
+  // If already HH:mm
+  if (/^([01]\d|2[0-3]):([0-5]\d)$/.test(time12)) {
+    return time12;
   }
 
-  // Try to parse common 12-hour formats like "hh:mm a", "h:mm a"
-  const now = new Date(); // Dummy date for parsing
-  const formatsToTry = ["hh:mm a", "h:mm a", "hh:mma", "h:mma"];
-  for (const fmt of formatsToTry) {
-    const parsedDate = parse(timeString, fmt, now);
-    if (isValid(parsedDate)) {
-      return formatDateFns(parsedDate, "HH:mm");
+  const lowerTime12 = time12.toLowerCase();
+  // Regex for hh:mm AM/PM, h:mm AM/PM, hh:mmAM/PM, h:mmAM/PM
+  const match = lowerTime12.match(/(\d{1,2}):(\d{2})\s*(am|pm)/);
+
+  if (match) {
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const period = match[3];
+
+    if (hours === 12) { // Handle 12 AM (midnight) and 12 PM (noon)
+      hours = (period === 'am') ? 0 : 12;
+    } else if (period === 'pm') {
+      hours += 12;
     }
+    // hours is now 0-23
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
   }
-  // If not parsable to a known format, return empty for input type="time" to handle it gracefully
-  return ""; 
+  return ""; // Return empty if not a recognized 12h format or already 24h
 };
 
 
@@ -161,7 +184,7 @@ export default function AdminGroupDetailPage() {
       auctionForm.reset({
         auctionMonth: groupData.auctionMonth || "",
         auctionScheduledDate: groupData.auctionScheduledDate || "",
-        auctionScheduledTime: groupData.auctionScheduledTime || "",
+        auctionScheduledTime: groupData.auctionScheduledTime || "", // This should be stored in 12h format
         lastAuctionWinner: groupData.lastAuctionWinner || "",
       });
 
@@ -245,11 +268,17 @@ export default function AdminGroupDetailPage() {
       await updateDoc(groupDocRef, {
         auctionMonth: values.auctionMonth || "",
         auctionScheduledDate: values.auctionScheduledDate || "",
-        auctionScheduledTime: values.auctionScheduledTime || "", // Saved as HH:mm if edited via time picker
+        auctionScheduledTime: values.auctionScheduledTime || "", // This is now the 12-hour format from form state
         lastAuctionWinner: values.lastAuctionWinner || "",
       });
-      // Optimistically update local state or re-fetch
-      setGroup(prevGroup => prevGroup ? { ...prevGroup, ...values } : null); 
+      
+      setGroup(prevGroup => prevGroup ? { 
+        ...prevGroup, 
+        auctionMonth: values.auctionMonth || "",
+        auctionScheduledDate: values.auctionScheduledDate || "",
+        auctionScheduledTime: values.auctionScheduledTime || "",
+        lastAuctionWinner: values.lastAuctionWinner || ""
+      } : null); 
       toast({ title: "Auction Details Updated", description: "Successfully saved auction details." });
       setIsEditingAuctionDetails(false);
     } catch (error) {
@@ -306,7 +335,6 @@ export default function AdminGroupDetailPage() {
     return <div className="container mx-auto py-8 text-center text-muted-foreground">Group data not available.</div>;
   }
 
-  // Generic component for displaying auction details (both view and edit for simple text fields)
   const AuctionDetailItem = ({ icon: Icon, label, value, isEditing, fieldName, register }: { icon: React.ElementType, label: string, value?: string, isEditing?: boolean, fieldName?: keyof AuctionDetailsFormValues, register?: any }) => (
     <div className="flex items-center p-3 bg-secondary/50 rounded-md">
       <Icon className="mr-3 h-5 w-5 text-muted-foreground flex-shrink-0" />
@@ -447,7 +475,7 @@ export default function AdminGroupDetailPage() {
                 </TableHeader>
                 <TableBody>
                   {membersDetails.map((member) => (
-                    <TableRow key={member.id}>{/* Compacted JSX below */}
+                    <TableRow key={member.id}>
                       <TableCell className="font-medium">{member.fullname}</TableCell><TableCell>{member.username}</TableCell><TableCell><div className="flex items-center"><Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}</div></TableCell><TableCell><div className="flex items-center"><CalendarDays className="mr-2 h-3 w-3 text-muted-foreground" /> {formatDateSafe(member.dob)}</div></TableCell>
                     </TableRow>
                   ))}
@@ -524,7 +552,7 @@ export default function AdminGroupDetailPage() {
 
                 <FormField
                   control={auctionForm.control}
-                  name="auctionScheduledTime"
+                  name="auctionScheduledTime" // This RHF field stores the 12-hour format string
                   render={({ field }) => (
                     <FormItem className="flex flex-col p-3 bg-secondary/50 rounded-md">
                       <div className="flex items-center">
@@ -533,8 +561,13 @@ export default function AdminGroupDetailPage() {
                           <FormLabel className="font-semibold text-foreground">Scheduled Time</FormLabel>
                           <Input
                             type="time"
-                            value={field.value ? convertTo24HourFormat(field.value) : ""}
-                            onChange={(e) => field.onChange(e.target.value)} // e.target.value is already HH:mm
+                            // Convert 12h format from field.value to 24h format for the input
+                            value={convert12hTo24hFormat(field.value)} 
+                            onChange={(e) => {
+                              // e.target.value is HH:mm (24h from input)
+                              // Convert it back to hh:mm AM/PM for RHF state and subsequent Firestore save
+                              field.onChange(convert24hTo12hFormat(e.target.value) || ""); 
+                            }}
                             className="text-sm h-8 mt-1 w-full"
                           />
                         </div>
@@ -558,6 +591,7 @@ export default function AdminGroupDetailPage() {
                         <p className="text-muted-foreground text-sm">{formatDateSafe(group.auctionScheduledDate, "PPP") || "N/A"}</p>
                     </div>
                 </div>
+                {/* Display formatted 12-hour time in view mode */}
                 <AuctionDetailItem icon={Clock} label="Scheduled Time" value={group.auctionScheduledTime} />
                 <AuctionDetailItem icon={Info} label="Last Auction Winner" value={group.lastAuctionWinner} />
             </div>
