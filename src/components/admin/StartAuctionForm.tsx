@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIconLucide, Loader2, Users as UsersIcon, PlayCircle, DollarSign, CheckCircle, Edit, ArrowLeft } from "lucide-react";
+import { Calendar as CalendarIconLucide, Loader2, PlayCircle, DollarSign, CheckCircle, ArrowLeft } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -26,7 +26,7 @@ const startAuctionFormSchema = z.object({
   auctionMonth: z.string().min(3, "Auction month is required (e.g., August 2024)."),
   auctionDate: z.date({ required_error: "Auction date is required." }),
   auctionTime: z.string().min(1, "Auction time is required."),
-  auctionMode: z.string().optional(),
+  auctionMode: z.enum(["Manual", "Online"]).optional(),
   winnerUserId: z.string().min(1, "Please select a winner."), // Stores Firestore User Doc ID
   winningBidAmount: z.coerce.number().positive("Winning bid amount must be a positive number."),
 });
@@ -44,7 +44,6 @@ const formatTimeTo12Hour = (timeStr?: string): string => {
     hours = hours ? hours : 12; // the hour '0' should be '12'
     return `${String(hours).padStart(2, '0')}:${minutesStr} ${ampm}`;
   }
-  // If it's already in some 12h format, return as is, assuming it's valid.
   return timeStr; 
 };
 
@@ -108,7 +107,7 @@ export function StartAuctionForm() {
           const preselected = fetchedGroups.find(g => g.id === preselectedGroupId);
           if (preselected) {
             setSelectedGroup(preselected);
-             setValue("selectedGroupId", preselected.id, { shouldValidate: true });
+            setValue("selectedGroupId", preselected.id, { shouldValidate: true });
           }
         }
       } catch (error) {
@@ -126,42 +125,71 @@ export function StartAuctionForm() {
       setSelectedGroup(null);
       setGroupMembers([]);
       setValue("winnerUserId", ""); 
+      setValue("auctionMonth", "");
+      setValue("auctionDate", new Date());
+      setValue("auctionTime", "");
       return;
     }
 
     const currentSelectedGroup = groups.find(g => g.id === watchedGroupId);
     setSelectedGroup(currentSelectedGroup || null);
 
-    if (currentSelectedGroup && currentSelectedGroup.members.length > 0) {
-      setLoadingMembers(true);
-      const fetchMembers = async () => {
+    if (currentSelectedGroup) {
+      // Pre-fill auction details from the selected group
+      setValue("auctionMonth", currentSelectedGroup.auctionMonth || "");
+      if (currentSelectedGroup.auctionScheduledDate) {
         try {
-          const usersRef = collection(db, "users");
-          const memberUsernamesBatches: string[][] = [];
-          for (let i = 0; i < currentSelectedGroup.members.length; i += 30) {
-            memberUsernamesBatches.push(currentSelectedGroup.members.slice(i, i + 30));
+          // Attempt to parse date string; ensure it's treated as local, not UTC
+          const dateParts = currentSelectedGroup.auctionScheduledDate.split('-');
+          if (dateParts.length === 3) {
+            const localDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+            setValue("auctionDate", localDate);
+          } else {
+             setValue("auctionDate", new Date()); // Fallback
           }
-          
-          const fetchedMembers: User[] = [];
-          for (const batch of memberUsernamesBatches) {
-            if (batch.length > 0) {
-              const q = query(usersRef, where("username", "in", batch));
-              const memberSnapshots = await getDocs(q);
-              memberSnapshots.docs.forEach(docSnap => fetchedMembers.push({ id: docSnap.id, ...docSnap.data() } as User));
-            }
-          }
-          setGroupMembers(fetchedMembers);
-        } catch (error) {
-          console.error("Error fetching group members:", error);
-          toast({ title: "Error", description: "Could not load members for the selected group.", variant: "destructive" });
-          setGroupMembers([]);
-        } finally {
-          setLoadingMembers(false);
+        } catch (e) {
+          console.warn("Could not parse auctionScheduledDate:", currentSelectedGroup.auctionScheduledDate, e);
+          setValue("auctionDate", new Date()); // Fallback
         }
-      };
-      fetchMembers();
+      } else {
+        setValue("auctionDate", new Date());
+      }
+      setValue("auctionTime", currentSelectedGroup.auctionScheduledTime || "");
+
+
+      if (currentSelectedGroup.members.length > 0) {
+        setLoadingMembers(true);
+        const fetchMembers = async () => {
+          try {
+            const usersRef = collection(db, "users");
+            const memberUsernamesBatches: string[][] = [];
+            for (let i = 0; i < currentSelectedGroup.members.length; i += 30) {
+              memberUsernamesBatches.push(currentSelectedGroup.members.slice(i, i + 30));
+            }
+            
+            const fetchedMembers: User[] = [];
+            for (const batch of memberUsernamesBatches) {
+              if (batch.length > 0) {
+                const q = query(usersRef, where("username", "in", batch));
+                const memberSnapshots = await getDocs(q);
+                memberSnapshots.docs.forEach(docSnap => fetchedMembers.push({ id: docSnap.id, ...docSnap.data() } as User));
+              }
+            }
+            setGroupMembers(fetchedMembers);
+          } catch (error) {
+            console.error("Error fetching group members:", error);
+            toast({ title: "Error", description: "Could not load members for the selected group.", variant: "destructive" });
+            setGroupMembers([]);
+          } finally {
+            setLoadingMembers(false);
+          }
+        };
+        fetchMembers();
+      } else {
+        setGroupMembers([]);
+      }
     } else {
-      setGroupMembers([]);
+        setGroupMembers([]);
     }
     setValue("winnerUserId", ""); 
   }, [watchedGroupId, groups, setValue, toast]);
@@ -335,8 +363,18 @@ export function StartAuctionForm() {
               name="auctionMode"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Auction Mode (Optional)</FormLabel>
-                  <FormControl><Input placeholder="e.g., Manual, Online" {...field} /></FormControl>
+                  <FormLabel>Auction Mode</FormLabel>
+                   <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select auction mode" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Manual">Manual</SelectItem>
+                      <SelectItem value="Online">Online</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -414,3 +452,5 @@ export function StartAuctionForm() {
     </Card>
   );
 }
+
+    
