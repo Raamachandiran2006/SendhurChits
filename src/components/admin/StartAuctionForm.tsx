@@ -27,30 +27,28 @@ const startAuctionFormSchema = z.object({
   auctionDate: z.date({ required_error: "Auction date is required." }),
   auctionTime: z.string().min(1, "Auction time is required."),
   auctionMode: z.enum(["Manual", "Online"]).optional(),
-  winnerUserId: z.string().min(1, "Please select a winner."), // Stores Firestore User Doc ID
+  winnerUserId: z.string().min(1, "Please select a winner."),
   winningBidAmount: z.coerce.number().positive("Winning bid amount must be a positive number."),
 });
 
 type StartAuctionFormValues = z.infer<typeof startAuctionFormSchema>;
 
-// Helper to convert 12h or 24h time string to 12h format for display/storage
 const formatTimeTo12Hour = (timeStr?: string): string => {
   if (!timeStr) return "";
-  if (/^([01]\d|2[0-3]):([0-5]\d)$/.test(timeStr)) { // If already 24h "HH:mm"
+  if (/^([01]\d|2[0-3]):([0-5]\d)$/.test(timeStr)) {
     const [hoursStr, minutesStr] = timeStr.split(':');
     let hours = parseInt(hoursStr, 10);
     const ampm = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12;
-    hours = hours ? hours : 12; // the hour '0' should be '12'
+    hours = hours ? hours : 12; 
     return `${String(hours).padStart(2, '0')}:${minutesStr} ${ampm}`;
   }
   return timeStr; 
 };
 
-// Helper to convert time string (12h or 24h) to "HH:mm" for <input type="time">
 const formatTimeTo24HourInput = (timeStr?: string): string => {
     if (!timeStr) return "";
-    if (/^([01]\d|2[0-3]):([0-5]\d)$/.test(timeStr)) return timeStr; // Already HH:mm
+    if (/^([01]\d|2[0-3]):([0-5]\d)$/.test(timeStr)) return timeStr;
 
     const lowerTime = timeStr.toLowerCase();
     const match = lowerTime.match(/(\d{1,2}):(\d{2})\s*(am|pm)/);
@@ -78,6 +76,9 @@ export function StartAuctionForm() {
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [groupMembers, setGroupMembers] = useState<User[]>([]); 
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [previousWinnerIds, setPreviousWinnerIds] = useState<string[]>([]);
+  const [loadingPreviousWinners, setLoadingPreviousWinners] = useState(false);
+
 
   const form = useForm<StartAuctionFormValues>({
     resolver: zodResolver(startAuctionFormSchema),
@@ -92,7 +93,7 @@ export function StartAuctionForm() {
     },
   });
 
-  const { watch, setValue } = form;
+  const { watch, setValue, reset } = form;
   const watchedGroupId = watch("selectedGroupId");
   const watchedWinnerUserId = watch("winnerUserId");
 
@@ -106,7 +107,7 @@ export function StartAuctionForm() {
         if (preselectedGroupId && fetchedGroups.length > 0) {
           const preselected = fetchedGroups.find(g => g.id === preselectedGroupId);
           if (preselected) {
-            setSelectedGroup(preselected);
+            //setSelectedGroup(preselected); // This will be handled by the next useEffect
             setValue("selectedGroupId", preselected.id, { shouldValidate: true });
           }
         }
@@ -124,10 +125,16 @@ export function StartAuctionForm() {
     if (!watchedGroupId) {
       setSelectedGroup(null);
       setGroupMembers([]);
-      setValue("winnerUserId", ""); 
-      setValue("auctionMonth", "");
-      setValue("auctionDate", new Date());
-      setValue("auctionTime", "");
+      setPreviousWinnerIds([]);
+      reset({ // Reset relevant form fields when group is deselected
+        selectedGroupId: "",
+        auctionMonth: "",
+        auctionDate: new Date(),
+        auctionTime: "",
+        auctionMode: "Manual",
+        winnerUserId: "",
+        winningBidAmount: undefined,
+      });
       return;
     }
 
@@ -135,32 +142,36 @@ export function StartAuctionForm() {
     setSelectedGroup(currentSelectedGroup || null);
 
     if (currentSelectedGroup) {
-      // Pre-fill auction details from the selected group
       setValue("auctionMonth", currentSelectedGroup.auctionMonth || "");
       if (currentSelectedGroup.auctionScheduledDate) {
         try {
-          // Attempt to parse date string; ensure it's treated as local, not UTC
           const dateParts = currentSelectedGroup.auctionScheduledDate.split('-');
-          if (dateParts.length === 3) {
-            const localDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+          const localDate = dateParts.length === 3 
+            ? new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]))
+            : parseISO(currentSelectedGroup.auctionScheduledDate); // Fallback for ISO strings
+          
+          if (!isNaN(localDate.getTime())) {
             setValue("auctionDate", localDate);
           } else {
-             setValue("auctionDate", new Date()); // Fallback
+            setValue("auctionDate", new Date()); // Fallback if parsing fails
           }
         } catch (e) {
           console.warn("Could not parse auctionScheduledDate:", currentSelectedGroup.auctionScheduledDate, e);
-          setValue("auctionDate", new Date()); // Fallback
+          setValue("auctionDate", new Date());
         }
       } else {
         setValue("auctionDate", new Date());
       }
       setValue("auctionTime", currentSelectedGroup.auctionScheduledTime || "");
+      setValue("auctionMode", currentSelectedGroup.biddingType === "auction" ? "Manual" : (currentSelectedGroup.biddingType ? currentSelectedGroup.biddingType : "Manual"));
 
 
-      if (currentSelectedGroup.members.length > 0) {
+      const fetchGroupData = async () => {
         setLoadingMembers(true);
-        const fetchMembers = async () => {
-          try {
+        setLoadingPreviousWinners(true);
+        try {
+          // Fetch members
+          if (currentSelectedGroup.members.length > 0) {
             const usersRef = collection(db, "users");
             const memberUsernamesBatches: string[][] = [];
             for (let i = 0; i < currentSelectedGroup.members.length; i += 30) {
@@ -176,23 +187,34 @@ export function StartAuctionForm() {
               }
             }
             setGroupMembers(fetchedMembers);
-          } catch (error) {
-            console.error("Error fetching group members:", error);
-            toast({ title: "Error", description: "Could not load members for the selected group.", variant: "destructive" });
+          } else {
             setGroupMembers([]);
-          } finally {
-            setLoadingMembers(false);
           }
-        };
-        fetchMembers();
-      } else {
-        setGroupMembers([]);
-      }
+
+          // Fetch previous auction winners for this group
+          const auctionRecordsRef = collection(db, "auctionRecords");
+          const qAuction = query(auctionRecordsRef, where("groupId", "==", currentSelectedGroup.id));
+          const auctionSnapshot = await getDocs(qAuction);
+          const winnerIds = auctionSnapshot.docs.map(docSnap => (docSnap.data() as AuctionRecord).winnerUserId);
+          setPreviousWinnerIds(winnerIds);
+
+        } catch (error) {
+          console.error("Error fetching group members or previous winners:", error);
+          toast({ title: "Error", description: "Could not load members or auction history for the selected group.", variant: "destructive" });
+          setGroupMembers([]);
+          setPreviousWinnerIds([]);
+        } finally {
+          setLoadingMembers(false);
+          setLoadingPreviousWinners(false);
+        }
+      };
+      fetchGroupData();
     } else {
         setGroupMembers([]);
+        setPreviousWinnerIds([]);
     }
     setValue("winnerUserId", ""); 
-  }, [watchedGroupId, groups, setValue, toast]);
+  }, [watchedGroupId, groups, setValue, toast, reset]);
   
   const getSelectedWinner = useCallback(() => {
     return groupMembers.find(member => member.id === watchedWinnerUserId) || null;
@@ -208,6 +230,15 @@ export function StartAuctionForm() {
     if (!winnerUser) {
         toast({ title: "Error", description: "Selected winner details not found.", variant: "destructive" });
         return;
+    }
+
+    if (previousWinnerIds.includes(winnerUser.id)) {
+      toast({ 
+        title: "Selection Blocked", 
+        description: `${winnerUser.fullname} has already won an auction in this group and cannot be selected again.`, 
+        variant: "destructive" 
+      });
+      return;
     }
 
     setIsSubmitting(true);
@@ -234,6 +265,10 @@ export function StartAuctionForm() {
       await updateDoc(groupDocRef, {
         lastAuctionWinner: winnerUser.fullname,
         lastWinningBidAmount: values.winningBidAmount,
+        // Optionally update group's auctionMonth, auctionScheduledDate, auctionScheduledTime if they should reflect the *last conducted* auction
+        auctionMonth: values.auctionMonth, 
+        auctionScheduledDate: format(values.auctionDate, "yyyy-MM-dd"),
+        auctionScheduledTime: formatTimeTo12Hour(values.auctionTime),
       });
 
       toast({ title: "Auction Recorded", description: `Auction for ${selectedGroup.groupName} successfully recorded.` });
@@ -364,7 +399,7 @@ export function StartAuctionForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Auction Mode</FormLabel>
-                   <Select onValueChange={field.onChange} defaultValue={field.value}>
+                   <Select onValueChange={field.onChange} value={field.value || "Manual"} >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select auction mode" />
@@ -386,18 +421,32 @@ export function StartAuctionForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Winner</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={!selectedGroup || loadingMembers}>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value} 
+                    disabled={!selectedGroup || loadingMembers || loadingPreviousWinners}
+                  >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={loadingMembers ? "Loading members..." : (selectedGroup ? "Select winner" : "Select group first")} />
+                        <SelectValue placeholder={
+                          loadingMembers || loadingPreviousWinners ? "Loading members..." : 
+                          (selectedGroup ? "Select winner" : "Select group first")} 
+                        />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {groupMembers.map((member) => (
-                        <SelectItem key={member.id} value={member.id}>
-                          {member.fullname} (@{member.username})
-                        </SelectItem>
-                      ))}
+                      {groupMembers.map((member) => {
+                        const hasWon = previousWinnerIds.includes(member.id);
+                        return (
+                          <SelectItem 
+                            key={member.id} 
+                            value={member.id}
+                            disabled={hasWon}
+                          >
+                            {member.fullname} (@{member.username}) {hasWon ? '(Already Won)' : ''}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -442,7 +491,11 @@ export function StartAuctionForm() {
               )}
             />
 
-            <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" disabled={isSubmitting || loadingGroups || loadingMembers}>
+            <Button 
+              type="submit" 
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90" 
+              disabled={isSubmitting || loadingGroups || loadingMembers || loadingPreviousWinners}
+            >
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
               Record Auction
             </Button>
@@ -452,5 +505,3 @@ export function StartAuctionForm() {
     </Card>
   );
 }
-
-    
