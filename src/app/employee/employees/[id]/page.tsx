@@ -12,17 +12,12 @@ import Image from "next/image";
 import { 
   Loader2, 
   ArrowLeft, 
-  User as UserIcon,
   Info, 
   AlertTriangle, 
   Phone, 
-  Home, 
   CalendarDays,
   Briefcase,
-  FileText,
-  CreditCard,
-  UserCircle2,
-  DollarSign
+  UserCircle2
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
@@ -82,7 +77,7 @@ export default function EmployeeViewColleagueDetailPage() {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-lg text-foreground">Loading employee details...</p>
+        <p className="mt-4 text-lg text-foreground">Loading colleague details...</p>
       </div>
     );
   }
@@ -102,7 +97,7 @@ export default function EmployeeViewColleagueDetailPage() {
   }
 
   if (!employee) {
-    return <div className="container mx-auto py-8 text-center text-muted-foreground">Employee data not available.</div>;
+    return <div className="container mx-auto py-8 text-center text-muted-foreground">Colleague data not available.</div>;
   }
 
   return (
@@ -135,11 +130,9 @@ export default function EmployeeViewColleagueDetailPage() {
         </CardHeader>
         <CardContent className="p-6 space-y-6">
           <section>
-            <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><Info className="mr-2 h-5 w-5" />Personal Information</h3>
+            <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><Info className="mr-2 h-5 w-5" />Contact Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
               <div className="flex items-start"><Phone className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Phone:</strong> {employee.phone}</div></div>
-              <div className="flex items-start"><CalendarDays className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Date of Birth:</strong> {formatDateSafe(employee.dob)}</div></div>
-              <div className="flex items-start col-span-1 md:col-span-2"><Home className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Address:</strong> {employee.address || "N/A"}</div></div>
             </div>
           </section>
           <Separator />
@@ -148,29 +141,6 @@ export default function EmployeeViewColleagueDetailPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
               <div className="flex items-start"><UserCircle2 className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Role:</strong> <Badge variant="secondary">{employee.role}</Badge></div></div>
               <div className="flex items-start"><CalendarDays className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Joining Date:</strong> {formatDateSafe(employee.joiningDate)}</div></div>
-                {employee.salary !== undefined && employee.salary !== null && (
-                  <div className="flex items-start"><DollarSign className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Salary:</strong> ₹{employee.salary.toLocaleString()}</div></div>
-                )}
-            </div>
-          </section>
-            <Separator />
-          <section>
-            <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><FileText className="mr-2 h-5 w-5" />Identification Documents</h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center"><CreditCard className="mr-2 h-4 w-4 text-muted-foreground" /> <strong className="text-foreground w-32">Aadhaar Number:</strong>{employee.aadhaarNumber || "N/A"}</div>
-              <div className="flex items-center"><CreditCard className="mr-2 h-4 w-4 text-muted-foreground" /> <strong className="text-foreground w-32">PAN Card Number:</strong>{employee.panCardNumber || "N/A"}</div>
-                {employee.photoUrl ? (
-                  <div className="flex items-start">
-                      <UserIcon className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <div>
-                      <strong className="block text-foreground">Photograph:</strong>
-                      <Button variant="link" asChild className="p-0 h-auto text-primary hover:underline">
-                          <a href={employee.photoUrl} target="_blank" rel="noopener noreferrer">View Photograph</a>
-                      </Button>
-                      </div>
-                  </div>
-                  ) : <p className="text-muted-foreground flex items-center"><UserIcon className="mr-2 h-4 w-4 text-muted-foreground" />Photograph: Not Uploaded</p>
-              }
             </div>
           </section>
         </CardContent>
