@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
-export default function DashboardLayout({
+export default function EmployeeLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -19,20 +19,20 @@ export default function DashboardLayout({
     if (!loading) {
       if (!loggedInEntity) {
         router.replace("/login");
-      } else if (userType !== 'user') {
-        // If logged in but not a regular user, redirect appropriately
+      } else if (userType !== 'employee') {
+        // If logged in but not an employee, redirect
         if (userType === 'admin') {
           router.replace("/admin");
-        } else if (userType === 'employee') {
-          router.replace("/employee/dashboard");
-        } else { // Should not happen
+        } else if (userType === 'user') {
+          router.replace("/dashboard");
+        } else {
           router.replace("/login");
         }
       }
     }
   }, [loggedInEntity, userType, loading, router]);
 
-  if (loading || !loggedInEntity || userType !== 'user') {
+  if (loading || !loggedInEntity || userType !== 'employee') {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -47,7 +47,7 @@ export default function DashboardLayout({
         {children}
       </main>
       <footer className="py-4 text-center text-sm text-muted-foreground border-t">
-        © {new Date().getFullYear()} ChitConnect. All rights reserved.
+        © {new Date().getFullYear()} ChitConnect Employee Portal.
       </footer>
     </div>
   );

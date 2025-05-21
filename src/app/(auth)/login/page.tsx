@@ -7,20 +7,22 @@ import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-  const { user, loading, isAdmin } = useAuth();
+  const { loggedInEntity, userType, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && user) {
-      if (isAdmin) {
+    if (!loading && loggedInEntity) {
+      if (userType === 'admin') {
         router.replace("/admin");
-      } else {
+      } else if (userType === 'employee') {
+        router.replace("/employee/dashboard");
+      } else if (userType === 'user') {
         router.replace("/dashboard");
       }
     }
-  }, [user, loading, isAdmin, router]);
+  }, [loggedInEntity, userType, loading, router]);
 
-  if (loading || (!loading && user)) {
+  if (loading || (!loading && loggedInEntity)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -30,3 +32,5 @@ export default function LoginPage() {
   
   return <LoginForm />;
 }
+
+    

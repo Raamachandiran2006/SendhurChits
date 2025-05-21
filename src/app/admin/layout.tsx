@@ -16,20 +16,25 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isAdmin, loading } = useAuth();
+  const { loggedInEntity, userType, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!loading) {
-      if (!user) {
+      if (!loggedInEntity) {
         router.replace("/login");
-      } else if (!isAdmin) {
-        router.replace("/dashboard");
+      } else if (userType !== 'admin') {
+        // If logged in but not an admin, redirect appropriately
+        if (userType === 'employee') {
+          router.replace("/employee/dashboard");
+        } else { // 'user'
+          router.replace("/dashboard");
+        }
       }
     }
-  }, [user, isAdmin, loading, router]);
+  }, [loggedInEntity, userType, loading, router]);
 
-  if (loading || !user || !isAdmin) {
+  if (loading || !loggedInEntity || userType !== 'admin') {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -59,3 +64,5 @@ export default function AdminLayout({
     </SidebarProvider>
   );
 }
+
+    

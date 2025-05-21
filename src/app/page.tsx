@@ -7,22 +7,26 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 
 export default function HomePage() {
-  const { user, isAdmin, loading } = useAuth();
+  const { loggedInEntity, userType, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!loading) {
-      if (user) {
-        if (isAdmin) {
+      if (loggedInEntity) {
+        if (userType === 'admin') {
           router.replace("/admin");
-        } else {
+        } else if (userType === 'employee') {
+          router.replace("/employee/dashboard");
+        } else if (userType === 'user') {
           router.replace("/dashboard");
+        } else { // Should not happen if loggedInEntity is true
+          router.replace("/login");
         }
       } else {
         router.replace("/login");
       }
     }
-  }, [user, isAdmin, loading, router]);
+  }, [loggedInEntity, userType, loading, router]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
@@ -31,3 +35,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    

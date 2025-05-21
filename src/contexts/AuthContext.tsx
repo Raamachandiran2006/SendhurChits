@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { User } from "@/types";
+import type { User, Employee } from "@/types";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
@@ -17,8 +17,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 interface AuthContextType {
-  user: User | null;
-  isAdmin: boolean;
+  loggedInEntity: User | Employee | null; // Can hold a User or Employee object
+  userType: 'user' | 'admin' | 'employee' | null; // Distinguishes the type of logged-in entity
   loading: boolean;
   login: (phone: string, passwordInput: string) => Promise<void>;
   signup: (userData: Omit<User, "id" | "username" | "groups" | "isAdmin" | "password"> & {password: string}) => Promise<void>;
@@ -28,19 +28,19 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [loggedInEntity, setLoggedInEntity] = useState<User | Employee | null>(null);
+  const [userType, setUserType] = useState<'user' | 'admin' | 'employee' | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("chitConnectUser");
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser) as User;
-      setUser(parsedUser);
-      // Admin check: specific username 'admin' OR isAdmin flag is true
-      setIsAdmin(parsedUser.username === "admin" || !!parsedUser.isAdmin);
+    const storedEntity = localStorage.getItem("chitConnectEntity");
+    const storedUserType = localStorage.getItem("chitConnectUserType") as 'user' | 'admin' | 'employee' | null;
+    
+    if (storedEntity && storedUserType) {
+      setLoggedInEntity(JSON.parse(storedEntity));
+      setUserType(storedUserType);
     }
     setLoading(false);
   }, []);
@@ -48,38 +48,70 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (phoneInput: string, passwordInput: string) => {
     setLoading(true);
     try {
+      // Try logging in as a User first
       const usersRef = collection(db, "users");
-      // Login using phone number
-      const q = query(usersRef, where("phone", "==", phoneInput));
-      const querySnapshot = await getDocs(q);
+      const userQuery = query(usersRef, where("phone", "==", phoneInput));
+      const userQuerySnapshot = await getDocs(userQuery);
 
-      if (querySnapshot.empty) {
-        toast({ title: "Login Failed", description: "Invalid phone number or password.", variant: "destructive" });
+      if (!userQuerySnapshot.empty) {
+        const userData = userQuerySnapshot.docs[0].data() as Omit<User, "id">;
+        const userId = userQuerySnapshot.docs[0].id;
+
+        if (userData.password !== passwordInput) {
+          toast({ title: "Login Failed", description: "Invalid phone number or password.", variant: "destructive" });
+          setLoading(false);
+          return;
+        }
+        
+        const entity: User = { ...userData, id: userId };
+        setLoggedInEntity(entity);
+        localStorage.setItem("chitConnectEntity", JSON.stringify(entity));
+
+        const isAdminUser = entity.username === "admin" || !!entity.isAdmin;
+        const currentType = isAdminUser ? 'admin' : 'user';
+        setUserType(currentType);
+        localStorage.setItem("chitConnectUserType", currentType);
+
+        toast({ title: "Login Successful", description: `Welcome back, ${entity.fullname}!` });
+        if (isAdminUser) {
+          router.push("/admin");
+        } else {
+          router.push("/dashboard");
+        }
         setLoading(false);
         return;
       }
 
-      const userData = querySnapshot.docs[0].data() as Omit<User, "id">;
-      const userId = querySnapshot.docs[0].id;
+      // If not found in users, try logging in as an Employee
+      const employeesRef = collection(db, "employees");
+      const employeeQuery = query(employeesRef, where("phone", "==", phoneInput));
+      const employeeQuerySnapshot = await getDocs(employeeQuery);
 
-      // WARNING: Plain text password comparison. NOT FOR PRODUCTION.
-      if (userData.password !== passwordInput) { 
-        toast({ title: "Login Failed", description: "Invalid phone number or password.", variant: "destructive" });
+      if (!employeeQuerySnapshot.empty) {
+        const employeeData = employeeQuerySnapshot.docs[0].data() as Omit<Employee, "id">;
+        const employeeId = employeeQuerySnapshot.docs[0].id;
+        
+        if (employeeData.password !== passwordInput) { // Assuming employees also have a plain text password
+          toast({ title: "Login Failed", description: "Invalid phone number or password.", variant: "destructive" });
+          setLoading(false);
+          return;
+        }
+
+        const entity: Employee = { ...employeeData, id: employeeId };
+        setLoggedInEntity(entity);
+        localStorage.setItem("chitConnectEntity", JSON.stringify(entity));
+        setUserType('employee');
+        localStorage.setItem("chitConnectUserType", 'employee');
+        
+        toast({ title: "Login Successful", description: `Welcome back, ${entity.fullname}!` });
+        router.push("/employee/dashboard");
         setLoading(false);
         return;
       }
-      
-      const loggedInUser: User = { ...userData, id: userId };
-      setUser(loggedInUser);
-      localStorage.setItem("chitConnectUser", JSON.stringify(loggedInUser));
-      const isAdminUser = loggedInUser.username === "admin" || !!loggedInUser.isAdmin;
-      setIsAdmin(isAdminUser);
-      toast({ title: "Login Successful", description: `Welcome back, ${loggedInUser.fullname}!` });
-      if (isAdminUser) {
-        router.push("/admin");
-      } else {
-        router.push("/dashboard");
-      }
+
+      // If not found in either collection
+      toast({ title: "Login Failed", description: "Invalid phone number or password.", variant: "destructive" });
+
     } catch (error) {
       console.error("Login error:", error);
       toast({ title: "Login Error", description: "An unexpected error occurred.", variant: "destructive" });
@@ -91,7 +123,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signup = async (userData: Omit<User, "id" | "username" | "groups" | "isAdmin" | "password"> & {password: string}) => {
     setLoading(true);
     try {
-      // Check if phone number already exists
       const phoneQuery = query(collection(db, "users"), where("phone", "==", userData.phone));
       const phoneSnapshot = await getDocs(phoneQuery);
       if (!phoneSnapshot.empty) {
@@ -101,15 +132,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const counterRef = doc(db, "metadata", "counters");
-      let newUsername = ""; // This will be the auto-generated user00X ID
+      let newUsername = ""; 
 
       await runTransaction(db, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
         let userCount = 0;
         if (!counterDoc.exists()) {
-          // Initialize counter if it doesn't exist
-          transaction.set(counterRef, { userCount: 1 }); // Start with 1, so first user is user001
-          userCount = 0; // Next user will be user001
+          transaction.set(counterRef, { userCount: 1 });
+          userCount = 0; 
         } else {
           userCount = counterDoc.data().userCount;
           transaction.update(counterRef, { userCount: userCount + 1 });
@@ -117,25 +147,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         newUsername = `user${String(userCount + 1).padStart(3, "0")}`;
       });
       
-      const newUserDocRef = doc(collection(db, "users")); // Auto-generate Firestore document ID
-      const newUser: Omit<User, "id"> = {
-        username: newUsername, // Store the generated user00X ID
+      const newUserDocRef = doc(collection(db, "users")); 
+      const newUserOmitId: Omit<User, "id"> = {
+        username: newUsername, 
         fullname: userData.fullname,
-        phone: userData.phone, // Store phone, used for login
+        phone: userData.phone, 
         dob: userData.dob,
-        password: userData.password, // WARNING: Plain text password. NOT FOR PRODUCTION.
+        password: userData.password, 
         address: userData.address,
         referralPerson: userData.referralPerson || "",
         aadhaarCardUrl: userData.aadhaarCardUrl || "",
         panCardUrl: userData.panCardUrl || "",
         photoUrl: userData.photoUrl || "",
-        groups: [], // Initialize with empty groups array
-        isAdmin: newUsername === "admin", // Special case for 'admin' username
+        groups: [], 
+        isAdmin: newUsername === "admin", 
       };
 
-      await setDoc(newUserDocRef, newUser);
+      await setDoc(newUserDocRef, newUserOmitId);
       
-      toast({ title: "Signup Successful", description: `Welcome, ${newUser.fullname}! You can now log in with your phone number.` });
+      toast({ title: "Signup Successful", description: `Welcome, ${newUserOmitId.fullname}! You can now log in with your phone number.` });
       router.push("/login");
     } catch (error) {
       console.error("Signup error:", error);
@@ -146,15 +176,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
-    setUser(null);
-    setIsAdmin(false);
-    localStorage.removeItem("chitConnectUser");
+    setLoggedInEntity(null);
+    setUserType(null);
+    localStorage.removeItem("chitConnectEntity");
+    localStorage.removeItem("chitConnectUserType");
     router.push("/login");
     toast({ title: "Logged Out", description: "You have been successfully logged out." });
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ loggedInEntity, userType, loading, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -167,3 +198,5 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
+    
