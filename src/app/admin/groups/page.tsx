@@ -62,45 +62,7 @@ export default function AdminGroupsPage() {
         </Button>
       </div>
 
-      <Card className="mb-8 shadow-lg">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <Megaphone className="h-6 w-6 text-primary" />
-            <CardTitle className="text-xl">Upcoming Auctions Details</CardTitle>
-          </div>
-          <CardDescription>Information about the next scheduled auction events.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div className="flex items-center p-3 bg-secondary/50 rounded-md">
-            <CalendarClock className="mr-3 h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="font-semibold text-foreground">Auction Month</p>
-              <p className="text-muted-foreground">{format(new Date(), "MMMM yyyy")}</p> {/* Placeholder: Current month */}
-            </div>
-          </div>
-          <div className="flex items-center p-3 bg-secondary/50 rounded-md">
-            <CalendarDays className="mr-3 h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="font-semibold text-foreground">Scheduled Date</p>
-              <p className="text-muted-foreground">15th {format(new Date(), "MMMM yyyy")}</p> {/* Placeholder */}
-            </div>
-          </div>
-          <div className="flex items-center p-3 bg-secondary/50 rounded-md">
-            <Clock className="mr-3 h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="font-semibold text-foreground">Scheduled Time</p>
-              <p className="text-muted-foreground">02:00 PM IST</p> {/* Placeholder */}
-            </div>
-          </div>
-          <div className="flex items-center p-3 bg-secondary/50 rounded-md">
-            <Info className="mr-3 h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="font-semibold text-foreground">Latest Auction</p>
-              <p className="text-muted-foreground">Group Alpha - Bid at ₹85,000</p> {/* Placeholder */}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Removed Upcoming Auctions Details card from here */}
 
       {groups.length === 0 ? (
         <Card className="text-center py-10 shadow-lg">

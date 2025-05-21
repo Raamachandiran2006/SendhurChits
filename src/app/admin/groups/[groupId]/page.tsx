@@ -13,7 +13,7 @@ import Link from "next/link";
 import { 
   Loader2, 
   ArrowLeft, 
-  Users as UsersIconLucide, // Renamed to avoid conflict
+  Users as UsersIconLucide, 
   User as UserIcon, 
   Info, 
   AlertTriangle, 
@@ -23,9 +23,11 @@ import {
   Landmark, 
   Clock, 
   Tag, 
-  LandmarkIcon as GroupLandmarkIcon, // Renamed for clarity
+  LandmarkIcon as GroupLandmarkIcon, 
   SearchCode,
-  Trash2
+  Trash2,
+  Megaphone, // Added for auction card
+  CalendarClock // Added for auction card
 } from "lucide-react";
 import { 
   AlertDialog, 
@@ -42,6 +44,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { Separator } from "@/components/ui/separator";
 
 // Helper function to format date safely
 const formatDateSafe = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
@@ -138,20 +141,18 @@ export default function AdminGroupDetailPage() {
     try {
       const groupDocRef = doc(db, "groups", groupId);
       
-      // Batch remove group ID from all members' `groups` array
-      const batch = writeBatch(db);
+      const batchDB = writeBatch(db);
       const usersToUpdateQuery = query(collection(db, "users"), where("groups", "array-contains", groupId));
       const usersToUpdateSnapshot = await getDocs(usersToUpdateQuery);
       
       usersToUpdateSnapshot.forEach(userDoc => {
-        batch.update(userDoc.ref, {
+        batchDB.update(userDoc.ref, {
           groups: arrayRemove(groupId)
         });
       });
       
-      await batch.commit();
+      await batchDB.commit();
       
-      // Delete the group document
       await deleteDoc(groupDocRef);
 
       toast({
@@ -252,7 +253,7 @@ export default function AdminGroupDetailPage() {
       <Card className="shadow-xl">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <UsersIconLucide className="h-8 w-8 text-primary" /> {/* Changed from GroupIcon to UsersIconLucide */}
+            <UsersIconLucide className="h-8 w-8 text-primary" />
             <div>
               <CardTitle className="text-2xl font-bold text-foreground">{group.groupName}</CardTitle>
               <CardDescription>{group.description}</CardDescription>
@@ -313,6 +314,46 @@ export default function AdminGroupDetailPage() {
       <Card className="shadow-xl">
         <CardHeader>
           <div className="flex items-center gap-3">
+            <Megaphone className="h-6 w-6 text-primary" />
+            <CardTitle className="text-xl font-bold text-foreground">Group Auction Details</CardTitle>
+          </div>
+          <CardDescription>Information about auction events for this group.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div className="flex items-center p-3 bg-secondary/50 rounded-md">
+            <CalendarClock className="mr-3 h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="font-semibold text-foreground">Auction Month</p>
+              <p className="text-muted-foreground">{format(new Date(), "MMMM yyyy")}</p> {/* Placeholder */}
+            </div>
+          </div>
+          <div className="flex items-center p-3 bg-secondary/50 rounded-md">
+            <CalendarDays className="mr-3 h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="font-semibold text-foreground">Next Scheduled Date</p>
+              <p className="text-muted-foreground">15th {format(new Date(), "MMMM yyyy")}</p> {/* Placeholder */}
+            </div>
+          </div>
+          <div className="flex items-center p-3 bg-secondary/50 rounded-md">
+            <Clock className="mr-3 h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="font-semibold text-foreground">Next Scheduled Time</p>
+              <p className="text-muted-foreground">02:00 PM IST</p> {/* Placeholder */}
+            </div>
+          </div>
+          <div className="flex items-center p-3 bg-secondary/50 rounded-md">
+            <Info className="mr-3 h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="font-semibold text-foreground">Last Auction Winner</p>
+              <p className="text-muted-foreground">To be determined</p> {/* Placeholder */}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      <Separator />
+      <Card className="shadow-xl">
+        <CardHeader>
+          <div className="flex items-center gap-3">
             <UserIcon className="h-8 w-8 text-primary" />
             <div>
               <CardTitle className="text-2xl font-bold text-foreground">Group Members</CardTitle>
@@ -331,7 +372,9 @@ export default function AdminGroupDetailPage() {
                 </TableHeader>
                 <TableBody>
                   {membersDetails.map((member) => (
-                    <TableRow key={member.id}><TableCell className="font-medium">{member.fullname}</TableCell><TableCell>{member.username}</TableCell><TableCell><div className="flex items-center"><Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}</div></TableCell><TableCell><div className="flex items-center"><CalendarDays className="mr-2 h-3 w-3 text-muted-foreground" /> {formatDateSafe(member.dob)}</div></TableCell></TableRow>
+                    <TableRow key={member.id}>{/* Compacted JSX below */}
+                      <TableCell className="font-medium">{member.fullname}</TableCell><TableCell>{member.username}</TableCell><TableCell><div className="flex items-center"><Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}</div></TableCell><TableCell><div className="flex items-center"><CalendarDays className="mr-2 h-3 w-3 text-muted-foreground" /> {formatDateSafe(member.dob)}</div></TableCell>
+                    </TableRow>
                   ))}
                 </TableBody>
               </Table>
@@ -342,4 +385,3 @@ export default function AdminGroupDetailPage() {
     </div>
   );
 }
-    
