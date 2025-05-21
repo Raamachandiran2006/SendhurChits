@@ -3,9 +3,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import type { Group, User } from "@/types";
+import type { Group, User, AuctionRecord } from "@/types";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, arrayRemove, updateDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, arrayRemove, updateDoc, orderBy } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,8 @@ import {
   Edit3,
   Save,
   XCircle,
-  PlayCircle 
+  PlayCircle,
+  History
 } from "lucide-react";
 import { 
   AlertDialog, 
@@ -46,7 +47,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO, parse, format as formatDateFns, isValid } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { useForm, Controller } from "react-hook-form";
@@ -141,12 +142,15 @@ export default function AdminGroupDetailPage() {
 
   const [group, setGroup] = useState<Group | null>(null);
   const [membersDetails, setMembersDetails] = useState<User[]>([]);
+  const [auctionHistory, setAuctionHistory] = useState<AuctionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
   const [isEditingAuctionDetails, setIsEditingAuctionDetails] = useState(false);
   const [isSavingAuctionDetails, setIsSavingAuctionDetails] = useState(false);
+  const [loadingAuctionHistory, setLoadingAuctionHistory] = useState(true);
+
 
   const auctionForm = useForm<AuctionDetailsFormValues>({
     resolver: zodResolver(auctionDetailsFormSchema),
@@ -158,21 +162,25 @@ export default function AdminGroupDetailPage() {
     },
   });
 
-  const fetchGroupAndMembers = useCallback(async () => {
+  const fetchGroupData = useCallback(async () => {
     if (!groupId) {
       setError("Group ID is missing.");
       setLoading(false);
+      setLoadingAuctionHistory(false);
       return;
     }
     setLoading(true);
+    setLoadingAuctionHistory(true);
     setError(null);
     try {
+      // Fetch Group Details
       const groupDocRef = doc(db, "groups", groupId);
       const groupDocSnap = await getDoc(groupDocRef);
 
       if (!groupDocSnap.exists()) {
         setError("Group not found.");
         setLoading(false);
+        setLoadingAuctionHistory(false);
         return;
       }
       const groupData = { id: groupDocSnap.id, ...groupDocSnap.data() } as Group;
@@ -184,7 +192,7 @@ export default function AdminGroupDetailPage() {
         lastAuctionWinner: groupData.lastAuctionWinner || "",
       });
 
-
+      // Fetch Members Details
       if (groupData.members && groupData.members.length > 0) {
         const memberUsernames = groupData.members;
         const fetchedMembers: User[] = [];
@@ -205,17 +213,26 @@ export default function AdminGroupDetailPage() {
       } else {
         setMembersDetails([]);
       }
+
+      // Fetch Auction History
+      const auctionRecordsRef = collection(db, "auctionRecords");
+      const qAuction = query(auctionRecordsRef, where("groupId", "==", groupId), orderBy("auctionDate", "desc"));
+      const auctionSnapshot = await getDocs(qAuction);
+      const fetchedAuctionHistory = auctionSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as AuctionRecord));
+      setAuctionHistory(fetchedAuctionHistory);
+
     } catch (err) {
       console.error("Error fetching group details:", err);
       setError("Failed to fetch group details. Please try again.");
     } finally {
       setLoading(false);
+      setLoadingAuctionHistory(false);
     }
   }, [groupId, auctionForm]);
 
   useEffect(() => {
-    fetchGroupAndMembers();
-  }, [fetchGroupAndMembers]);
+    fetchGroupData();
+  }, [fetchGroupData]);
 
   const handleDeleteGroup = async () => {
     if (!group || deleteConfirmationText !== "delete") return;
@@ -599,7 +616,7 @@ export default function AdminGroupDetailPage() {
       <Card className="shadow-xl">
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-3">
-            <Clock className="h-6 w-6 text-primary" /> 
+            <History className="h-6 w-6 text-primary" /> 
             <CardTitle className="text-xl font-bold text-foreground">Auction History</CardTitle>
           </div>
           <Button asChild variant="outline" size="sm">
@@ -609,9 +626,37 @@ export default function AdminGroupDetailPage() {
           </Button>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground text-center py-4">
-            Auction history will be displayed here.
-          </p>
+           {loadingAuctionHistory ? (
+             <div className="flex justify-center items-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="ml-3 text-muted-foreground">Loading auction history...</p>
+             </div>
+           ) : auctionHistory.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">
+              No auction history found for this group.
+            </p>
+           ) : (
+            <div className="space-y-4">
+              {auctionHistory.map((auction, index) => (
+                <Card key={auction.id} className="bg-secondary/50 shadow-sm">
+                  <CardHeader className="pb-3 pt-4">
+                    <CardTitle className="text-md font-semibold text-primary">
+                      Auction #{auctionHistory.length - index}
+                    </CardTitle>
+                    <CardDescription>
+                      {auction.auctionMonth} - {formatDateSafe(auction.auctionDate, "PPP")}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-sm space-y-1 pb-4">
+                    <p><strong className="text-foreground">Winner:</strong> {auction.winnerFullname} (@{auction.winnerUsername})</p>
+                    <p><strong className="text-foreground">Winning Bid:</strong> ₹{auction.winningBidAmount.toLocaleString()}</p>
+                    {auction.auctionTime && <p><strong className="text-foreground">Time:</strong> {auction.auctionTime}</p>}
+                    {auction.auctionMode && <p><strong className="text-foreground">Mode:</strong> {auction.auctionMode}</p>}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+           )}
         </CardContent>
       </Card>
 
