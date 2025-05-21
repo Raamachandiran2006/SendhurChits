@@ -386,7 +386,18 @@ export function StartAuctionForm() {
                   <FormLabel>Winning Bid Amount (₹)</FormLabel>
                     <div className="flex items-center gap-2">
                         <DollarSign className="h-5 w-5 text-muted-foreground" />
-                        <FormControl><Input type="number" placeholder="e.g., 12000" {...field} /></FormControl>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            placeholder="e.g., 12000" 
+                            {...field}
+                            value={field.value === undefined ? "" : field.value}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                field.onChange(val === "" ? undefined : parseFloat(val));
+                            }}
+                          />
+                        </FormControl>
                     </div>
                   <FormMessage />
                 </FormItem>
@@ -403,5 +414,3 @@ export function StartAuctionForm() {
     </Card>
   );
 }
-
-    
