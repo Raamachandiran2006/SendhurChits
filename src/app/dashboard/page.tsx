@@ -7,14 +7,25 @@ import type { Group, User } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where, documentId } from "firebase/firestore";
 import { UserGroupCard } from "@/components/dashboard/UserGroupCard";
-import { Loader2, ListX } from "lucide-react";
+import { Loader2, ListX, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import Image from "next/image";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { loggedInEntity, userType } = useAuth(); // Use loggedInEntity which will be User type here
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const user = loggedInEntity as User | null; // Cast to User
+
+  const getInitials = (name: string | undefined) => {
+    if (!name) return "U";
+    const names = name.split(' ');
+    if (names.length === 1) return names[0][0].toUpperCase();
+    return names[0][0].toUpperCase() + names[names.length - 1][0].toUpperCase();
+  }
 
   useEffect(() => {
     if (user && user.groups && user.groups.length > 0) {
@@ -22,9 +33,6 @@ export default function DashboardPage() {
         setLoading(true);
         try {
           const groupsRef = collection(db, "groups");
-          // Firestore 'in' query supports up to 30 elements in the array.
-          // For more, batching or alternative structuring is needed.
-          // For this scaffold, assume user.groups.length <= 30.
           const q = query(groupsRef, where(documentId(), "in", user.groups.slice(0,30) ));
           const querySnapshot = await getDocs(q);
           const userGroups = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group));
@@ -53,8 +61,29 @@ export default function DashboardPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <div className="mb-8 flex flex-col sm:flex-row justify-between items-center">
-        <h1 className="text-3xl font-bold text-foreground mb-4 sm:mb-0">Your Chit Groups</h1>
+      <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+        <div className="flex items-center gap-4 mb-4 sm:mb-0">
+          {user?.photoUrl ? (
+            <Image 
+              src={user.photoUrl} 
+              alt={`${user.fullname}'s photo`} 
+              width={80} 
+              height={80} 
+              className="rounded-full border-2 border-primary object-cover"
+              data-ai-hint="user profile"
+            />
+          ) : (
+            <Avatar className="h-20 w-20 border-2 border-primary">
+              <AvatarFallback className="text-3xl bg-secondary text-secondary-foreground">
+                {getInitials(user?.fullname)}
+              </AvatarFallback>
+            </Avatar>
+          )}
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Welcome, {user?.fullname}!</h1>
+            <p className="text-muted-foreground">Here are your chit groups.</p>
+          </div>
+        </div>
         {user?.isAdmin && (
           <Button asChild variant="outline">
             <Link href="/admin/groups/create">Create New Group</Link>
@@ -77,12 +106,16 @@ export default function DashboardPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {groups.map((group) => (
-            <UserGroupCard key={group.id} group={group} />
-          ))}
+        <div>
+          <h2 className="text-2xl font-semibold text-foreground mb-6">Your Chit Groups</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {groups.map((group) => (
+              <UserGroupCard key={group.id} group={group} />
+            ))}
+          </div>
         </div>
       )}
     </div>
   );
 }
+
