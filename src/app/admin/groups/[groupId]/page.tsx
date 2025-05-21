@@ -45,7 +45,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, parse, format as formatDateFns, isValid } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { useForm, Controller } from "react-hook-form";
@@ -61,10 +61,9 @@ import { cn } from "@/lib/utils";
 const formatDateSafe = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
   if (!dateString) return "N/A";
   try {
-    // Try parsing as ISO if it contains 'T', otherwise assume 'yyyy-MM-dd' or direct Date object
     const date = typeof dateString === 'string' && dateString.includes('T') 
       ? parseISO(dateString) 
-      : (typeof dateString === 'string' ? new Date(dateString.replace(/-/g, '/')) : dateString); // Looser parsing for yyyy-MM-dd
+      : (typeof dateString === 'string' ? new Date(dateString.replace(/-/g, '/')) : dateString); 
 
     if (isNaN(date.getTime())) return "N/A";
     return format(date, outputFormat);
@@ -86,11 +85,34 @@ const getBiddingTypeLabel = (type: string | undefined) => {
 const auctionDetailsFormSchema = z.object({
   auctionMonth: z.string().optional().or(z.literal('')),
   auctionScheduledDate: z.string().optional().or(z.literal('')),
-  auctionScheduledTime: z.string().optional().or(z.literal('')),
+  auctionScheduledTime: z.string().optional().or(z.literal('')), // Stored as string (can be HH:mm or user input)
   lastAuctionWinner: z.string().optional().or(z.literal('')),
 });
 
 type AuctionDetailsFormValues = z.infer<typeof auctionDetailsFormSchema>;
+
+// Helper to convert various time string formats to HH:mm for input type="time"
+const convertTo24HourFormat = (timeString?: string): string => {
+  if (!timeString || timeString.trim() === "") return "";
+  
+  // Check if it's already HH:mm (e.g., "15:00")
+  if (/^([01]\d|2[0-3]):([0-5]\d)$/.test(timeString)) {
+    return timeString;
+  }
+
+  // Try to parse common 12-hour formats like "hh:mm a", "h:mm a"
+  const now = new Date(); // Dummy date for parsing
+  const formatsToTry = ["hh:mm a", "h:mm a", "hh:mma", "h:mma"];
+  for (const fmt of formatsToTry) {
+    const parsedDate = parse(timeString, fmt, now);
+    if (isValid(parsedDate)) {
+      return formatDateFns(parsedDate, "HH:mm");
+    }
+  }
+  // If not parsable to a known format, return empty for input type="time" to handle it gracefully
+  return ""; 
+};
+
 
 export default function AdminGroupDetailPage() {
   const params = useParams();
@@ -223,10 +245,11 @@ export default function AdminGroupDetailPage() {
       await updateDoc(groupDocRef, {
         auctionMonth: values.auctionMonth || "",
         auctionScheduledDate: values.auctionScheduledDate || "",
-        auctionScheduledTime: values.auctionScheduledTime || "",
+        auctionScheduledTime: values.auctionScheduledTime || "", // Saved as HH:mm if edited via time picker
         lastAuctionWinner: values.lastAuctionWinner || "",
       });
-      setGroup(prevGroup => prevGroup ? { ...prevGroup, ...values } : null);
+      // Optimistically update local state or re-fetch
+      setGroup(prevGroup => prevGroup ? { ...prevGroup, ...values } : null); 
       toast({ title: "Auction Details Updated", description: "Successfully saved auction details." });
       setIsEditingAuctionDetails(false);
     } catch (error) {
@@ -283,13 +306,14 @@ export default function AdminGroupDetailPage() {
     return <div className="container mx-auto py-8 text-center text-muted-foreground">Group data not available.</div>;
   }
 
+  // Generic component for displaying auction details (both view and edit for simple text fields)
   const AuctionDetailItem = ({ icon: Icon, label, value, isEditing, fieldName, register }: { icon: React.ElementType, label: string, value?: string, isEditing?: boolean, fieldName?: keyof AuctionDetailsFormValues, register?: any }) => (
     <div className="flex items-center p-3 bg-secondary/50 rounded-md">
       <Icon className="mr-3 h-5 w-5 text-muted-foreground flex-shrink-0" />
       <div className="flex-grow">
         <p className="font-semibold text-foreground">{label}</p>
         {isEditing && fieldName ? (
-          <Input {...register(fieldName)} defaultValue={value || ""} className="text-sm h-8 mt-1" />
+             <Input {...register(fieldName)} defaultValue={value || ""} className="text-sm h-8 mt-1 w-full" />
         ) : (
           <p className="text-muted-foreground text-sm">{value || "N/A"}</p>
         )}
@@ -460,17 +484,18 @@ export default function AdminGroupDetailPage() {
         </CardHeader>
         <CardDescription className="px-6 pb-2">Information about auction events for this group.</CardDescription>
         <CardContent>
-          <Form {...auctionForm}>
-            <form onSubmit={auctionForm.handleSubmit(onSaveAuctionDetails)} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <AuctionDetailItem icon={CalendarClock} label="Auction Month" value={group.auctionMonth} isEditing={isEditingAuctionDetails} fieldName="auctionMonth" register={auctionForm.register} />
-              <FormField control={auctionForm.control} name="auctionScheduledDate" render={({ field }) => (
-                <FormItem className="flex flex-col p-3 bg-secondary/50 rounded-md">
-                  <div className="flex items-center">
-                    <CalendarDays className="mr-3 h-5 w-5 text-muted-foreground flex-shrink-0" />
-                    <div>
-                      <FormLabel className="font-semibold text-foreground">Scheduled Date</FormLabel>
-                      {isEditingAuctionDetails ? (
-                         <Popover>
+          {isEditingAuctionDetails ? (
+            <Form {...auctionForm}>
+              <form onSubmit={auctionForm.handleSubmit(onSaveAuctionDetails)} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <AuctionDetailItem icon={CalendarClock} label="Auction Month" value={group.auctionMonth} isEditing fieldName="auctionMonth" register={auctionForm.register} />
+                
+                <FormField control={auctionForm.control} name="auctionScheduledDate" render={({ field }) => (
+                  <FormItem className="flex flex-col p-3 bg-secondary/50 rounded-md">
+                    <div className="flex items-center">
+                      <CalendarDays className="mr-3 h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      <div>
+                        <FormLabel className="font-semibold text-foreground">Scheduled Date</FormLabel>
+                        <Popover>
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button
@@ -485,26 +510,61 @@ export default function AdminGroupDetailPage() {
                           <PopoverContent className="w-auto p-0" align="start">
                             <Calendar
                               mode="single"
-                              selected={field.value ? new Date(field.value.replace(/-/g, '/')) : undefined} // Handle YYYY-MM-DD
+                              selected={field.value ? new Date(field.value.replace(/-/g, '/')) : undefined}
                               onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
                               initialFocus
                             />
                           </PopoverContent>
                         </Popover>
-                      ) : (
-                        <p className="text-muted-foreground text-sm">{formatDateSafe(group.auctionScheduledDate, "PPP") || "N/A"}</p>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                  <FormMessage className="text-xs" />
-                </FormItem>
-              )} />
-              <AuctionDetailItem icon={Clock} label="Scheduled Time" value={group.auctionScheduledTime} isEditing={isEditingAuctionDetails} fieldName="auctionScheduledTime" register={auctionForm.register} />
-              <AuctionDetailItem icon={Info} label="Last Auction Winner" value={group.lastAuctionWinner} isEditing={isEditingAuctionDetails} fieldName="lastAuctionWinner" register={auctionForm.register} />
-            </form>
-          </Form>
+                    <FormMessage className="text-xs pl-[calc(0.75rem+1.25rem)]" />
+                  </FormItem>
+                )} />
+
+                <FormField
+                  control={auctionForm.control}
+                  name="auctionScheduledTime"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col p-3 bg-secondary/50 rounded-md">
+                      <div className="flex items-center">
+                        <Clock className="mr-3 h-5 w-5 text-muted-foreground flex-shrink-0" />
+                        <div>
+                          <FormLabel className="font-semibold text-foreground">Scheduled Time</FormLabel>
+                          <Input
+                            type="time"
+                            value={field.value ? convertTo24HourFormat(field.value) : ""}
+                            onChange={(e) => field.onChange(e.target.value)} // e.target.value is already HH:mm
+                            className="text-sm h-8 mt-1 w-full"
+                          />
+                        </div>
+                      </div>
+                      <FormMessage className="text-xs pl-[calc(0.75rem+1.25rem)]" />
+                    </FormItem>
+                  )}
+                />
+
+                <AuctionDetailItem icon={Info} label="Last Auction Winner" value={group.lastAuctionWinner} isEditing fieldName="lastAuctionWinner" register={auctionForm.register} />
+              </form>
+            </Form>
+          ) : (
+            // View Mode for Auction Details
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <AuctionDetailItem icon={CalendarClock} label="Auction Month" value={group.auctionMonth} />
+                 <div className="flex items-center p-3 bg-secondary/50 rounded-md">
+                    <CalendarDays className="mr-3 h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    <div>
+                        <p className="font-semibold text-foreground">Scheduled Date</p>
+                        <p className="text-muted-foreground text-sm">{formatDateSafe(group.auctionScheduledDate, "PPP") || "N/A"}</p>
+                    </div>
+                </div>
+                <AuctionDetailItem icon={Clock} label="Scheduled Time" value={group.auctionScheduledTime} />
+                <AuctionDetailItem icon={Info} label="Last Auction Winner" value={group.lastAuctionWinner} />
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
   );
 }
+
