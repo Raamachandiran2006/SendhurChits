@@ -30,7 +30,8 @@ import {
   CalendarClock,
   Edit3,
   Save,
-  XCircle
+  XCircle,
+  PlayCircle // For Start Auction button
 } from "lucide-react";
 import { 
   AlertDialog, 
@@ -94,15 +95,13 @@ type AuctionDetailsFormValues = z.infer<typeof auctionDetailsFormSchema>;
 // Converts "HH:mm" (24h) to "hh:mm AM/PM" (12h)
 const convert24hTo12hFormat = (time24?: string): string => {
   if (!time24 || !/^([01]\d|2[0-3]):([0-5]\d)$/.test(time24)) {
-    // If it's not in HH:mm format, it might already be 12h or invalid.
-    // For safety, return as is. If it's an empty string or other, it'll pass through.
     return time24 || ""; 
   }
   const [hoursStr, minutesStr] = time24.split(':');
   let hours = parseInt(hoursStr, 10);
   const ampm = hours >= 12 ? 'PM' : 'AM';
   hours = hours % 12;
-  hours = hours ? hours : 12; // the hour '0' should be '12'
+  hours = hours ? hours : 12; 
   const hours12Str = String(hours).padStart(2, '0');
   return `${hours12Str}:${minutesStr} ${ampm}`;
 };
@@ -111,13 +110,11 @@ const convert24hTo12hFormat = (time24?: string): string => {
 const convert12hTo24hFormat = (time12?: string): string => {
   if (!time12 || time12.trim() === "") return "";
 
-  // If already HH:mm
   if (/^([01]\d|2[0-3]):([0-5]\d)$/.test(time12)) {
     return time12;
   }
 
   const lowerTime12 = time12.toLowerCase();
-  // Regex for hh:mm AM/PM, h:mm AM/PM, hh:mmAM/PM, h:mmAM/PM
   const match = lowerTime12.match(/(\d{1,2}):(\d{2})\s*(am|pm)/);
 
   if (match) {
@@ -125,15 +122,14 @@ const convert12hTo24hFormat = (time12?: string): string => {
     const minutes = parseInt(match[2], 10);
     const period = match[3];
 
-    if (hours === 12) { // Handle 12 AM (midnight) and 12 PM (noon)
+    if (hours === 12) { 
       hours = (period === 'am') ? 0 : 12;
     } else if (period === 'pm') {
       hours += 12;
     }
-    // hours is now 0-23
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
   }
-  return ""; // Return empty if not a recognized 12h format or already 24h
+  return ""; 
 };
 
 
@@ -184,7 +180,7 @@ export default function AdminGroupDetailPage() {
       auctionForm.reset({
         auctionMonth: groupData.auctionMonth || "",
         auctionScheduledDate: groupData.auctionScheduledDate || "",
-        auctionScheduledTime: groupData.auctionScheduledTime || "", // This should be stored in 12h format
+        auctionScheduledTime: groupData.auctionScheduledTime || "", 
         lastAuctionWinner: groupData.lastAuctionWinner || "",
       });
 
@@ -268,7 +264,7 @@ export default function AdminGroupDetailPage() {
       await updateDoc(groupDocRef, {
         auctionMonth: values.auctionMonth || "",
         auctionScheduledDate: values.auctionScheduledDate || "",
-        auctionScheduledTime: values.auctionScheduledTime || "", // This is now the 12-hour format from form state
+        auctionScheduledTime: values.auctionScheduledTime || "", 
         lastAuctionWinner: values.lastAuctionWinner || "",
       });
       
@@ -552,7 +548,7 @@ export default function AdminGroupDetailPage() {
 
                 <FormField
                   control={auctionForm.control}
-                  name="auctionScheduledTime" // This RHF field stores the 12-hour format string
+                  name="auctionScheduledTime" 
                   render={({ field }) => (
                     <FormItem className="flex flex-col p-3 bg-secondary/50 rounded-md">
                       <div className="flex items-center">
@@ -561,11 +557,8 @@ export default function AdminGroupDetailPage() {
                           <FormLabel className="font-semibold text-foreground">Scheduled Time</FormLabel>
                           <Input
                             type="time"
-                            // Convert 12h format from field.value to 24h format for the input
                             value={convert12hTo24hFormat(field.value)} 
                             onChange={(e) => {
-                              // e.target.value is HH:mm (24h from input)
-                              // Convert it back to hh:mm AM/PM for RHF state and subsequent Firestore save
                               field.onChange(convert24hTo12hFormat(e.target.value) || ""); 
                             }}
                             className="text-sm h-8 mt-1 w-full"
@@ -581,7 +574,6 @@ export default function AdminGroupDetailPage() {
               </form>
             </Form>
           ) : (
-            // View Mode for Auction Details
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <AuctionDetailItem icon={CalendarClock} label="Auction Month" value={group.auctionMonth} />
                  <div className="flex items-center p-3 bg-secondary/50 rounded-md">
@@ -591,13 +583,33 @@ export default function AdminGroupDetailPage() {
                         <p className="text-muted-foreground text-sm">{formatDateSafe(group.auctionScheduledDate, "PPP") || "N/A"}</p>
                     </div>
                 </div>
-                {/* Display formatted 12-hour time in view mode */}
                 <AuctionDetailItem icon={Clock} label="Scheduled Time" value={group.auctionScheduledTime} />
                 <AuctionDetailItem icon={Info} label="Last Auction Winner" value={group.lastAuctionWinner} />
             </div>
           )}
         </CardContent>
       </Card>
+
+      <Separator />
+
+      <Card className="shadow-xl">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Clock className="h-6 w-6 text-primary" /> {/* Changed icon for Auction History */}
+            <CardTitle className="text-xl font-bold text-foreground">Auction History</CardTitle>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => { /* Placeholder for Start Auction functionality */ }}>
+            <PlayCircle className="mr-2 h-4 w-4" /> Start Auction
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {/* Placeholder for Auction History content */}
+          <p className="text-muted-foreground text-center py-4">
+            Auction history will be displayed here. The "Start Auction" button is a placeholder for now.
+          </p>
+        </CardContent>
+      </Card>
+
     </div>
   );
 }
