@@ -44,6 +44,7 @@ export interface Employee {
   role: string; // e.g., "Manager", "Agent", "Accountant"
   joiningDate: string; // YYYY-MM-DD
   salary?: number; // Optional monthly salary
+  hasUnreadSalaryNotification?: boolean;
 }
 
 export interface SalaryRecord {

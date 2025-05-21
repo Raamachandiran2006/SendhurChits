@@ -13,16 +13,18 @@ import {
   doc,
   setDoc,
   runTransaction,
+  updateDoc,
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 interface AuthContextType {
-  loggedInEntity: User | Employee | null; // Can hold a User or Employee object
-  userType: 'user' | 'admin' | 'employee' | null; // Distinguishes the type of logged-in entity
+  loggedInEntity: User | Employee | null; 
+  userType: 'user' | 'admin' | 'employee' | null; 
   loading: boolean;
   login: (phone: string, passwordInput: string) => Promise<void>;
   signup: (userData: Omit<User, "id" | "username" | "groups" | "isAdmin" | "password"> & {password: string}) => Promise<void>;
   logout: () => void;
+  clearSalaryNotificationForEmployee: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,7 +50,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (phoneInput: string, passwordInput: string) => {
     setLoading(true);
     try {
-      // Try logging in as a User first
       const usersRef = collection(db, "users");
       const userQuery = query(usersRef, where("phone", "==", phoneInput));
       const userQuerySnapshot = await getDocs(userQuery);
@@ -82,7 +83,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      // If not found in users, try logging in as an Employee
       const employeesRef = collection(db, "employees");
       const employeeQuery = query(employeesRef, where("phone", "==", phoneInput));
       const employeeQuerySnapshot = await getDocs(employeeQuery);
@@ -91,7 +91,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const employeeData = employeeQuerySnapshot.docs[0].data() as Omit<Employee, "id">;
         const employeeId = employeeQuerySnapshot.docs[0].id;
         
-        if (employeeData.password !== passwordInput) { // Assuming employees also have a plain text password
+        if (employeeData.password !== passwordInput) { 
           toast({ title: "Login Failed", description: "Invalid phone number or password.", variant: "destructive" });
           setLoading(false);
           return;
@@ -109,7 +109,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      // If not found in either collection
       toast({ title: "Login Failed", description: "Invalid phone number or password.", variant: "destructive" });
 
     } catch (error) {
@@ -137,8 +136,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await runTransaction(db, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
         let userCount = 0;
-        if (!counterDoc.exists()) {
-          transaction.set(counterRef, { userCount: 1 });
+        if (!counterDoc.exists() || !counterDoc.data()?.userCount) {
+          transaction.set(counterRef, { userCount: 1 }, {merge: true});
           userCount = 0; 
         } else {
           userCount = counterDoc.data().userCount;
@@ -184,8 +183,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Logged Out", description: "You have been successfully logged out." });
   };
 
+  const clearSalaryNotificationForEmployee = async () => {
+    if (loggedInEntity && userType === 'employee' && 'hasUnreadSalaryNotification' in loggedInEntity && loggedInEntity.hasUnreadSalaryNotification) {
+      try {
+        const employeeDocRef = doc(db, "employees", loggedInEntity.id);
+        await updateDoc(employeeDocRef, { hasUnreadSalaryNotification: false });
+        
+        const updatedEmployeeEntity = { ...loggedInEntity, hasUnreadSalaryNotification: false };
+        setLoggedInEntity(updatedEmployeeEntity);
+        localStorage.setItem("chitConnectEntity", JSON.stringify(updatedEmployeeEntity));
+
+      } catch (error) {
+        console.error("Error clearing salary notification:", error);
+        toast({ title: "Error", description: "Could not clear salary notification.", variant: "destructive" });
+      }
+    }
+  };
+
+
   return (
-    <AuthContext.Provider value={{ loggedInEntity, userType, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ loggedInEntity, userType, loading, login, signup, logout, clearSalaryNotificationForEmployee }}>
       {children}
     </AuthContext.Provider>
   );
@@ -198,5 +215,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-
-    

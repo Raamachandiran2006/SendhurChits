@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Layers, Briefcase, LogOut } from "lucide-react";
+import { Home, Users, Layers, Briefcase, LogOut, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -14,18 +14,24 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
+  useSidebar, // Import useSidebar to access its state
 } from "@/components/ui/sidebar";
+import type { Employee } from "@/types";
 
 const navItems = [
   { href: "/employee/dashboard", label: "Dashboard", icon: Home },
   { href: "/employee/users", label: "View Users", icon: Users },
   { href: "/employee/groups", label: "View Groups", icon: Layers },
   { href: "/employee/employees", label: "View Colleagues", icon: Briefcase },
+  { href: "/employee/salary", label: "My Salary", icon: DollarSign },
 ];
 
 export function EmployeeSidebar() {
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { logout, loggedInEntity, userType } = useAuth();
+  const { state: sidebarState } = useSidebar(); // Get sidebar state (expanded/collapsed)
+
+  const employee = userType === 'employee' ? loggedInEntity as Employee : null;
 
   return (
      <Sidebar className="border-r" collapsible="icon">
@@ -42,21 +48,32 @@ export function EmployeeSidebar() {
         </SidebarHeader>
         <SidebarContent className="p-2 flex flex-col">
           <SidebarMenu className="flex-grow">
-            {navItems.map((item) => (
+            {navItems.map((item) => {
+              const isSalaryPage = item.href === "/employee/salary";
+              const hasNotification = employee?.hasUnreadSalaryNotification;
+
+              return (
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton
                   asChild
                   isActive={pathname === item.href || (item.href !== "/employee/dashboard" && pathname.startsWith(item.href))}
                   tooltip={item.label}
-                  className="justify-start"
+                  className="justify-start relative" // Added relative for badge positioning
                 >
-                  <Link href={item.href}>
+                  <Link href={item.href} className="flex items-center w-full">
                     <item.icon className="h-5 w-5 mr-3" />
-                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                    <span className="group-data-[collapsible=icon]:hidden flex-grow">{item.label}</span>
+                    {isSalaryPage && hasNotification && sidebarState === "expanded" && (
+                      <span className="ml-auto bg-red-500 text-white text-xs w-4 h-4 flex items-center justify-center rounded-full">1</span>
+                    )}
+                    {isSalaryPage && hasNotification && sidebarState === "collapsed" && (
+                      <span className="absolute top-1 right-1 bg-red-500 w-2 h-2 rounded-full border border-sidebar-background"></span>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-            ))}
+              );
+            })}
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="p-4 border-t">

@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, serverTimestamp, Timestamp, query, orderBy } from "firebase/firestore";
+import { collection, addDoc, getDocs, serverTimestamp, Timestamp, query, orderBy, doc, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import type { Employee } from "@/types";
@@ -42,7 +42,7 @@ export function AddSalaryRecordForm() {
     resolver: zodResolver(addSalaryRecordFormSchema),
     defaultValues: {
       employeeDocId: "",
-      amount: undefined, // Use undefined for numeric inputs that are not pre-filled
+      amount: undefined, 
       paymentDate: new Date(),
       remarks: "",
     },
@@ -85,6 +85,12 @@ export function AddSalaryRecordForm() {
         paymentDate: format(values.paymentDate, "yyyy-MM-dd"),
         remarks: values.remarks || "",
         recordedAt: serverTimestamp(),
+      });
+
+      // Set notification flag for the employee
+      const employeeDocRef = doc(db, "employees", values.employeeDocId);
+      await updateDoc(employeeDocRef, {
+        hasUnreadSalaryNotification: true,
       });
 
       toast({ title: "Salary Record Added", description: `Salary for ${selectedEmployee.fullname} recorded successfully.` });
