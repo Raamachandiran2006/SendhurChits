@@ -28,6 +28,10 @@ export interface Group {
   commission?: number; // Optional: foreman commission percentage
   biddingType?: "auction" | "random" | "pre-fixed"; // Optional: type of bidding
   minBid?: number; // Optional: minimum bid amount
+  auctionMonth?: string;
+  auctionScheduledDate?: string; // e.g., "YYYY-MM-DD" or descriptive string
+  auctionScheduledTime?: string; // e.g., "02:00 PM IST"
+  lastAuctionWinner?: string; // e.g., username or "To be determined"
 }
 
 export interface Employee {

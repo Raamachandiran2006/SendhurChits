@@ -1,11 +1,11 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { Group, User } from "@/types";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, arrayRemove } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, arrayRemove, updateDoc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,10 @@ import {
   SearchCode,
   Trash2,
   Megaphone, 
-  CalendarClock 
+  CalendarClock,
+  Edit3,
+  Save,
+  XCircle
 } from "lucide-react";
 import { 
   AlertDialog, 
@@ -45,12 +48,24 @@ import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+
 
 // Helper function to format date safely
 const formatDateSafe = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
   if (!dateString) return "N/A";
   try {
-    const date = dateString.includes('T') ? parseISO(dateString) : new Date(dateString + 'T00:00:00');
+    // Try parsing as ISO if it contains 'T', otherwise assume 'yyyy-MM-dd' or direct Date object
+    const date = typeof dateString === 'string' && dateString.includes('T') 
+      ? parseISO(dateString) 
+      : (typeof dateString === 'string' ? new Date(dateString.replace(/-/g, '/')) : dateString); // Looser parsing for yyyy-MM-dd
+
     if (isNaN(date.getTime())) return "N/A";
     return format(date, outputFormat);
   } catch (e) {
@@ -68,6 +83,15 @@ const getBiddingTypeLabel = (type: string | undefined) => {
   }
 };
 
+const auctionDetailsFormSchema = z.object({
+  auctionMonth: z.string().optional().or(z.literal('')),
+  auctionScheduledDate: z.string().optional().or(z.literal('')),
+  auctionScheduledTime: z.string().optional().or(z.literal('')),
+  lastAuctionWinner: z.string().optional().or(z.literal('')),
+});
+
+type AuctionDetailsFormValues = z.infer<typeof auctionDetailsFormSchema>;
+
 export default function AdminGroupDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -80,59 +104,77 @@ export default function AdminGroupDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const [isEditingAuctionDetails, setIsEditingAuctionDetails] = useState(false);
+  const [isSavingAuctionDetails, setIsSavingAuctionDetails] = useState(false);
 
-  useEffect(() => {
+  const auctionForm = useForm<AuctionDetailsFormValues>({
+    resolver: zodResolver(auctionDetailsFormSchema),
+    defaultValues: {
+      auctionMonth: "",
+      auctionScheduledDate: "",
+      auctionScheduledTime: "",
+      lastAuctionWinner: "",
+    },
+  });
+
+  const fetchGroupAndMembers = useCallback(async () => {
     if (!groupId) {
       setError("Group ID is missing.");
       setLoading(false);
       return;
     }
+    setLoading(true);
+    setError(null);
+    try {
+      const groupDocRef = doc(db, "groups", groupId);
+      const groupDocSnap = await getDoc(groupDocRef);
 
-    const fetchGroupAndMembers = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const groupDocRef = doc(db, "groups", groupId);
-        const groupDocSnap = await getDoc(groupDocRef);
-
-        if (!groupDocSnap.exists()) {
-          setError("Group not found.");
-          setLoading(false);
-          return;
-        }
-        const groupData = { id: groupDocSnap.id, ...groupDocSnap.data() } as Group;
-        setGroup(groupData);
-
-        if (groupData.members && groupData.members.length > 0) {
-          const memberUsernames = groupData.members;
-          const fetchedMembers: User[] = [];
-          const batchSize = 30; 
-
-          for (let i = 0; i < memberUsernames.length; i += batchSize) {
-            const batchUsernames = memberUsernames.slice(i, i + batchSize);
-            if (batchUsernames.length > 0) {
-              const usersRef = collection(db, "users");
-              const q = query(usersRef, where("username", "in", batchUsernames));
-              const querySnapshot = await getDocs(q);
-              querySnapshot.docs.forEach(docSnap => {
-                fetchedMembers.push({ id: docSnap.id, ...docSnap.data() } as User);
-              });
-            }
-          }
-          setMembersDetails(fetchedMembers);
-        } else {
-          setMembersDetails([]);
-        }
-      } catch (err) {
-        console.error("Error fetching group details:", err);
-        setError("Failed to fetch group details. Please try again.");
-      } finally {
+      if (!groupDocSnap.exists()) {
+        setError("Group not found.");
         setLoading(false);
+        return;
       }
-    };
+      const groupData = { id: groupDocSnap.id, ...groupDocSnap.data() } as Group;
+      setGroup(groupData);
+      auctionForm.reset({
+        auctionMonth: groupData.auctionMonth || "",
+        auctionScheduledDate: groupData.auctionScheduledDate || "",
+        auctionScheduledTime: groupData.auctionScheduledTime || "",
+        lastAuctionWinner: groupData.lastAuctionWinner || "",
+      });
 
+
+      if (groupData.members && groupData.members.length > 0) {
+        const memberUsernames = groupData.members;
+        const fetchedMembers: User[] = [];
+        const batchSize = 30; 
+
+        for (let i = 0; i < memberUsernames.length; i += batchSize) {
+          const batchUsernames = memberUsernames.slice(i, i + batchSize);
+          if (batchUsernames.length > 0) {
+            const usersRef = collection(db, "users");
+            const q = query(usersRef, where("username", "in", batchUsernames));
+            const querySnapshot = await getDocs(q);
+            querySnapshot.docs.forEach(docSnap => {
+              fetchedMembers.push({ id: docSnap.id, ...docSnap.data() } as User);
+            });
+          }
+        }
+        setMembersDetails(fetchedMembers);
+      } else {
+        setMembersDetails([]);
+      }
+    } catch (err) {
+      console.error("Error fetching group details:", err);
+      setError("Failed to fetch group details. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [groupId, auctionForm]);
+
+  useEffect(() => {
     fetchGroupAndMembers();
-  }, [groupId]);
+  }, [fetchGroupAndMembers]);
 
   const handleDeleteGroup = async () => {
     if (!group || deleteConfirmationText !== "delete") return;
@@ -173,6 +215,40 @@ export default function AdminGroupDetailPage() {
     }
   };
 
+  const onSaveAuctionDetails = async (values: AuctionDetailsFormValues) => {
+    if (!group) return;
+    setIsSavingAuctionDetails(true);
+    try {
+      const groupDocRef = doc(db, "groups", groupId);
+      await updateDoc(groupDocRef, {
+        auctionMonth: values.auctionMonth || "",
+        auctionScheduledDate: values.auctionScheduledDate || "",
+        auctionScheduledTime: values.auctionScheduledTime || "",
+        lastAuctionWinner: values.lastAuctionWinner || "",
+      });
+      setGroup(prevGroup => prevGroup ? { ...prevGroup, ...values } : null);
+      toast({ title: "Auction Details Updated", description: "Successfully saved auction details." });
+      setIsEditingAuctionDetails(false);
+    } catch (error) {
+      console.error("Error updating auction details:", error);
+      toast({ title: "Error", description: "Could not update auction details. " + (error as Error).message, variant: "destructive" });
+    } finally {
+      setIsSavingAuctionDetails(false);
+    }
+  };
+
+  const handleCancelEditAuctionDetails = () => {
+    if (group) {
+      auctionForm.reset({
+        auctionMonth: group.auctionMonth || "",
+        auctionScheduledDate: group.auctionScheduledDate || "",
+        auctionScheduledTime: group.auctionScheduledTime || "",
+        lastAuctionWinner: group.lastAuctionWinner || "",
+      });
+    }
+    setIsEditingAuctionDetails(false);
+  };
+
 
   if (loading) {
     return (
@@ -206,6 +282,21 @@ export default function AdminGroupDetailPage() {
   if (!group) {
     return <div className="container mx-auto py-8 text-center text-muted-foreground">Group data not available.</div>;
   }
+
+  const AuctionDetailItem = ({ icon: Icon, label, value, isEditing, fieldName, register }: { icon: React.ElementType, label: string, value?: string, isEditing?: boolean, fieldName?: keyof AuctionDetailsFormValues, register?: any }) => (
+    <div className="flex items-center p-3 bg-secondary/50 rounded-md">
+      <Icon className="mr-3 h-5 w-5 text-muted-foreground flex-shrink-0" />
+      <div className="flex-grow">
+        <p className="font-semibold text-foreground">{label}</p>
+        {isEditing && fieldName ? (
+          <Input {...register(fieldName)} defaultValue={value || ""} className="text-sm h-8 mt-1" />
+        ) : (
+          <p className="text-muted-foreground text-sm">{value || "N/A"}</p>
+        )}
+      </div>
+    </div>
+  );
+
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -346,42 +437,72 @@ export default function AdminGroupDetailPage() {
       <Separator />
 
       <Card className="shadow-xl">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-3">
             <Megaphone className="h-6 w-6 text-primary" />
             <CardTitle className="text-xl font-bold text-foreground">Group Auction Details</CardTitle>
           </div>
-          <CardDescription>Information about auction events for this group.</CardDescription>
+          {!isEditingAuctionDetails ? (
+            <Button variant="outline" size="sm" onClick={() => setIsEditingAuctionDetails(true)}>
+              <Edit3 className="mr-2 h-4 w-4" /> Edit
+            </Button>
+          ) : (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleCancelEditAuctionDetails} disabled={isSavingAuctionDetails}>
+                <XCircle className="mr-2 h-4 w-4" /> Cancel
+              </Button>
+              <Button size="sm" onClick={auctionForm.handleSubmit(onSaveAuctionDetails)} disabled={isSavingAuctionDetails}>
+                {isSavingAuctionDetails ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Save
+              </Button>
+            </div>
+          )}
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div className="flex items-center p-3 bg-secondary/50 rounded-md">
-            <CalendarClock className="mr-3 h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="font-semibold text-foreground">Auction Month</p>
-              <p className="text-muted-foreground">{format(new Date(), "MMMM yyyy")}</p> {/* Placeholder */}
-            </div>
-          </div>
-          <div className="flex items-center p-3 bg-secondary/50 rounded-md">
-            <CalendarDays className="mr-3 h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="font-semibold text-foreground">Next Scheduled Date</p>
-              <p className="text-muted-foreground">15th {format(new Date(), "MMMM yyyy")}</p> {/* Placeholder */}
-            </div>
-          </div>
-          <div className="flex items-center p-3 bg-secondary/50 rounded-md">
-            <Clock className="mr-3 h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="font-semibold text-foreground">Next Scheduled Time</p>
-              <p className="text-muted-foreground">02:00 PM IST</p> {/* Placeholder */}
-            </div>
-          </div>
-          <div className="flex items-center p-3 bg-secondary/50 rounded-md">
-            <Info className="mr-3 h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="font-semibold text-foreground">Last Auction Winner</p>
-              <p className="text-muted-foreground">To be determined</p> {/* Placeholder */}
-            </div>
-          </div>
+        <CardDescription className="px-6 pb-2">Information about auction events for this group.</CardDescription>
+        <CardContent>
+          <Form {...auctionForm}>
+            <form onSubmit={auctionForm.handleSubmit(onSaveAuctionDetails)} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <AuctionDetailItem icon={CalendarClock} label="Auction Month" value={group.auctionMonth} isEditing={isEditingAuctionDetails} fieldName="auctionMonth" register={auctionForm.register} />
+              <FormField control={auctionForm.control} name="auctionScheduledDate" render={({ field }) => (
+                <FormItem className="flex flex-col p-3 bg-secondary/50 rounded-md">
+                  <div className="flex items-center">
+                    <CalendarDays className="mr-3 h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    <div>
+                      <FormLabel className="font-semibold text-foreground">Scheduled Date</FormLabel>
+                      {isEditingAuctionDetails ? (
+                         <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn("w-full pl-3 text-left font-normal h-8 mt-1 text-sm", !field.value && "text-muted-foreground")}
+                              >
+                                {field.value ? formatDateSafe(field.value, "PPP") : <span>Pick a date</span>}
+                                <CalendarDays className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value ? new Date(field.value.replace(/-/g, '/')) : undefined} // Handle YYYY-MM-DD
+                              onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      ) : (
+                        <p className="text-muted-foreground text-sm">{formatDateSafe(group.auctionScheduledDate, "PPP") || "N/A"}</p>
+                      )}
+                    </div>
+                  </div>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )} />
+              <AuctionDetailItem icon={Clock} label="Scheduled Time" value={group.auctionScheduledTime} isEditing={isEditingAuctionDetails} fieldName="auctionScheduledTime" register={auctionForm.register} />
+              <AuctionDetailItem icon={Info} label="Last Auction Winner" value={group.lastAuctionWinner} isEditing={isEditingAuctionDetails} fieldName="lastAuctionWinner" register={auctionForm.register} />
+            </form>
+          </Form>
         </CardContent>
       </Card>
     </div>
