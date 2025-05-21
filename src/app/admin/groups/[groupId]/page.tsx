@@ -31,7 +31,7 @@ import {
   Edit3,
   Save,
   XCircle,
-  PlayCircle // For Start Auction button
+  PlayCircle 
 } from "lucide-react";
 import { 
   AlertDialog, 
@@ -599,17 +599,18 @@ export default function AdminGroupDetailPage() {
       <Card className="shadow-xl">
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-3">
-            <Clock className="h-6 w-6 text-primary" /> {/* Changed icon for Auction History */}
+            <Clock className="h-6 w-6 text-primary" /> 
             <CardTitle className="text-xl font-bold text-foreground">Auction History</CardTitle>
           </div>
-          <Button variant="outline" size="sm" onClick={() => { /* Placeholder for Start Auction functionality */ }}>
-            <PlayCircle className="mr-2 h-4 w-4" /> Start Auction
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/admin/auctions/start?groupId=${groupId}`}>
+              <PlayCircle className="mr-2 h-4 w-4" /> Start Auction
+            </Link>
           </Button>
         </CardHeader>
         <CardContent>
-          {/* Placeholder for Auction History content */}
           <p className="text-muted-foreground text-center py-4">
-            Auction history will be displayed here. The "Start Auction" button is a placeholder for now.
+            Auction history will be displayed here.
           </p>
         </CardContent>
       </Card>
@@ -617,4 +618,3 @@ export default function AdminGroupDetailPage() {
     </div>
   );
 }
-

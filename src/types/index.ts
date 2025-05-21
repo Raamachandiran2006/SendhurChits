@@ -31,8 +31,9 @@ export interface Group {
   minBid?: number; // Optional: minimum bid amount
   auctionMonth?: string;
   auctionScheduledDate?: string; // e.g., "YYYY-MM-DD" or descriptive string
-  auctionScheduledTime?: string; // e.g., "02:00 PM IST"
+  auctionScheduledTime?: string; // e.g., "03:00 PM IST"
   lastAuctionWinner?: string; // e.g., username or "To be determined"
+  lastWinningBidAmount?: number; // New field for the last winning bid amount
 }
 
 export interface Employee {
@@ -61,4 +62,19 @@ export interface SalaryRecord {
   paymentDate: string; // YYYY-MM-DD
   remarks?: string;
   recordedAt: import('firebase/firestore').Timestamp; // Firestore Timestamp
+}
+
+export interface AuctionRecord {
+  id: string; // Firestore document ID for this auction record
+  groupId: string; // Firestore doc ID of the group
+  groupName: string;
+  auctionMonth: string; // e.g., "August 2024"
+  auctionDate: string; // YYYY-MM-DD
+  auctionTime: string; // e.g., "03:00 PM"
+  auctionMode?: string;
+  winnerUserId: string; // Firestore doc ID of the winning User
+  winnerFullname: string;
+  winnerUsername: string; // The user00X style ID of the winner
+  winningBidAmount: number;
+  recordedAt: import('firebase/firestore').Timestamp;
 }
