@@ -1,3 +1,4 @@
+
 export interface User {
   id: string; // Firestore document ID
   username: string; // Auto-generated unique ID (e.g., user001), not for login
@@ -21,6 +22,6 @@ export interface Group {
   totalPeople: number;
   totalAmount: number;
   members: string[]; // Array of usernames (the auto-generated ones)
-  tenure?: string; // e.g., "10 months", "1 year"
+  tenure?: number; // Number of months
   startDate?: string; // YYYY-MM-DD
 }

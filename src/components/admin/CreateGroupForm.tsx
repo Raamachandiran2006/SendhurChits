@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 import type { User } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, PlusCircle, Users, CalendarIcon, CalendarDays } from "lucide-react";
+import { Loader2, PlusCircle, Users, CalendarIcon, CalendarDays, Clock } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -30,7 +30,7 @@ const groupFormSchema = z.object({
   totalPeople: z.coerce.number().int().positive("Total people must be a positive number"),
   totalAmount: z.coerce.number().positive("Total amount must be a positive number"),
   memberUsernames: z.array(z.string()).min(1, "At least one member must be selected"),
-  tenure: z.string().min(1, "Tenure is required (e.g., 10 months, 1 year)"),
+  tenure: z.coerce.number().int().min(1, "Tenure must be at least 1 month"),
   startDate: z.date({ required_error: "Start date is required." }),
 });
 
@@ -49,7 +49,7 @@ export function CreateGroupForm() {
       totalPeople: 10,
       totalAmount: 100000,
       memberUsernames: [],
-      tenure: "10 months",
+      tenure: 10, // Default to 10 months
       startDate: new Date(),
     },
   });
@@ -60,7 +60,7 @@ export function CreateGroupForm() {
       try {
         // Fetch non-admin users
         const usersRef = collection(db, "users");
-        const q = query(usersRef, where("isAdmin", "!=", true)); // Exclude admins, or adjust as needed
+        const q = query(usersRef, where("isAdmin", "!=", true)); 
         const querySnapshot = await getDocs(q);
         const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
         setUsers(fetchedUsers);
@@ -82,17 +82,15 @@ export function CreateGroupForm() {
         description: values.description,
         totalPeople: values.totalPeople,
         totalAmount: values.totalAmount,
-        members: values.memberUsernames, // Store usernames
-        tenure: values.tenure,
+        members: values.memberUsernames, 
+        tenure: values.tenure, // Store as number
         startDate: format(values.startDate, "yyyy-MM-dd"),
       });
 
       const groupId = newGroupRef.id;
 
-      // Update each selected user's document
       const batch = writeBatch(db);
       values.memberUsernames.forEach(username => {
-        // Find user by username to get their document ID
         const userToUpdate = users.find(u => u.username === username);
         if(userToUpdate) {
           const userDocRef = doc(db, "users", userToUpdate.id);
@@ -114,7 +112,7 @@ export function CreateGroupForm() {
   }
   
   const today = new Date();
-  const fiveYearsFromNow = subYears(today, -5); // allow start dates up to 5 years in future
+  const fiveYearsFromNow = subYears(today, -5); 
 
 
   return (
@@ -193,9 +191,12 @@ export function CreateGroupForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tenure</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., 10 months, 1 year" {...field} />
-                    </FormControl>
+                    <div className="flex items-center gap-2">
+                      <FormControl>
+                        <Input type="number" placeholder="10" {...field} className="w-1/2"/>
+                      </FormControl>
+                      <span className="text-muted-foreground">months</span>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -231,8 +232,8 @@ export function CreateGroupForm() {
                           captionLayout="dropdown-buttons"
                           selected={field.value}
                           onSelect={field.onChange}
-                          fromDate={subYears(today, 1)} // Can select start date from 1 year ago
-                          toDate={fiveYearsFromNow} // Up to 5 years in the future
+                          fromDate={subYears(today, 1)} 
+                          toDate={fiveYearsFromNow} 
                           initialFocus
                         />
                       </PopoverContent>

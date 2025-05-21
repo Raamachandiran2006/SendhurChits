@@ -66,7 +66,7 @@ export default function AdminGroupDetailPage() {
         if (groupData.members && groupData.members.length > 0) {
           const memberUsernames = groupData.members;
           const fetchedMembers: User[] = [];
-          const batchSize = 30;
+          const batchSize = 30; // Firestore 'in' query limit (actually 30 per array, but good practice)
 
           for (let i = 0; i < memberUsernames.length; i += batchSize) {
             const batchUsernames = memberUsernames.slice(i, i + batchSize);
@@ -157,7 +157,7 @@ export default function AdminGroupDetailPage() {
             </div>
             <div className="flex items-center">
               <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
-              <span>Tenure: {group.tenure || "N/A"}</span>
+              <span>Tenure: {group.tenure ? `${group.tenure} months` : "N/A"}</span>
             </div>
             <div className="flex items-center">
               <CalendarDays className="mr-2 h-4 w-4 text-muted-foreground" />
