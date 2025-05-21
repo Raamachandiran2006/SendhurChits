@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIconLucide, Loader2, Users as UsersIcon, PlayCircle, DollarSign, CheckCircle, Edit } from "lucide-react";
+import { Calendar as CalendarIconLucide, Loader2, Users as UsersIcon, PlayCircle, DollarSign, CheckCircle, Edit, ArrowLeft } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -45,7 +45,6 @@ const formatTimeTo12Hour = (timeStr?: string): string => {
     return `${String(hours).padStart(2, '0')}:${minutesStr} ${ampm}`;
   }
   // If it's already in some 12h format, return as is, assuming it's valid.
-  // More robust parsing can be added if various 12h inputs are expected.
   return timeStr; 
 };
 
@@ -64,7 +63,7 @@ const formatTimeTo24HourInput = (timeStr?: string): string => {
         else if (period === 'pm' && hours !== 12) hours += 12;
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
     }
-    return ""; // Return empty if not parsable to avoid input errors
+    return ""; 
 };
 
 
@@ -78,7 +77,7 @@ export function StartAuctionForm() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
-  const [groupMembers, setGroupMembers] = useState<User[]>([]); // Full User objects
+  const [groupMembers, setGroupMembers] = useState<User[]>([]); 
   const [loadingMembers, setLoadingMembers] = useState(false);
 
   const form = useForm<StartAuctionFormValues>({
@@ -98,7 +97,6 @@ export function StartAuctionForm() {
   const watchedGroupId = watch("selectedGroupId");
   const watchedWinnerUserId = watch("winnerUserId");
 
-  // Fetch all groups for the dropdown
   useEffect(() => {
     const fetchGroupsData = async () => {
       setLoadingGroups(true);
@@ -110,6 +108,7 @@ export function StartAuctionForm() {
           const preselected = fetchedGroups.find(g => g.id === preselectedGroupId);
           if (preselected) {
             setSelectedGroup(preselected);
+             setValue("selectedGroupId", preselected.id, { shouldValidate: true });
           }
         }
       } catch (error) {
@@ -120,14 +119,13 @@ export function StartAuctionForm() {
       }
     };
     fetchGroupsData();
-  }, [preselectedGroupId, toast]);
+  }, [preselectedGroupId, toast, setValue]);
 
-  // When selectedGroupId changes, fetch its members
   useEffect(() => {
     if (!watchedGroupId) {
       setSelectedGroup(null);
       setGroupMembers([]);
-      setValue("winnerUserId", ""); // Reset winner if group changes
+      setValue("winnerUserId", ""); 
       return;
     }
 
@@ -139,7 +137,6 @@ export function StartAuctionForm() {
       const fetchMembers = async () => {
         try {
           const usersRef = collection(db, "users");
-          // Firestore 'in' query limit is 30. Handle larger groups if necessary.
           const memberUsernamesBatches: string[][] = [];
           for (let i = 0; i < currentSelectedGroup.members.length; i += 30) {
             memberUsernamesBatches.push(currentSelectedGroup.members.slice(i, i + 30));
@@ -166,7 +163,7 @@ export function StartAuctionForm() {
     } else {
       setGroupMembers([]);
     }
-    setValue("winnerUserId", ""); // Reset winner when group changes
+    setValue("winnerUserId", ""); 
   }, [watchedGroupId, groups, setValue, toast]);
   
   const getSelectedWinner = useCallback(() => {
@@ -205,15 +202,10 @@ export function StartAuctionForm() {
         recordedAt: serverTimestamp() as Timestamp,
       });
 
-      // Update the group document
       const groupDocRef = doc(db, "groups", selectedGroup.id);
       await updateDoc(groupDocRef, {
         lastAuctionWinner: winnerUser.fullname,
         lastWinningBidAmount: values.winningBidAmount,
-        // Optionally update scheduled auction details if these fields are for the *next* auction
-        // auctionMonth: values.auctionMonth, 
-        // auctionScheduledDate: format(values.auctionDate, "yyyy-MM-dd"),
-        // auctionScheduledTime: formatTimeTo12Hour(values.auctionTime),
       });
 
       toast({ title: "Auction Recorded", description: `Auction for ${selectedGroup.groupName} successfully recorded.` });
@@ -240,6 +232,15 @@ export function StartAuctionForm() {
         </div>
       </CardHeader>
       <CardContent>
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={() => router.back()} 
+          className="mb-6"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back
+        </Button>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -249,7 +250,7 @@ export function StartAuctionForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Chit Group Name</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loadingGroups}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={loadingGroups}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder={loadingGroups ? "Loading groups..." : "Select a group"} />
@@ -402,3 +403,5 @@ export function StartAuctionForm() {
     </Card>
   );
 }
+
+    
