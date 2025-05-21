@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Layers, PlusCircle, LogOut, Briefcase } from "lucide-react"; // Added Briefcase for Employees
+import { Home, Users, Layers, PlusCircle, LogOut, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,8 +23,8 @@ const navItems = [
   { href: "/admin", label: "Overview", icon: Home },
   { href: "/admin/users", label: "Manage Users", icon: Users },
   { href: "/admin/groups", label: "Manage Groups", icon: Layers },
-  { href: "/admin/employees", label: "Manage Employees", icon: Briefcase }, // New Employee Link
-  { href: "/admin/groups/create", label: "Create Group", icon: PlusCircle, className: "mt-auto pt-2 border-t border-sidebar-border" }, // Moved create group lower
+  { href: "/admin/groups/create", label: "Create Group", icon: PlusCircle },
+  { href: "/admin/employees", label: "Manage Employees", icon: Briefcase },
 ];
 
 export function AdminSidebar() {
