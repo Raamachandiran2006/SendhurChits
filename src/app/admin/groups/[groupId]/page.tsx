@@ -663,3 +663,4 @@ export default function AdminGroupDetailPage() {
     </div>
   );
 }
+
