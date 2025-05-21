@@ -297,6 +297,10 @@ export default function AdminGroupDetailPage() {
     setIsEditingAuctionDetails(false);
   };
 
+  const handleMemberRowClick = (memberId: string) => {
+    router.push(`/admin/users/${memberId}`);
+  };
+
 
   if (loading) {
     return (
@@ -471,7 +475,7 @@ export default function AdminGroupDetailPage() {
                 </TableHeader>
                 <TableBody>
                   {membersDetails.map((member) => (
-                    <TableRow key={member.id}>
+                    <TableRow key={member.id} onClick={() => handleMemberRowClick(member.id)} className="cursor-pointer hover:bg-muted/70 transition-colors">
                       <TableCell className="font-medium">{member.fullname}</TableCell><TableCell>{member.username}</TableCell><TableCell><div className="flex items-center"><Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}</div></TableCell><TableCell><div className="flex items-center"><CalendarDays className="mr-2 h-3 w-3 text-muted-foreground" /> {formatDateSafe(member.dob)}</div></TableCell>
                     </TableRow>
                   ))}

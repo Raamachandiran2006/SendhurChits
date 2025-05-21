@@ -13,6 +13,7 @@ export interface User {
   photoUrl?: string;
   groups: string[]; // Array of group IDs
   isAdmin?: boolean;
+  dueAmount?: number; // Optional: due amount for the user
 }
 
 export interface Group {

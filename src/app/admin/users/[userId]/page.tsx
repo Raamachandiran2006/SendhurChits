@@ -91,6 +91,7 @@ const editUserFormSchema = z.object({
   recentPhotographFile: optionalImageFileSchema,
   recentPhotographWebcamDataUrl: z.string().optional().nullable(),
   isAdmin: z.boolean().default(false).optional(),
+  dueAmount: z.coerce.number().optional().nullable(),
 });
 
 type EditUserFormValues = z.infer<typeof editUserFormSchema>;
@@ -153,6 +154,7 @@ export default function AdminUserDetailPage() {
         panCard: null,
         recentPhotographFile: null,
         recentPhotographWebcamDataUrl: null,
+        dueAmount: userData.dueAmount ?? null,
       });
       setCapturedImage(userData.photoUrl || null);
 
@@ -289,6 +291,7 @@ export default function AdminUserDetailPage() {
         address: values.address,
         referralPerson: values.referralPerson || "",
         isAdmin: values.isAdmin,
+        dueAmount: values.dueAmount ?? undefined,
       };
 
       // WARNING: Password update is not secure. Implement proper password hashing.
@@ -409,6 +412,22 @@ export default function AdminUserDetailPage() {
                     </FormItem>
                   )} 
                 />
+                 <FormField control={form.control} name="dueAmount" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Due Amount (₹)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          placeholder="e.g., 5000"
+                          {...field} 
+                          value={field.value ?? ""}
+                          onChange={e => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} 
+                />
                 
                 <Card>
                   <CardHeader><CardTitle className="text-lg">Update Documents (Optional)</CardTitle></CardHeader>
@@ -521,6 +540,13 @@ export default function AdminUserDetailPage() {
                 <div className="flex items-start"><CalendarDays className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Date of Birth:</strong> {formatDateSafe(user.dob)}</div></div>
                 <div className="flex items-start col-span-1 md:col-span-2"><Home className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Address:</strong> {user.address || "N/A"}</div></div>
                 <div className="flex items-start"><Briefcase className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Referred By:</strong> {user.referralPerson || "N/A"}</div></div>
+              </div>
+            </section>
+            <Separator />
+             <section>
+              <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><DollarSign className="mr-2 h-5 w-5" />Financial Information</h3>
+              <div className="space-y-3 text-sm">
+                 <div className="flex items-center"><strong className="text-foreground w-28">Due Amount:</strong>{user.dueAmount !== undefined && user.dueAmount !== null ? `₹${user.dueAmount.toLocaleString()}` : "N/A"}</div>
               </div>
             </section>
             <Separator />
