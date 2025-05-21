@@ -1,0 +1,70 @@
+
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Home, Users, Layers, Briefcase, LogOut } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarFooter,
+} from "@/components/ui/sidebar";
+
+const navItems = [
+  { href: "/employee/dashboard", label: "Dashboard", icon: Home },
+  { href: "/employee/users", label: "View Users", icon: Users },
+  { href: "/employee/groups", label: "View Groups", icon: Layers },
+  { href: "/employee/employees", label: "View Colleagues", icon: Briefcase },
+];
+
+export function EmployeeSidebar() {
+  const pathname = usePathname();
+  const { logout } = useAuth();
+
+  return (
+     <Sidebar className="border-r" collapsible="icon">
+        <SidebarHeader className="p-4 items-center justify-center">
+           <Link href="/employee/dashboard" className="flex items-center gap-2 text-primary">
+            <svg width="28" height="28" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="text-primary group-data-[collapsible=icon]:mx-auto">
+                <circle cx="50" cy="50" r="45" stroke="currentColor" strokeWidth="5" fill="none"/>
+                <path d="M30 50 Q50 30 70 50" stroke="currentColor" strokeWidth="5" fill="none"/>
+                <path d="M30 50 Q50 70 70 50" stroke="currentColor" strokeWidth="5" fill="none"/>
+                <circle cx="50" cy="50" r="10" fill="currentColor"/>
+            </svg>
+            <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">ChitConnect</span>
+          </Link>
+        </SidebarHeader>
+        <SidebarContent className="p-2 flex flex-col">
+          <SidebarMenu className="flex-grow">
+            {navItems.map((item) => (
+              <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === item.href || (item.href !== "/employee/dashboard" && pathname.startsWith(item.href))}
+                  tooltip={item.label}
+                  className="justify-start"
+                >
+                  <Link href={item.href}>
+                    <item.icon className="h-5 w-5 mr-3" />
+                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarContent>
+        <SidebarFooter className="p-4 border-t">
+            <SidebarMenuButton onClick={logout} tooltip="Log Out" className="justify-start w-full text-destructive hover:bg-destructive hover:text-destructive-foreground">
+                <LogOut className="h-5 w-5 mr-3" />
+                <span className="group-data-[collapsible=icon]:hidden">Logout</span>
+            </SidebarMenuButton>
+        </SidebarFooter>
+      </Sidebar>
+  );
+}
