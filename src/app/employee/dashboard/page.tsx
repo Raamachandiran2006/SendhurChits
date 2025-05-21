@@ -74,15 +74,7 @@ export default function EmployeeDashboardPage() {
         </Card>
       </div>
       
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle>Your Profile</CardTitle>
-          <CardDescription>Manage your personal information (coming soon).</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Profile editing features will be available here in the future.</p>
-        </CardContent>
-      </Card>
+      {/* "Your Profile" card removed from here */}
 
     </div>
   );
