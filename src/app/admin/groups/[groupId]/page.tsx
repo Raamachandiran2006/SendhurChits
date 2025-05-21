@@ -5,14 +5,43 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { Group, User } from "@/types";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, arrayRemove } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import { Loader2, ArrowLeft, Users as GroupIcon, User as UserIcon, Info, AlertTriangle, Phone, Mail, CalendarDays, Landmark, Users, Clock, Percent, Tag, LandmarkIcon, SearchCode } from "lucide-react";
+import { 
+  Loader2, 
+  ArrowLeft, 
+  Users as UsersIconLucide, // Renamed to avoid conflict
+  User as UserIcon, 
+  Info, 
+  AlertTriangle, 
+  Phone, 
+  Mail, 
+  CalendarDays, 
+  Landmark, 
+  Clock, 
+  Tag, 
+  LandmarkIcon as GroupLandmarkIcon, // Renamed for clarity
+  SearchCode,
+  Trash2
+} from "lucide-react";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle, 
+  AlertDialogTrigger 
+} from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 // Helper function to format date safely
 const formatDateSafe = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
@@ -39,12 +68,15 @@ const getBiddingTypeLabel = (type: string | undefined) => {
 export default function AdminGroupDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { toast } = useToast();
   const groupId = params.groupId as string;
 
   const [group, setGroup] = useState<Group | null>(null);
   const [membersDetails, setMembersDetails] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
 
   useEffect(() => {
     if (!groupId) {
@@ -99,6 +131,48 @@ export default function AdminGroupDetailPage() {
     fetchGroupAndMembers();
   }, [groupId]);
 
+  const handleDeleteGroup = async () => {
+    if (!group || deleteConfirmationText !== "delete") return;
+
+    setIsDeleting(true);
+    try {
+      const groupDocRef = doc(db, "groups", groupId);
+      
+      // Batch remove group ID from all members' `groups` array
+      const batch = writeBatch(db);
+      const usersToUpdateQuery = query(collection(db, "users"), where("groups", "array-contains", groupId));
+      const usersToUpdateSnapshot = await getDocs(usersToUpdateQuery);
+      
+      usersToUpdateSnapshot.forEach(userDoc => {
+        batch.update(userDoc.ref, {
+          groups: arrayRemove(groupId)
+        });
+      });
+      
+      await batch.commit();
+      
+      // Delete the group document
+      await deleteDoc(groupDocRef);
+
+      toast({
+        title: "Group Deleted",
+        description: `Group "${group.groupName}" and its member associations have been successfully deleted.`,
+      });
+      router.push("/admin/groups");
+    } catch (err) {
+      console.error("Error deleting group:", err);
+      toast({
+        title: "Error Deleting Group",
+        description: "Failed to delete the group. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmationText("");
+    }
+  };
+
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
@@ -134,71 +208,107 @@ export default function AdminGroupDetailPage() {
 
   return (
     <div className="container mx-auto py-8 space-y-8">
-      <div>
-        <Button variant="outline" onClick={() => router.push("/admin/groups")} className="mb-6">
+      <div className="flex justify-between items-center mb-6">
+        <Button variant="outline" onClick={() => router.push("/admin/groups")}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to All Groups
         </Button>
-        <Card className="shadow-xl">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <GroupIcon className="h-8 w-8 text-primary" />
-              <div>
-                <CardTitle className="text-2xl font-bold text-foreground">{group.groupName}</CardTitle>
-                <CardDescription>{group.description}</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center">
-              <Users className="mr-2 h-4 w-4 text-muted-foreground" />
-              <span>Capacity: {group.totalPeople} members</span>
-            </div>
-            <div className="flex items-center">
-              <Badge variant="secondary">Members: {group.members.length} / {group.totalPeople}</Badge>
-            </div>
-            <div className="flex items-center">
-              <Landmark className="mr-2 h-4 w-4 text-muted-foreground" />
-              <span>Total Amount: ₹{group.totalAmount.toLocaleString()}</span>
-            </div>
-            <div className="flex items-center">
-              <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
-              <span>Tenure: {group.tenure ? `${group.tenure} months` : "N/A"}</span>
-            </div>
-            <div className="flex items-center">
-              <CalendarDays className="mr-2 h-4 w-4 text-muted-foreground" />
-              <span>Start Date: {formatDateSafe(group.startDate)}</span>
-            </div>
-             <div className="flex items-center">
-              <Info className="mr-2 h-4 w-4 text-muted-foreground" />
-              <span>Group ID: {group.id}</span>
-            </div>
-            {group.rate !== undefined && ( // Changed from rate (%) to Monthly Installment (₹)
-              <div className="flex items-center">
-                <LandmarkIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                <span>Monthly Installment: ₹{group.rate.toLocaleString()}</span>
-              </div>
-            )}
-            {group.commission !== undefined && (
-              <div className="flex items-center">
-                <Tag className="mr-2 h-4 w-4 text-muted-foreground" />
-                <span>Commission: {group.commission}%</span>
-              </div>
-            )}
-            {group.biddingType && (
-              <div className="flex items-center">
-                <SearchCode className="mr-2 h-4 w-4 text-muted-foreground" />
-                <span>Bidding Type: {getBiddingTypeLabel(group.biddingType)}</span>
-              </div>
-            )}
-            {group.minBid !== undefined && (
-              <div className="flex items-center">
-                <LandmarkIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                <span>Min Bid Amount: ₹{group.minBid.toLocaleString()}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive">
+              <Trash2 className="mr-2 h-4 w-4" /> Delete Group
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the group
+                <strong className="text-foreground"> {group.groupName} </strong> 
+                and remove it from all associated users. Type "delete" to confirm.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <Input 
+              type="text"
+              placeholder='Type "delete" to confirm'
+              value={deleteConfirmationText}
+              onChange={(e) => setDeleteConfirmationText(e.target.value)}
+              className="my-2"
+            />
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDeleteConfirmationText("")}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteGroup}
+                disabled={deleteConfirmationText !== "delete" || isDeleting}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Confirm Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
+
+      <Card className="shadow-xl">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <UsersIconLucide className="h-8 w-8 text-primary" /> {/* Changed from GroupIcon to UsersIconLucide */}
+            <div>
+              <CardTitle className="text-2xl font-bold text-foreground">{group.groupName}</CardTitle>
+              <CardDescription>{group.description}</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div className="flex items-center">
+            <UsersIconLucide className="mr-2 h-4 w-4 text-muted-foreground" />
+            <span>Capacity: {group.totalPeople} members</span>
+          </div>
+          <div className="flex items-center">
+            <Badge variant="secondary">Members: {group.members.length} / {group.totalPeople}</Badge>
+          </div>
+          <div className="flex items-center">
+            <Landmark className="mr-2 h-4 w-4 text-muted-foreground" />
+            <span>Total Amount: ₹{group.totalAmount.toLocaleString()}</span>
+          </div>
+          <div className="flex items-center">
+            <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
+            <span>Tenure: {group.tenure ? `${group.tenure} months` : "N/A"}</span>
+          </div>
+          <div className="flex items-center">
+            <CalendarDays className="mr-2 h-4 w-4 text-muted-foreground" />
+            <span>Start Date: {formatDateSafe(group.startDate)}</span>
+          </div>
+            <div className="flex items-center">
+            <Info className="mr-2 h-4 w-4 text-muted-foreground" />
+            <span>Group ID: {group.id}</span>
+          </div>
+          {group.rate !== undefined && (
+            <div className="flex items-center">
+              <GroupLandmarkIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+              <span>Monthly Installment: ₹{group.rate.toLocaleString()}</span>
+            </div>
+          )}
+          {group.commission !== undefined && (
+            <div className="flex items-center">
+              <Tag className="mr-2 h-4 w-4 text-muted-foreground" />
+              <span>Commission: {group.commission}%</span>
+            </div>
+          )}
+          {group.biddingType && (
+            <div className="flex items-center">
+              <SearchCode className="mr-2 h-4 w-4 text-muted-foreground" />
+              <span>Bidding Type: {getBiddingTypeLabel(group.biddingType)}</span>
+            </div>
+          )}
+          {group.minBid !== undefined && (
+            <div className="flex items-center">
+              <GroupLandmarkIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+              <span>Min Bid Amount: ₹{group.minBid.toLocaleString()}</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="shadow-xl">
         <CardHeader>
@@ -232,5 +342,4 @@ export default function AdminGroupDetailPage() {
     </div>
   );
 }
-
     
