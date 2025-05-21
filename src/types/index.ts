@@ -32,11 +32,15 @@ export interface Group {
 
 export interface Employee {
   id: string; // Firestore document ID
-  employeeId: string; // Custom employee ID, e.g., EMP001
+  employeeId: string; // Auto-generated unique ID (e.g., EMP001)
   fullname: string;
-  email: string;
-  phone: string;
+  phone: string; // Used for login, must be unique
+  dob: string; // YYYY-MM-DD
+  password?: string; // Stored for custom auth, SHOULD BE HASHED
+  address: string;
+  aadhaarNumber?: string; // 12-digit number
+  panCardNumber?: string; // 10-character alphanumeric
+  photoUrl?: string;
   role: string; // e.g., "Manager", "Agent", "Accountant"
   joiningDate: string; // YYYY-MM-DD
-  // Add other relevant employee fields here later
 }
