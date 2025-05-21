@@ -35,18 +35,27 @@ const groupFormSchema = z.object({
   startDate: z.date({ required_error: "Start date is required." }),
   rate: z.preprocess( // Now "Monthly Installment (₹)"
     (val) => (val === "" ? undefined : val),
-    z.coerce.number({ invalid_type_error: "Monthly Installment must be a number" }).positive("Monthly Installment must be a positive number").optional()
+    z.coerce.number({ invalid_type_error: "Monthly Installment must be a number" })
+     .int({ message: "Monthly Installment must be a whole number." })
+     .positive("Monthly Installment must be a positive number")
+     .optional()
   ),
   commission: z.preprocess(
     (val) => (val === "" ? undefined : val),
-    z.coerce.number({ invalid_type_error: "Commission must be a number" }).positive("Commission must be a positive number").optional()
+    z.coerce.number({ invalid_type_error: "Commission must be a number" })
+     .int({ message: "Commission must be a whole number." })
+     .positive("Commission must be a positive number")
+     .optional()
   ),
   biddingType: z.enum(["auction", "random", "pre-fixed"], {
     errorMap: () => ({ message: "Please select a valid bidding type." }),
   }).optional(),
   minBid: z.preprocess(
     (val) => (val === "" ? undefined : val),
-    z.coerce.number({ invalid_type_error: "Minimum bid must be a number" }).positive("Minimum bid must be a positive number").optional()
+    z.coerce.number({ invalid_type_error: "Minimum bid must be a number" })
+     .int({ message: "Minimum bid must be a whole number." })
+     .positive("Minimum bid must be a positive number")
+     .optional()
   ),
 });
 
@@ -106,10 +115,18 @@ export function CreateGroupForm() {
         startDate: format(values.startDate, "yyyy-MM-dd"),
       };
 
-      if (values.rate !== undefined && values.rate !== null && !isNaN(values.rate)) groupData.rate = values.rate; // Monthly Installment
-      if (values.commission !== undefined && values.commission !== null && !isNaN(values.commission)) groupData.commission = values.commission;
-      if (values.biddingType) groupData.biddingType = values.biddingType;
-      if (values.minBid !== undefined && values.minBid !== null && !isNaN(values.minBid)) groupData.minBid = values.minBid;
+      if (values.rate !== undefined && values.rate !== null && !isNaN(values.rate)) {
+        groupData.rate = Math.round(values.rate);
+      }
+      if (values.commission !== undefined && values.commission !== null && !isNaN(values.commission)) {
+        groupData.commission = Math.round(values.commission);
+      }
+      if (values.biddingType) {
+        groupData.biddingType = values.biddingType;
+      }
+      if (values.minBid !== undefined && values.minBid !== null && !isNaN(values.minBid)) {
+        groupData.minBid = Math.round(values.minBid);
+      }
 
 
       const newGroupRef = await addDoc(collection(db, "groups"), groupData);
@@ -222,7 +239,7 @@ export function CreateGroupForm() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField control={form.control} name="rate" render={({ field }) => ( // Renamed label for 'rate'
+                <FormField control={form.control} name="rate" render={({ field }) => ( 
                     <FormItem>
                         <FormLabel>Monthly Installment (₹)</FormLabel>
                         <div className="flex items-center gap-2">
@@ -333,5 +350,3 @@ export function CreateGroupForm() {
     </Card>
   );
 }
-
-    
