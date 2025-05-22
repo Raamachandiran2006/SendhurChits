@@ -34,7 +34,7 @@ export default function AuctionRecordDetailPage() {
   const recordId = params.recordId as string;
 
   const [auctionRecord, setAuctionRecord] = useState<AuctionRecord | null>(null);
-  const [groupData, setGroupData] = useState<Group | null>(null); 
+  const [groupData, setGroupData] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,41 +128,6 @@ export default function AuctionRecordDetailPage() {
     </div>
   );
 
-  let amountToBePaidToWinner: number | null = null;
-  if (typeof auctionRecord.winningBidAmount === 'number' && 
-      typeof auctionRecord.finalAmountToBePaid === 'number') {
-    // Typically, amount to be paid to winner is winning bid - total installments paid by winner
-    // Or if `finalAmountToBePaid` here means the total dividend shared, then it's more complex.
-    // Based on "winning bid amount - final amount to be paid", this is likely the amount the winner *receives* after all deductions/instalments.
-    // Assuming finalAmountToBePaid here refers to the net amount the company holds after paying dividends,
-    // then the winner gets the winningBidAmount MINUS any costs or their own share.
-    // For simplicity, sticking to the direct formula: winning bid - final amount to be paid by OTHERS.
-    // This formula seems like `winning bid - (group rate - dividend)`.
-    // If `finalAmountToBePaid` is the amount non-winners pay as installment AFTER dividend:
-    // Then `Amount to Winner` = `Total Chit Value` - `Total Discount` - `Sum of (Installments paid by winner up to auction)`
-    // The direct formula `winningBidAmount - finalAmountToBePaid` seems to interpret `finalAmountToBePaid` as a deduction from the bid.
-    // Let's assume `finalAmountToBePaid` is the *actual amount each member pays this month after dividend*.
-    // The total amount collected from non-winners: `(groupData.totalPeople - 1) * auctionRecord.finalAmountToBePaid`
-    // The amount the winner is due: `groupData.totalAmount - (discount from winning bid)`
-    // The winner is essentially getting the `winningBidAmount`. The "Amount to be Paid to Winner" is simply this bid amount.
-    // The question is likely asking for the net cash the winner receives: `winningBidAmount - winner's_own_installment_for_this_month`.
-    // Since `finalAmountToBePaid` is what *other* members pay, the winner is also implicitly "paying" this amount by forgoing their dividend.
-    // So, `Amount to be paid to winner = winningBidAmount - finalAmountToBePaid`
-    // This represents the bid value, less the effective contribution this month (via forgone dividend).
-    // This might be simpler: `amount to be paid to winner = winningBidAmount - (groupData.rate - auctionRecord.dividendPerMember)`
-    // Which is `winningBidAmount - auctionRecord.finalAmountToBePaid` if `finalAmountToBePaid` is defined as `rate - dividend`.
-
-    // Let's stick to the direct formula provided by the user request:
-    // `amountToBePaidToWinner = winningBidAmount - finalAmountToBePaid` (where finalAmountToBePaid is the member installment after dividend)
-    if (typeof auctionRecord.finalAmountToBePaid === 'number' && auctionRecord.finalAmountToBePaid !== null) {
-         amountToBePaidToWinner = auctionRecord.winningBidAmount - auctionRecord.finalAmountToBePaid;
-    } else {
-        // If finalAmountToBePaid is not set (e.g. for the first auction or if calculations failed),
-        // this value would be misleading. We can default it or show N/A.
-        // For now, if finalAmountToBePaid is not a number, amountToBePaidToWinner remains null.
-    }
-  }
-  
   return (
     <div className="container mx-auto py-8 space-y-6">
       <Button
@@ -211,7 +176,7 @@ export default function AuctionRecordDetailPage() {
               <DetailItem icon={Info} label="Winner User ID" value={auctionRecord.winnerUsername} />
             </div>
           </section>
-          
+
           <Separator />
 
           <section>
@@ -223,7 +188,7 @@ export default function AuctionRecordDetailPage() {
                 <DetailItem icon={BarChartHorizontalBig} label="Net Discount" value={formatCurrency(auctionRecord.netDiscount)} />
                 <DetailItem icon={UsersIcon} label="Dividend Per Member" value={formatCurrency(auctionRecord.dividendPerMember)} />
                 <DetailItem icon={Landmark} label="Amount to be Paid" value={formatCurrency(auctionRecord.finalAmountToBePaid)} />
-                <DetailItem icon={HandCoins} label="Amount to be Paid to Winner" value={formatCurrency(amountToBePaidToWinner)} />
+                <DetailItem icon={HandCoins} label="Amount to be Paid to Winner" value={formatCurrency(auctionRecord.amountPaidToWinner)} />
             </div>
           </section>
         </CardContent>

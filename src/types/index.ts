@@ -33,7 +33,7 @@ export interface Group {
   auctionScheduledDate?: string; // e.g., "YYYY-MM-DD" or descriptive string
   auctionScheduledTime?: string; // e.g., "03:00 PM IST"
   lastAuctionWinner?: string; // e.g., username or "To be determined"
-  lastWinningBidAmount?: number; 
+  lastWinningBidAmount?: number;
 }
 
 export interface Employee {
@@ -79,9 +79,9 @@ export interface AuctionRecord {
   winningBidAmount: number;
   discount?: number | null;
   commissionAmount?: number | null;
-  netDiscount?: number | null; // Added
-  dividendPerMember?: number | null; // Added
+  netDiscount?: number | null;
+  dividendPerMember?: number | null;
   finalAmountToBePaid?: number | null; // This will store the final amount for other members
+  amountPaidToWinner?: number | null; // Amount the winner receives
   recordedAt: import('firebase/firestore').Timestamp;
 }
-

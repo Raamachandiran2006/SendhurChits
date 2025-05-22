@@ -133,7 +133,7 @@ export function StartAuctionForm() {
       setAuctionNumberOptions([]);
       const currentGroupId = form.getValues("selectedGroupId");
       reset({
-        selectedGroupId: preselectedGroupId === currentGroupId ? currentGroupId : "", 
+        selectedGroupId: preselectedGroupId === currentGroupId ? currentGroupId : "",
         auctionNumber: undefined,
         auctionMonth: "",
         auctionDate: new Date(),
@@ -221,7 +221,7 @@ export function StartAuctionForm() {
                       break;
                   }
               }
-              if (!defaultAuctionNumber && fetchedAuctionHistory.length === 0) { 
+              if (!defaultAuctionNumber && fetchedAuctionHistory.length === 0 && currentSelectedGroup.tenure > 0) {
                   defaultAuctionNumber = 1;
               }
           }
@@ -246,7 +246,7 @@ export function StartAuctionForm() {
         setAuctionNumberOptions([]);
         setValue("auctionNumber", undefined);
     }
-    setValue("winnerUserId", ""); 
+    setValue("winnerUserId", "");
   }, [watchedGroupId, groups, setValue, toast, reset, form, preselectedGroupId]);
 
   const getSelectedWinner = useCallback(() => {
@@ -273,7 +273,7 @@ export function StartAuctionForm() {
       });
       return;
     }
-    
+
     if (completedAuctionNumbers.includes(values.auctionNumber)) {
        toast({
         title: "Selection Blocked",
@@ -297,7 +297,7 @@ export function StartAuctionForm() {
         }
 
         let calculatedDiscount: number | null = null;
-        if (totalAmount > 0 && winningBid > 0) { // Assuming winningBid is also positive
+        if (totalAmount > 0 && winningBid > 0) {
             calculatedDiscount = totalAmount - winningBid;
         }
 
@@ -316,6 +316,12 @@ export function StartAuctionForm() {
             calculatedFinalAmountToBePaid = groupRate - calculatedDividendPerMember;
         }
 
+        let amountPaidToWinnerCalc: number | null = null;
+        if (typeof values.winningBidAmount === 'number' && calculatedFinalAmountToBePaid !== null) {
+          amountPaidToWinnerCalc = values.winningBidAmount - calculatedFinalAmountToBePaid;
+        }
+
+
       const auctionRecordData: Omit<AuctionRecord, "id" | "recordedAt"> & { recordedAt?: any } = {
         groupId: selectedGroup.id,
         groupName: selectedGroup.groupName,
@@ -333,6 +339,7 @@ export function StartAuctionForm() {
         netDiscount: calculatedNetDiscount,
         dividendPerMember: calculatedDividendPerMember,
         finalAmountToBePaid: calculatedFinalAmountToBePaid,
+        amountPaidToWinner: amountPaidToWinnerCalc,
       };
 
       await addDoc(collection(db, "auctionRecords"), {
@@ -344,7 +351,7 @@ export function StartAuctionForm() {
       await updateDoc(groupDocRef, {
         lastAuctionWinner: winnerUser.fullname,
         lastWinningBidAmount: values.winningBidAmount,
-        auctionMonth: values.auctionMonth, 
+        auctionMonth: values.auctionMonth,
         auctionScheduledDate: format(values.auctionDate, "yyyy-MM-dd"),
         auctionScheduledTime: formatTimeTo12Hour(values.auctionTime),
       });
@@ -358,9 +365,6 @@ export function StartAuctionForm() {
 
         for (const member of nonWinningMembers) {
           const userDocRef = doc(db, "users", member.id);
-          // It's better to read the current dueAmount in a transaction if precise increment is critical.
-          // For simplicity here, we assume dueAmount is fetched with groupMembers or we fetch it individually.
-          // Let's assume groupMembers state has the latest User object including dueAmount
           const currentDue = member.dueAmount || 0;
           const newDueAmount = currentDue + calculatedFinalAmountToBePaid;
           batch.update(userDocRef, { dueAmount: newDueAmount });
@@ -614,15 +618,15 @@ export function StartAuctionForm() {
                           <Input
                             type="number"
                             placeholder="e.g., 70000"
-                            {...field} 
-                            value={field.value === undefined ? "" : field.value} 
+                            {...field}
+                            value={field.value === undefined ? "" : field.value}
                             onChange={(e) => {
                                 const val = e.target.value;
                                 if (val === "") {
                                   field.onChange(undefined);
                                 } else {
-                                  const num = parseInt(val, 10); // Use parseInt
-                                  field.onChange(isNaN(num) ? undefined : num); 
+                                  const num = parseInt(val, 10);
+                                  field.onChange(isNaN(num) ? undefined : num);
                                 }
                             }}
                           />
