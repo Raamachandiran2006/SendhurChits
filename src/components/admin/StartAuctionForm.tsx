@@ -78,7 +78,7 @@ export function StartAuctionForm() {
   const [groupMembers, setGroupMembers] = useState<User[]>([]); 
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [previousWinnerIds, setPreviousWinnerIds] = useState<string[]>([]);
-  const [loadingPreviousWinners, setLoadingPreviousWinners] = useState(false);
+  const [loadingPreviousWinnersAndCount, setLoadingPreviousWinnersAndCount] = useState(false);
   const [auctionNumberOptions, setAuctionNumberOptions] = useState<number[]>([]);
 
 
@@ -176,10 +176,11 @@ export function StartAuctionForm() {
       }
 
 
-      const fetchGroupData = async () => {
+      const fetchGroupRelatedData = async () => {
         setLoadingMembers(true);
-        setLoadingPreviousWinners(true);
+        setLoadingPreviousWinnersAndCount(true);
         try {
+          // Fetch Members
           if (currentSelectedGroup.members.length > 0) {
             const usersRef = collection(db, "users");
             const memberUsernamesBatches: string[][] = [];
@@ -200,30 +201,45 @@ export function StartAuctionForm() {
             setGroupMembers([]);
           }
 
+          // Fetch Auction Records for winners and count
           const auctionRecordsRef = collection(db, "auctionRecords");
           const qAuction = query(auctionRecordsRef, where("groupId", "==", currentSelectedGroup.id));
           const auctionSnapshot = await getDocs(qAuction);
           const winnerIds = auctionSnapshot.docs.map(docSnap => (docSnap.data() as AuctionRecord).winnerUserId);
           setPreviousWinnerIds(winnerIds);
 
+          const numPreviousAuctions = auctionSnapshot.size;
+          let defaultAuctionNumber: number | undefined = undefined;
+          if (currentSelectedGroup.tenure && currentSelectedGroup.tenure > 0) {
+            const nextNum = numPreviousAuctions + 1;
+            if (nextNum <= currentSelectedGroup.tenure) {
+              defaultAuctionNumber = nextNum;
+            } else if (numPreviousAuctions === 0) { 
+              defaultAuctionNumber = 1;
+            }
+          }
+          setValue("auctionNumber", defaultAuctionNumber, { shouldValidate: false });
+
+
         } catch (error) {
-          console.error("Error fetching group members or previous winners:", error);
+          console.error("Error fetching group members or auction history:", error);
           toast({ title: "Error", description: "Could not load members or auction history for the selected group.", variant: "destructive" });
           setGroupMembers([]);
           setPreviousWinnerIds([]);
+          setValue("auctionNumber", undefined);
         } finally {
           setLoadingMembers(false);
-          setLoadingPreviousWinners(false);
+          setLoadingPreviousWinnersAndCount(false);
         }
       };
-      fetchGroupData();
+      fetchGroupRelatedData();
     } else {
         setGroupMembers([]);
         setPreviousWinnerIds([]);
         setAuctionNumberOptions([]);
+        setValue("auctionNumber", undefined);
     }
     setValue("winnerUserId", ""); 
-    setValue("auctionNumber", undefined);
   }, [watchedGroupId, groups, setValue, toast, reset]);
   
   const getSelectedWinner = useCallback(() => {
@@ -354,13 +370,16 @@ export function StartAuctionForm() {
                   <FormItem>
                     <FormLabel>Auction Number</FormLabel>
                     <Select 
-                      onValueChange={(value) => field.onChange(parseInt(value))} // Ensure value is number
-                      value={field.value?.toString()} // Convert number to string for Select
-                      disabled={!selectedGroup || !selectedGroup.tenure || auctionNumberOptions.length === 0}
+                      onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
+                      value={field.value?.toString()} 
+                      disabled={!selectedGroup || !selectedGroup.tenure || auctionNumberOptions.length === 0 || loadingPreviousWinnersAndCount}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={!selectedGroup || !selectedGroup.tenure ? "Select group first or group has no tenure" : "Select auction number"} />
+                          <SelectValue placeholder={
+                            loadingPreviousWinnersAndCount ? "Loading..." : 
+                            (!selectedGroup || !selectedGroup.tenure ? "Select group or group has no tenure" : "Select auction number")} 
+                          />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -464,12 +483,12 @@ export function StartAuctionForm() {
                   <Select 
                     onValueChange={field.onChange} 
                     value={field.value} 
-                    disabled={!selectedGroup || loadingMembers || loadingPreviousWinners}
+                    disabled={!selectedGroup || loadingMembers || loadingPreviousWinnersAndCount}
                   >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder={
-                          loadingMembers || loadingPreviousWinners ? "Loading members..." : 
+                          loadingMembers || loadingPreviousWinnersAndCount ? "Loading members..." : 
                           (selectedGroup ? "Select winner" : "Select group first")} 
                         />
                       </SelectTrigger>
@@ -534,7 +553,7 @@ export function StartAuctionForm() {
             <Button 
               type="submit" 
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90" 
-              disabled={isSubmitting || loadingGroups || loadingMembers || loadingPreviousWinners}
+              disabled={isSubmitting || loadingGroups || loadingMembers || loadingPreviousWinnersAndCount}
             >
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
               Record Auction
@@ -545,3 +564,4 @@ export function StartAuctionForm() {
     </Card>
   );
 }
+
