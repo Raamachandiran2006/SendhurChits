@@ -216,7 +216,7 @@ export default function AdminGroupDetailPage() {
 
       // Fetch Auction History
       const auctionRecordsRef = collection(db, "auctionRecords");
-      const qAuction = query(auctionRecordsRef, where("groupId", "==", groupId), orderBy("auctionDate", "desc"));
+      const qAuction = query(auctionRecordsRef, where("groupId", "==", groupId), orderBy("auctionDate", "asc")); // Changed to ascending
       const auctionSnapshot = await getDocs(qAuction);
       const fetchedAuctionHistory = auctionSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as AuctionRecord));
       setAuctionHistory(fetchedAuctionHistory);
@@ -638,22 +638,28 @@ export default function AdminGroupDetailPage() {
            ) : (
             <div className="space-y-4">
               {auctionHistory.map((auction, index) => (
-                <Card key={auction.id} className="bg-secondary/50 shadow-sm">
-                  <CardHeader className="pb-3 pt-4">
-                    <CardTitle className="text-md font-semibold text-primary">
-                      Auction #{auction.auctionNumber || index + 1}
-                    </CardTitle>
-                    <CardDescription>
-                      {auction.groupName} ({auction.auctionMonth} - {formatDateSafe(auction.auctionDate, "PPP")})
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="text-sm space-y-1 pb-4">
-                    <p><strong className="text-foreground">Winner:</strong> {auction.winnerFullname} (@{auction.winnerUsername})</p>
-                    <p><strong className="text-foreground">Winning Bid:</strong> ₹{auction.winningBidAmount.toLocaleString()}</p>
-                    {auction.auctionTime && <p><strong className="text-foreground">Time:</strong> {auction.auctionTime}</p>}
-                    {auction.auctionMode && <p><strong className="text-foreground">Mode:</strong> {auction.auctionMode}</p>}
-                  </CardContent>
-                </Card>
+                <Link key={auction.id} href={`/admin/auctions/records/${auction.id}`} className="block">
+                  <Card className="bg-secondary/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-3 pt-4">
+                      <CardTitle className="text-md font-semibold text-primary">
+                        Auction #{auction.auctionNumber || index + 1}
+                      </CardTitle>
+                       <CardDescription>
+                        Group: {auction.groupName} (ID: {auction.groupId})
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-2 pb-4">
+                        <div><strong className="text-foreground">Auction Period:</strong> {auction.auctionMonth} - {formatDateSafe(auction.auctionDate, "PPP")}</div>
+                        {auction.auctionTime && <div><strong className="text-foreground">Time:</strong> {auction.auctionTime}</div>}
+                        <div><strong className="text-foreground">Winner:</strong> {auction.winnerFullname} (ID: {auction.winnerUsername})</div>
+                        <div><strong className="text-foreground">Winning Bid:</strong> ₹{auction.winningBidAmount.toLocaleString()}</div>
+                        {auction.discount !== null && auction.discount !== undefined && <div><strong className="text-foreground">Discount:</strong> ₹{auction.discount.toLocaleString()}</div>}
+                        {auction.commissionAmount !== null && auction.commissionAmount !== undefined && <div><strong className="text-foreground">Commission:</strong> ₹{auction.commissionAmount.toLocaleString()}</div>}
+                        {auction.finalAmountToBePaid !== null && auction.finalAmountToBePaid !== undefined && <div><strong className="text-foreground">Net Amount Paid:</strong> ₹{auction.finalAmountToBePaid.toLocaleString()}</div>}
+                        {auction.auctionMode && <p><strong className="text-foreground">Mode:</strong> {auction.auctionMode}</p>}
+                    </CardContent>
+                  </Card>
+                </Link>
               ))}
             </div>
            )}
@@ -663,3 +669,6 @@ export default function AdminGroupDetailPage() {
     </div>
   );
 }
+
+
+    
