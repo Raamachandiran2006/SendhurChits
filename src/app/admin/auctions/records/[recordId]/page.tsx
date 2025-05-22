@@ -117,12 +117,13 @@ export default function AuctionRecordDetailPage() {
     return <div className="container mx-auto py-8 text-center text-muted-foreground">Auction record data not available.</div>;
   }
 
-  const DetailItem = ({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: React.ReactNode; }) => (
+  const DetailItem = ({ icon: Icon, label, value, subValue }: { icon: React.ElementType; label: string; value: React.ReactNode; subValue?: string; }) => (
     <div className="flex items-start py-2">
       <Icon className="mr-3 h-5 w-5 text-muted-foreground flex-shrink-0 mt-1" />
       <div>
         <p className="font-medium text-foreground">{label}</p>
         <p className="text-sm text-muted-foreground">{value || "N/A"}</p>
+        {subValue && <p className="text-xs text-muted-foreground/80 italic">{subValue}</p>}
       </div>
     </div>
   );
@@ -181,14 +182,14 @@ export default function AuctionRecordDetailPage() {
 
           <section>
             <h3 className="text-lg font-semibold text-primary mb-2 flex items-center"><Calculator className="mr-2 h-5 w-5" />Financials</h3>
-             {!groupData && <p className="text-muted-foreground text-sm">Group data not available for full context.</p>}
+             {!groupData && <p className="text-muted-foreground text-sm">Group data not available for full context of stored calculations.</p>}
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6">
                 <DetailItem icon={Landmark} label="Commission Amount" value={formatCurrency(auctionRecord.commissionAmount)} />
                 <DetailItem icon={Percent} label="Discount" value={formatCurrency(auctionRecord.discount)} />
                 <DetailItem icon={BarChartHorizontalBig} label="Net Discount" value={formatCurrency(auctionRecord.netDiscount)} />
                 <DetailItem icon={UsersIcon} label="Dividend Per Member" value={formatCurrency(auctionRecord.dividendPerMember)} />
-                <DetailItem icon={Landmark} label="Final Amount (Paid by Winner)" value={formatCurrency(auctionRecord.winningBidAmount)} />
-                <DetailItem icon={Landmark} label="Installment (Paid by other Members)" value={formatCurrency(auctionRecord.finalAmountToBePaid)} />
+                <DetailItem icon={Landmark} label="Winning Bid Amount" value={formatCurrency(auctionRecord.winningBidAmount)} />
+                <DetailItem icon={Landmark} label="Amount to be Paid (by Member)" value={formatCurrency(auctionRecord.finalAmountToBePaid)} />
             </div>
           </section>
         </CardContent>
