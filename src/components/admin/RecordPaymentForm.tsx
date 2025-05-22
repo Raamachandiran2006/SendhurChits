@@ -66,6 +66,8 @@ const recordPaymentFormSchema = z.object({
 
 type RecordPaymentFormValues = z.infer<typeof recordPaymentFormSchema>;
 
+const NO_AUCTION_SELECTED_VALUE = "no-auction-selected"; // Unique value for "None" option
+
 export function RecordPaymentForm() {
   const { toast } = useToast();
   const router = useRouter();
@@ -83,7 +85,7 @@ export function RecordPaymentForm() {
     resolver: zodResolver(recordPaymentFormSchema),
     defaultValues: {
       selectedGroupId: "",
-      selectedAuctionId: "",
+      selectedAuctionId: undefined, // Use undefined for placeholder to show
       selectedUserId: "",
       paymentDate: new Date(),
       paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
@@ -119,7 +121,7 @@ export function RecordPaymentForm() {
       setSelectedGroupObject(null);
       setGroupAuctions([]);
       setGroupMembers([]);
-      setValue("selectedAuctionId", "");
+      setValue("selectedAuctionId", undefined); // Reset to undefined
       setValue("selectedUserId", "");
       return;
     }
@@ -152,7 +154,6 @@ export function RecordPaymentForm() {
           if (group.members && group.members.length > 0) {
             const usersRef = collection(db, "users");
             const fetchedMembers: User[] = [];
-             // Firestore 'in' query limit is 30. Batch if necessary.
             for (let i = 0; i < group.members.length; i += 30) {
                 const batchUsernames = group.members.slice(i, i + 30);
                 if (batchUsernames.length > 0) {
@@ -190,7 +191,10 @@ export function RecordPaymentForm() {
       setIsSubmitting(false);
       return;
     }
-    const selectedAuction = values.selectedAuctionId ? groupAuctions.find(a => a.id === values.selectedAuctionId) : null;
+    
+    const selectedAuction = values.selectedAuctionId && values.selectedAuctionId !== NO_AUCTION_SELECTED_VALUE 
+      ? groupAuctions.find(a => a.id === values.selectedAuctionId) 
+      : null;
 
     try {
       const paymentData: Omit<PaymentRecord, "id" | "recordedAt"> & { recordedAt?: any } = {
@@ -202,7 +206,7 @@ export function RecordPaymentForm() {
         userUsername: selectedUser.username,
         userFullname: selectedUser.fullname,
         paymentDate: format(values.paymentDate, "yyyy-MM-dd"),
-        paymentTime: values.paymentTime, // Already in 12hr format from form state
+        paymentTime: values.paymentTime, 
         paymentType: values.paymentType,
         paymentMode: values.paymentMode,
         amount: values.amount,
@@ -215,9 +219,17 @@ export function RecordPaymentForm() {
       });
 
       toast({ title: "Payment Recorded", description: "Payment details saved successfully." });
-      form.reset(); // Clear the form
-      // Optionally, redirect or refresh a list of payments
-      // router.push("/admin/payments/master-record?refreshId=" + Date.now());
+      form.reset({
+        selectedGroupId: values.selectedGroupId, // Keep group selected
+        selectedAuctionId: undefined,
+        selectedUserId: "",
+        paymentDate: new Date(),
+        paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
+        paymentType: undefined,
+        paymentMode: undefined,
+        amount: undefined,
+        remarks: "",
+      }); 
     } catch (error) {
       console.error("Error recording payment:", error);
       toast({ title: "Error", description: "Could not record payment. " + (error as Error).message, variant: "destructive" });
@@ -278,7 +290,7 @@ export function RecordPaymentForm() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem> {/* Option for no specific auction */}
+                      <SelectItem value={NO_AUCTION_SELECTED_VALUE}>None</SelectItem> 
                       {groupAuctions.map((auction) => (
                         <SelectItem key={auction.id} value={auction.id}>
                           Auction #{auction.auctionNumber} - {auction.auctionMonth}
