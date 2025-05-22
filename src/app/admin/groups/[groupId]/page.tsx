@@ -32,7 +32,8 @@ import {
   Save,
   XCircle,
   PlayCircle,
-  History
+  History,
+  DollarSign // Added DollarSign icon
 } from "lucide-react";
 import { 
   AlertDialog, 
@@ -60,7 +61,7 @@ import { cn } from "@/lib/utils";
 
 
 // Helper function to format date safely
-const formatDateSafe = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
+const formatDateSafe = (dateString: string | Date | undefined | null, outputFormat: string = "dd MMM yyyy") => {
   if (!dateString) return "N/A";
   try {
     const date = typeof dateString === 'string' && dateString.includes('T') 
@@ -73,6 +74,12 @@ const formatDateSafe = (dateString: string | undefined | null, outputFormat: str
     return "N/A";
   }
 };
+
+const formatCurrency = (amount: number | null | undefined) => {
+  if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
+  return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+};
+
 
 const getBiddingTypeLabel = (type: string | undefined) => {
   if (!type) return "N/A";
@@ -642,20 +649,39 @@ export default function AdminGroupDetailPage() {
                   <Card className="bg-secondary/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
                     <CardHeader className="pb-3 pt-4">
                       <CardTitle className="text-md font-semibold text-primary">
-                        Auction #{auction.auctionNumber || index + 1}
+                         Auction #{auction.auctionNumber ? auction.auctionNumber : index + 1}
                       </CardTitle>
+                      <CardDescription>Group: {auction.groupName}</CardDescription>
                     </CardHeader>
                     <CardContent className="text-sm space-y-2 pb-4">
                         <div><strong className="text-foreground">Period:</strong> {auction.auctionMonth} - {formatDateSafe(auction.auctionDate, "PP")}</div>
                         {auction.auctionTime && <div><strong className="text-foreground">Time:</strong> {auction.auctionTime}</div>}
-                        <div><strong className="text-foreground">Winner:</strong> {auction.winnerFullname}</div>
-                        <div><strong className="text-foreground">Winning Bid:</strong> ₹{auction.winningBidAmount.toLocaleString()}</div>
+                        <div><strong className="text-foreground">Winner:</strong> {auction.winnerFullname} ({auction.winnerUsername})</div>
+                        <div><strong className="text-foreground">Winning Bid:</strong> {formatCurrency(auction.winningBidAmount)}</div>
                     </CardContent>
                   </Card>
                 </Link>
               ))}
             </div>
            )}
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      <Card className="shadow-xl">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div className="flex items-center gap-3">
+            <DollarSign className="h-6 w-6 text-primary" /> 
+            <CardTitle className="text-xl font-bold text-foreground">Payment History</CardTitle>
+          </div>
+          {/* Placeholder for a button like "Add Payment Record" if needed later */}
+          {/* <Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Add Payment</Button> */}
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground text-center py-4">
+            Payment history feature is currently under development.
+          </p>
         </CardContent>
       </Card>
 
