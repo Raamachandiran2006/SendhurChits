@@ -31,7 +31,7 @@ export interface Group {
   minBid?: number; // Optional: minimum bid amount
   auctionMonth?: string;
   auctionScheduledDate?: string; // e.g., "YYYY-MM-DD" or descriptive string
-  auctionScheduledTime?: string; // e.g., "03:00 PM IST"
+  auctionScheduledTime?: string; // e.g., "03:00 PM"
   lastAuctionWinner?: string; // e.g., username or "To be determined"
   lastWinningBidAmount?: number;
 }
@@ -81,7 +81,20 @@ export interface AuctionRecord {
   commissionAmount?: number | null;
   netDiscount?: number | null;
   dividendPerMember?: number | null;
-  finalAmountToBePaid?: number | null; // This will store the final amount for other members
+  finalAmountToBePaid?: number | null; // Amount to be paid by other members
   amountPaidToWinner?: number | null; // Amount the winner receives
+  recordedAt: import('firebase/firestore').Timestamp;
+}
+
+export interface ExpenseRecord {
+  id: string; // Firestore document ID
+  type: 'spend' | 'received';
+  date: string; // YYYY-MM-DD
+  time?: string | null; // HH:MM AM/PM for spend, optional for received
+  amount: number;
+  reason?: string | null; // For spend
+  fromPerson?: string | null; // For received
+  paymentMode?: 'Cash' | 'UPI' | 'Netbanking' | null; // For received
+  remarks?: string | null;
   recordedAt: import('firebase/firestore').Timestamp;
 }

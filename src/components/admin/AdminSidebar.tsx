@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Layers, PlusCircle, LogOut, Briefcase } from "lucide-react";
+import { Home, Users, Layers, PlusCircle, LogOut, Briefcase, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,6 +25,7 @@ const navItems = [
   { href: "/admin/groups", label: "Manage Groups", icon: Layers },
   { href: "/admin/groups/create", label: "Create Group", icon: PlusCircle },
   { href: "/admin/employees", label: "Manage Employees", icon: Briefcase },
+  { href: "/admin/payments", label: "Payments", icon: CreditCard },
 ];
 
 export function AdminSidebar() {
@@ -47,7 +48,7 @@ export function AdminSidebar() {
         <SidebarContent className="p-2 flex flex-col">
           <SidebarMenu className="flex-grow">
             {navItems.map((item) => (
-              <SidebarMenuItem key={item.href} className={item.className}>
+              <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton
                   asChild
                   isActive={pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))}
