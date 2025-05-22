@@ -285,11 +285,13 @@ export function StartAuctionForm() {
 
     setIsSubmitting(true);
     try {
+        // Ensure selectedGroup and its numeric properties are valid before calculation
         const commission = typeof selectedGroup.commission === 'number' ? selectedGroup.commission : 0;
         const totalAmount = typeof selectedGroup.totalAmount === 'number' ? selectedGroup.totalAmount : 0;
         const groupRate = typeof selectedGroup.rate === 'number' ? selectedGroup.rate : 0;
-        const totalPeople = typeof selectedGroup.totalPeople === 'number' && selectedGroup.totalPeople > 0 ? selectedGroup.totalPeople : 1;
+        const totalPeople = typeof selectedGroup.totalPeople === 'number' && selectedGroup.totalPeople > 0 ? selectedGroup.totalPeople : 1; // Avoid division by zero
         const winningBid = typeof values.winningBidAmount === 'number' ? values.winningBidAmount : 0;
+
 
         let calculatedCommissionAmount: number | null = null;
         if (selectedGroup.commission !== undefined && selectedGroup.commission !== null && totalAmount > 0) {
@@ -311,16 +313,10 @@ export function StartAuctionForm() {
             calculatedDividendPerMember = calculatedNetDiscount / totalPeople;
         }
 
-        let calculatedFinalAmountToBePaid: number | null = null;
+        let calculatedFinalAmountToBePaid: number | null = null; // This is the installment amount for each member
         if (groupRate > 0 && calculatedDividendPerMember !== null) {
             calculatedFinalAmountToBePaid = groupRate - calculatedDividendPerMember;
         }
-
-        let amountPaidToWinnerCalc: number | null = null;
-        if (typeof values.winningBidAmount === 'number' && calculatedFinalAmountToBePaid !== null) {
-          amountPaidToWinnerCalc = values.winningBidAmount - calculatedFinalAmountToBePaid;
-        }
-
 
       const auctionRecordData: Omit<AuctionRecord, "id" | "recordedAt"> & { recordedAt?: any } = {
         groupId: selectedGroup.id,
@@ -339,7 +335,6 @@ export function StartAuctionForm() {
         netDiscount: calculatedNetDiscount,
         dividendPerMember: calculatedDividendPerMember,
         finalAmountToBePaid: calculatedFinalAmountToBePaid,
-        amountPaidToWinner: amountPaidToWinnerCalc,
       };
 
       await addDoc(collection(db, "auctionRecords"), {
@@ -358,19 +353,18 @@ export function StartAuctionForm() {
 
       toast({ title: "Auction Recorded", description: `Auction for ${selectedGroup.groupName} successfully recorded.` });
 
-      // Update dueAmount for non-winning members
+      // Update dueAmount for ALL members
       if (calculatedFinalAmountToBePaid !== null && calculatedFinalAmountToBePaid > 0) {
         const batch = writeBatch(db);
-        const nonWinningMembers = groupMembers.filter(member => member.id !== winnerUser.id);
-
-        for (const member of nonWinningMembers) {
+        
+        for (const member of groupMembers) { // Iterate through all group members
           const userDocRef = doc(db, "users", member.id);
           const currentDue = member.dueAmount || 0;
           const newDueAmount = currentDue + calculatedFinalAmountToBePaid;
           batch.update(userDocRef, { dueAmount: newDueAmount });
         }
         await batch.commit();
-        toast({ title: "Due Amounts Updated", description: `Due amounts for non-winning members have been updated.` });
+        toast({ title: "Due Amounts Updated", description: `Due amounts for all group members have been updated.` });
       }
 
       router.push(`/admin/groups/${selectedGroup.id}`);
@@ -619,7 +613,7 @@ export function StartAuctionForm() {
                             type="number"
                             placeholder="e.g., 70000"
                             {...field}
-                            value={field.value === undefined ? "" : field.value}
+                            value={field.value === undefined ? "" : field.value.toString()}
                             onChange={(e) => {
                                 const val = e.target.value;
                                 if (val === "") {

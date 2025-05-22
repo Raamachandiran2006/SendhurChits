@@ -8,7 +8,7 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, CalendarDays, Clock, User, Tag, Landmark, Percent, FileText, Info, AlertTriangle, BarChartHorizontalBig, Calculator, Users as UsersIcon, HandCoins } from "lucide-react";
+import { Loader2, ArrowLeft, CalendarDays, Clock, User, Tag, Landmark, Percent, FileText, Info, AlertTriangle, BarChartHorizontalBig, Calculator, Users as UsersIcon, HandCoins, LandmarkIcon } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Separator } from "@/components/ui/separator";
 
@@ -157,7 +157,7 @@ export default function AuctionRecordDetailPage() {
           <section>
             <h3 className="text-lg font-semibold text-primary mb-2 flex items-center"><Info className="mr-2 h-5 w-5" />Group & Auction Info</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-              <DetailItem icon={Landmark} label="Chit Group Name" value={auctionRecord.groupName} subValue={groupData ? `Commission: ${groupData.commission ?? 'N/A'}%, Total: ${formatCurrency(groupData.totalAmount)}, Rate: ${formatCurrency(groupData.rate)}` : ''}/>
+              <DetailItem icon={LandmarkIcon} label="Chit Group Name" value={auctionRecord.groupName} subValue={groupData ? `Commission: ${groupData.commission ?? 'N/A'}%, Total: ${formatCurrency(groupData.totalAmount)}, Rate: ${formatCurrency(groupData.rate)}` : ''}/>
               <DetailItem icon={Info} label="Chit Group ID" value={auctionRecord.groupId} />
               <DetailItem icon={CalendarDays} label="Auction Month" value={auctionRecord.auctionMonth} />
               <DetailItem icon={CalendarDays} label="Auction Date" value={formatDateSafe(auctionRecord.auctionDate)} />
@@ -182,13 +182,12 @@ export default function AuctionRecordDetailPage() {
           <section>
             <h3 className="text-lg font-semibold text-primary mb-2 flex items-center"><Calculator className="mr-2 h-5 w-5" />Financials</h3>
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6">
-                <DetailItem icon={Landmark} label="Winning Bid Amount" value={formatCurrency(auctionRecord.winningBidAmount)} />
+                <DetailItem icon={LandmarkIcon} label="Winning Bid Amount" value={formatCurrency(auctionRecord.winningBidAmount)} />
                 <DetailItem icon={Percent} label="Discount" value={formatCurrency(auctionRecord.discount)} />
-                <DetailItem icon={Landmark} label="Commission Amount" value={formatCurrency(auctionRecord.commissionAmount)} />
+                <DetailItem icon={LandmarkIcon} label="Commission Amount" value={formatCurrency(auctionRecord.commissionAmount)} />
                 <DetailItem icon={BarChartHorizontalBig} label="Net Discount" value={formatCurrency(auctionRecord.netDiscount)} />
                 <DetailItem icon={UsersIcon} label="Dividend Per Member" value={formatCurrency(auctionRecord.dividendPerMember)} />
-                <DetailItem icon={Landmark} label="Amount to be Paid" value={formatCurrency(auctionRecord.finalAmountToBePaid)} />
-                <DetailItem icon={HandCoins} label="Amount to be Paid to Winner" value={formatCurrency(auctionRecord.amountPaidToWinner)} />
+                <DetailItem icon={LandmarkIcon} label="Installment Amount (Paid by All)" value={formatCurrency(auctionRecord.finalAmountToBePaid)} />
             </div>
           </section>
         </CardContent>

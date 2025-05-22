@@ -81,8 +81,7 @@ export interface AuctionRecord {
   commissionAmount?: number | null;
   netDiscount?: number | null;
   dividendPerMember?: number | null;
-  finalAmountToBePaid?: number | null; // Amount to be paid by other members
-  amountPaidToWinner?: number | null; // Amount the winner receives
+  finalAmountToBePaid?: number | null; // Amount to be paid by each member for this round (installment)
   recordedAt: import('firebase/firestore').Timestamp;
 }
 
