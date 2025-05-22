@@ -641,7 +641,7 @@ export default function AdminGroupDetailPage() {
                 <Card key={auction.id} className="bg-secondary/50 shadow-sm">
                   <CardHeader className="pb-3 pt-4">
                     <CardTitle className="text-md font-semibold text-primary">
-                      Auction #{auctionHistory.length - index}
+                      Auction #{auction.auctionNumber || index + 1}
                     </CardTitle>
                     <CardDescription>
                       {auction.auctionMonth} - {formatDateSafe(auction.auctionDate, "PPP")}

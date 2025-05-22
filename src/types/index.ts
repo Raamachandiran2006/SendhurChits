@@ -68,6 +68,7 @@ export interface AuctionRecord {
   id: string; // Firestore document ID for this auction record
   groupId: string; // Firestore doc ID of the group
   groupName: string;
+  auctionNumber?: number; // Explicit auction number
   auctionMonth: string; // e.g., "August 2024"
   auctionDate: string; // YYYY-MM-DD
   auctionTime: string; // e.g., "03:00 PM"

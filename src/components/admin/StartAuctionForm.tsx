@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIconLucide, Loader2, PlayCircle, DollarSign, CheckCircle, ArrowLeft } from "lucide-react";
+import { Calendar as CalendarIconLucide, Loader2, PlayCircle, DollarSign, CheckCircle, ArrowLeft, ListNumbers } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 const startAuctionFormSchema = z.object({
   selectedGroupId: z.string().min(1, "Please select a Chit Group."),
+  auctionNumber: z.coerce.number().int().positive("Auction number is required."),
   auctionMonth: z.string().min(3, "Auction month is required (e.g., August 2024)."),
   auctionDate: z.date({ required_error: "Auction date is required." }),
   auctionTime: z.string().min(1, "Auction time is required."),
@@ -78,12 +79,14 @@ export function StartAuctionForm() {
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [previousWinnerIds, setPreviousWinnerIds] = useState<string[]>([]);
   const [loadingPreviousWinners, setLoadingPreviousWinners] = useState(false);
+  const [auctionNumberOptions, setAuctionNumberOptions] = useState<number[]>([]);
 
 
   const form = useForm<StartAuctionFormValues>({
     resolver: zodResolver(startAuctionFormSchema),
     defaultValues: {
       selectedGroupId: preselectedGroupId || "",
+      auctionNumber: undefined,
       auctionMonth: "",
       auctionDate: new Date(),
       auctionTime: "",
@@ -107,7 +110,6 @@ export function StartAuctionForm() {
         if (preselectedGroupId && fetchedGroups.length > 0) {
           const preselected = fetchedGroups.find(g => g.id === preselectedGroupId);
           if (preselected) {
-            //setSelectedGroup(preselected); // This will be handled by the next useEffect
             setValue("selectedGroupId", preselected.id, { shouldValidate: true });
           }
         }
@@ -126,8 +128,10 @@ export function StartAuctionForm() {
       setSelectedGroup(null);
       setGroupMembers([]);
       setPreviousWinnerIds([]);
-      reset({ // Reset relevant form fields when group is deselected
+      setAuctionNumberOptions([]);
+      reset({ 
         selectedGroupId: "",
+        auctionNumber: undefined,
         auctionMonth: "",
         auctionDate: new Date(),
         auctionTime: "",
@@ -148,12 +152,12 @@ export function StartAuctionForm() {
           const dateParts = currentSelectedGroup.auctionScheduledDate.split('-');
           const localDate = dateParts.length === 3 
             ? new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]))
-            : parseISO(currentSelectedGroup.auctionScheduledDate); // Fallback for ISO strings
+            : parseISO(currentSelectedGroup.auctionScheduledDate); 
           
           if (!isNaN(localDate.getTime())) {
             setValue("auctionDate", localDate);
           } else {
-            setValue("auctionDate", new Date()); // Fallback if parsing fails
+            setValue("auctionDate", new Date());
           }
         } catch (e) {
           console.warn("Could not parse auctionScheduledDate:", currentSelectedGroup.auctionScheduledDate, e);
@@ -164,13 +168,18 @@ export function StartAuctionForm() {
       }
       setValue("auctionTime", currentSelectedGroup.auctionScheduledTime || "");
       setValue("auctionMode", currentSelectedGroup.biddingType === "auction" ? "Manual" : (currentSelectedGroup.biddingType ? currentSelectedGroup.biddingType : "Manual"));
+      
+      if (currentSelectedGroup.tenure && currentSelectedGroup.tenure > 0) {
+        setAuctionNumberOptions(Array.from({ length: currentSelectedGroup.tenure }, (_, i) => i + 1));
+      } else {
+        setAuctionNumberOptions([]);
+      }
 
 
       const fetchGroupData = async () => {
         setLoadingMembers(true);
         setLoadingPreviousWinners(true);
         try {
-          // Fetch members
           if (currentSelectedGroup.members.length > 0) {
             const usersRef = collection(db, "users");
             const memberUsernamesBatches: string[][] = [];
@@ -191,7 +200,6 @@ export function StartAuctionForm() {
             setGroupMembers([]);
           }
 
-          // Fetch previous auction winners for this group
           const auctionRecordsRef = collection(db, "auctionRecords");
           const qAuction = query(auctionRecordsRef, where("groupId", "==", currentSelectedGroup.id));
           const auctionSnapshot = await getDocs(qAuction);
@@ -212,8 +220,10 @@ export function StartAuctionForm() {
     } else {
         setGroupMembers([]);
         setPreviousWinnerIds([]);
+        setAuctionNumberOptions([]);
     }
     setValue("winnerUserId", ""); 
+    setValue("auctionNumber", undefined);
   }, [watchedGroupId, groups, setValue, toast, reset]);
   
   const getSelectedWinner = useCallback(() => {
@@ -246,6 +256,7 @@ export function StartAuctionForm() {
       const auctionRecordData: Omit<AuctionRecord, "id" | "recordedAt"> = {
         groupId: selectedGroup.id,
         groupName: selectedGroup.groupName,
+        auctionNumber: values.auctionNumber,
         auctionMonth: values.auctionMonth,
         auctionDate: format(values.auctionDate, "yyyy-MM-dd"),
         auctionTime: formatTimeTo12Hour(values.auctionTime),
@@ -265,7 +276,6 @@ export function StartAuctionForm() {
       await updateDoc(groupDocRef, {
         lastAuctionWinner: winnerUser.fullname,
         lastWinningBidAmount: values.winningBidAmount,
-        // Optionally update group's auctionMonth, auctionScheduledDate, auctionScheduledTime if they should reflect the *last conducted* auction
         auctionMonth: values.auctionMonth, 
         auctionScheduledDate: format(values.auctionDate, "yyyy-MM-dd"),
         auctionScheduledTime: formatTimeTo12Hour(values.auctionTime),
@@ -336,6 +346,36 @@ export function StartAuctionForm() {
                 <Input readOnly value={selectedGroup?.id || ""} placeholder="Auto-filled" />
               </FormItem>
             </div>
+            
+            <FormField
+                control={form.control}
+                name="auctionNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Auction Number</FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(parseInt(value))} // Ensure value is number
+                      value={field.value?.toString()} // Convert number to string for Select
+                      disabled={!selectedGroup || !selectedGroup.tenure || auctionNumberOptions.length === 0}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={!selectedGroup || !selectedGroup.tenure ? "Select group first or group has no tenure" : "Select auction number"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {auctionNumberOptions.map((num) => (
+                          <SelectItem key={num} value={num.toString()}>
+                            Auction #{num}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
 
             <FormField
               control={form.control}
