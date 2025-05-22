@@ -8,9 +8,10 @@ import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Loader2, Layers as LayersIcon, Users, Landmark, ArrowLeft } from "lucide-react"; // Renamed Layers to LayersIcon
+import { Loader2, Layers as LayersIcon, Users, Landmark, ArrowLeft } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+// Removed cn and format imports as they are not used here
 
 export default function EmployeeViewGroupsPage() {
   const [groups, setGroups] = useState<Group[]>([]);

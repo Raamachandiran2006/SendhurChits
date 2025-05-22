@@ -29,7 +29,6 @@ import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
 import { Separator } from "@/components/ui/separator";
 
-// Helper function to format date safely
 const formatDateSafe = (dateString: string | Date | undefined | null): string => {
   if (!dateString) return "N/A";
   try {
@@ -44,7 +43,7 @@ const formatDateSafe = (dateString: string | Date | undefined | null): string =>
 export default function EmployeeViewUserDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const userId = params.id as string; // Assuming 'id' is the Firestore document ID
+  const userId = params.id as string;
 
   const [user, setUser] = useState<User | null>(null);
   const [userGroups, setUserGroups] = useState<Group[]>([]);
@@ -154,6 +153,13 @@ export default function EmployeeViewUserDetailPage() {
               <div className="flex items-start"><CalendarDays className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Date of Birth:</strong> {formatDateSafe(user.dob)}</div></div>
               <div className="flex items-start col-span-1 md:col-span-2"><Home className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Address:</strong> {user.address || "N/A"}</div></div>
               <div className="flex items-start"><Briefcase className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Referred By:</strong> {user.referralPerson || "N/A"}</div></div>
+            </div>
+          </section>
+          <Separator />
+           <section>
+            <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><DollarSign className="mr-2 h-5 w-5" />Financial Information</h3>
+            <div className="space-y-3 text-sm">
+               <div className="flex items-center"><strong className="text-foreground w-28">Due Amount:</strong>{user.dueAmount !== undefined && user.dueAmount !== null ? `₹${user.dueAmount.toLocaleString()}` : "N/A"}</div>
             </div>
           </section>
           <Separator />

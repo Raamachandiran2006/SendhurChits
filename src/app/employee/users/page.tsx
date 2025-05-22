@@ -6,12 +6,12 @@ import type { User } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Removed CardDescription
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Users as UsersIcon, ArrowLeft } from "lucide-react"; // Renamed Users to UsersIcon
+import { Loader2, Users as UsersIcon, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns"; // Ensure parseISO is imported
 import { Button } from "@/components/ui/button";
 
 export default function EmployeeViewUsersPage() {
@@ -42,7 +42,7 @@ export default function EmployeeViewUsersPage() {
       return "N/A";
     }
     try {
-      const date = new Date(dateString);
+      const date = parseISO(dateString); // Use parseISO for robust parsing
       if (isNaN(date.getTime())) {
         return "N/A";
       }
@@ -84,6 +84,9 @@ export default function EmployeeViewUsersPage() {
       </div>
 
       <Card className="shadow-xl">
+        <CardHeader>
+            {/* Title and description moved to page header */}
+        </CardHeader>
         <CardContent className="pt-6">
           {users.length === 0 ? (
             <div className="text-center py-10">
@@ -108,7 +111,7 @@ export default function EmployeeViewUsersPage() {
                       key={user.id} 
                       onClick={() => handleUserRowClick(user.id)}
                       className="cursor-pointer hover:bg-muted/70 transition-colors"
-                    >{/* Compacted JSX below */}
+                    >
                       <TableCell className="font-medium">{user.fullname}</TableCell><TableCell>{user.username}</TableCell><TableCell>{user.phone}</TableCell><TableCell>{formatDateSafe(user.dob)}</TableCell><TableCell>{user.isAdmin || user.username === 'admin' ? (<Badge variant="destructive">Admin</Badge>) : (<Badge variant="secondary">User</Badge>)}</TableCell><TableCell className="text-right">{user.groups?.length || 0}</TableCell>
                     </TableRow>
                   ))}
