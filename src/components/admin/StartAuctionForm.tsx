@@ -131,7 +131,7 @@ export function StartAuctionForm() {
       setPreviousWinnerIds([]);
       setCompletedAuctionNumbers([]);
       setAuctionNumberOptions([]);
-      reset({
+      reset({ // Reset relevant fields
         selectedGroupId: "",
         auctionNumber: undefined,
         auctionMonth: "",
@@ -169,7 +169,8 @@ export function StartAuctionForm() {
         setValue("auctionDate", new Date());
       }
       setValue("auctionTime", currentSelectedGroup.auctionScheduledTime || "");
-      setValue("auctionMode", currentSelectedGroup.biddingType === "auction" ? "Manual" : (currentSelectedGroup.biddingType ? currentSelectedGroup.biddingType : "Manual"));
+      setValue("auctionMode", currentSelectedGroup.biddingType === "auction" ? "Manual" : (currentSelectedGroup.biddingType === "random" ? "Online" : (currentSelectedGroup.biddingType === "pre-fixed" ? "Online" : "Manual")));
+
 
       if (currentSelectedGroup.tenure && currentSelectedGroup.tenure > 0) {
         setAuctionNumberOptions(Array.from({ length: currentSelectedGroup.tenure }, (_, i) => i + 1));
@@ -252,7 +253,7 @@ export function StartAuctionForm() {
         setAuctionNumberOptions([]);
         setValue("auctionNumber", undefined);
     }
-    setValue("winnerUserId", "");
+    setValue("winnerUserId", ""); // Reset winner when group changes
   }, [watchedGroupId, groups, setValue, toast, reset]);
 
   const getSelectedWinner = useCallback(() => {
@@ -289,6 +290,29 @@ export function StartAuctionForm() {
       return;
     }
 
+    // Perform calculations
+    let calculatedCommissionAmount: number | null = null;
+    let calculatedDiscount: number | null = null;
+    let calculatedNetDiscount: number | null = null;
+    let calculatedDividendPerMember: number | null = null;
+    let calculatedFinalAmountToBePaid: number | null = null;
+
+    if (typeof selectedGroup.commission === 'number' && typeof selectedGroup.totalAmount === 'number') {
+      calculatedCommissionAmount = (selectedGroup.commission * selectedGroup.totalAmount) / 100;
+    }
+    if (typeof selectedGroup.totalAmount === 'number' && typeof values.winningBidAmount === 'number') {
+      calculatedDiscount = selectedGroup.totalAmount - values.winningBidAmount;
+    }
+    if (calculatedDiscount !== null && calculatedCommissionAmount !== null) {
+      calculatedNetDiscount = calculatedDiscount - calculatedCommissionAmount;
+    }
+    if (calculatedNetDiscount !== null && typeof selectedGroup.totalPeople === 'number' && selectedGroup.totalPeople > 0) {
+      calculatedDividendPerMember = calculatedNetDiscount / selectedGroup.totalPeople;
+    }
+    if (typeof selectedGroup.rate === 'number' && calculatedDividendPerMember !== null) {
+      calculatedFinalAmountToBePaid = selectedGroup.rate - calculatedDividendPerMember;
+    }
+
 
     setIsSubmitting(true);
     try {
@@ -304,9 +328,11 @@ export function StartAuctionForm() {
         winnerFullname: winnerUser.fullname,
         winnerUsername: winnerUser.username,
         winningBidAmount: values.winningBidAmount,
-        discount: null,
-        commissionAmount: null,
-        finalAmountToBePaid: null,
+        commissionAmount: calculatedCommissionAmount,
+        discount: calculatedDiscount,
+        netDiscount: calculatedNetDiscount,
+        dividendPerMember: calculatedDividendPerMember,
+        finalAmountToBePaid: calculatedFinalAmountToBePaid,
       };
 
       await addDoc(collection(db, "auctionRecords"), {
@@ -318,7 +344,7 @@ export function StartAuctionForm() {
       await updateDoc(groupDocRef, {
         lastAuctionWinner: winnerUser.fullname,
         lastWinningBidAmount: values.winningBidAmount,
-        auctionMonth: values.auctionMonth,
+        auctionMonth: values.auctionMonth, // Update group's auction month to the current one
         auctionScheduledDate: format(values.auctionDate, "yyyy-MM-dd"),
         auctionScheduledTime: formatTimeTo12Hour(values.auctionTime),
       });
@@ -408,20 +434,20 @@ export function StartAuctionForm() {
                         />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
-                      {!loadingPreviousWinnersAndCount && auctionNumberOptions.map((num) => {
-                        const isCompleted = completedAuctionNumbers.includes(num);
-                        return (
-                          <SelectItem
-                            key={num}
-                            value={num.toString()}
-                            disabled={isCompleted}
-                          >
-                            Auction #{num} {isCompleted ? '(Completed)' : ''}
-                          </SelectItem>
-                        );
-                      })}
-                      {loadingPreviousWinnersAndCount && <SelectItem value="loading" disabled>Loading...</SelectItem>}
+                     <SelectContent>
+                        {!loadingPreviousWinnersAndCount && auctionNumberOptions.map((num) => {
+                            const isCompleted = completedAuctionNumbers.includes(num);
+                            return (
+                            <SelectItem
+                                key={num}
+                                value={num.toString()}
+                                disabled={isCompleted}
+                            >
+                                Auction #{num} {isCompleted ? '(Completed)' : ''}
+                            </SelectItem>
+                            );
+                        })}
+                        {loadingPreviousWinnersAndCount && <SelectItem value="loading" disabled>Loading...</SelectItem>}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -597,3 +623,4 @@ export function StartAuctionForm() {
     </Card>
   );
 }
+
