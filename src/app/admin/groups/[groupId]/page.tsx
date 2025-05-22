@@ -33,7 +33,7 @@ import {
   XCircle,
   PlayCircle,
   History,
-  DollarSign // Added DollarSign icon
+  DollarSign
 } from "lucide-react";
 import { 
   AlertDialog, 
@@ -321,11 +321,6 @@ export default function AdminGroupDetailPage() {
     setIsEditingAuctionDetails(false);
   };
 
-  const handleMemberRowClick = (memberId: string) => {
-    router.push(`/admin/users/${memberId}`);
-  };
-
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
@@ -495,12 +490,26 @@ export default function AdminGroupDetailPage() {
             <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
-                  <TableRow><TableHead>Full Name</TableHead><TableHead>Username</TableHead><TableHead>Phone Number</TableHead><TableHead>Date of Birth</TableHead></TableRow>
+                  <TableRow>
+                    <TableHead>Full Name</TableHead>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Phone Number</TableHead>
+                    <TableHead className="text-right">Due Amount (₹)</TableHead>
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
                   {membersDetails.map((member) => (
-                    <TableRow key={member.id} onClick={() => handleMemberRowClick(member.id)} className="cursor-pointer hover:bg-muted/70 transition-colors">{/* Compacted JSX below */}
-                      <TableCell className="font-medium">{member.fullname}</TableCell><TableCell>{member.username}</TableCell><TableCell><div className="flex items-center"><Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}</div></TableCell><TableCell><div className="flex items-center"><CalendarDays className="mr-2 h-3 w-3 text-muted-foreground" /> {formatDateSafe(member.dob)}</div></TableCell>
+                    <TableRow key={member.id} className="hover:bg-muted/50 transition-colors">
+                      <TableCell className="font-medium">{member.fullname}</TableCell>
+                      <TableCell>{member.username}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(member.dueAmount)}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
