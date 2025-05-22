@@ -3,12 +3,12 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import type { AuctionRecord } from "@/types";
+import type { AuctionRecord, Group } from "@/types";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, CalendarDays, Clock, User, Tag, Landmark, Percent, FileText, Info, AlertTriangle } from "lucide-react";
+import { Loader2, ArrowLeft, CalendarDays, Clock, User, Tag, Landmark, Percent, FileText, Info, AlertTriangle, BarChartHorizontalBig, Calculator } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Separator } from "@/components/ui/separator";
 
@@ -24,8 +24,8 @@ const formatDateSafe = (dateString: string | undefined | null, outputFormat: str
 };
 
 const formatCurrency = (amount: number | null | undefined) => {
-  if (amount === null || amount === undefined) return "N/A";
-  return `₹${amount.toLocaleString()}`;
+  if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
+  return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 export default function AuctionRecordDetailPage() {
@@ -34,10 +34,18 @@ export default function AuctionRecordDetailPage() {
   const recordId = params.recordId as string;
 
   const [auctionRecord, setAuctionRecord] = useState<AuctionRecord | null>(null);
+  const [groupData, setGroupData] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAuctionRecord = useCallback(async () => {
+  // Calculated values
+  const [calculatedCommissionAmount, setCalculatedCommissionAmount] = useState<number | null>(null);
+  const [calculatedDiscount, setCalculatedDiscount] = useState<number | null>(null);
+  const [calculatedNetDiscount, setCalculatedNetDiscount] = useState<number | null>(null);
+  const [calculatedDividendPerMember, setCalculatedDividendPerMember] = useState<number | null>(null);
+  const [calculatedFinalAmountToBePaidByMember, setCalculatedFinalAmountToBePaidByMember] = useState<number | null>(null);
+
+  const fetchAuctionRecordAndGroup = useCallback(async () => {
     if (!recordId) {
       setError("Auction Record ID is missing.");
       setLoading(false);
@@ -51,11 +59,27 @@ export default function AuctionRecordDetailPage() {
 
       if (!recordDocSnap.exists()) {
         setError("Auction Record not found.");
+        setAuctionRecord(null);
+        setGroupData(null);
       } else {
-        setAuctionRecord({ id: recordDocSnap.id, ...recordDocSnap.data() } as AuctionRecord);
+        const fetchedAuctionRecord = { id: recordDocSnap.id, ...recordDocSnap.data() } as AuctionRecord;
+        setAuctionRecord(fetchedAuctionRecord);
+
+        if (fetchedAuctionRecord.groupId) {
+          const groupDocRef = doc(db, "groups", fetchedAuctionRecord.groupId);
+          const groupDocSnap = await getDoc(groupDocRef);
+          if (groupDocSnap.exists()) {
+            setGroupData({ id: groupDocSnap.id, ...groupDocSnap.data() } as Group);
+          } else {
+            console.warn(`Group with ID ${fetchedAuctionRecord.groupId} not found for auction record ${recordId}`);
+            setGroupData(null);
+          }
+        } else {
+          setGroupData(null);
+        }
       }
     } catch (err) {
-      console.error("Error fetching auction record:", err);
+      console.error("Error fetching auction record or group:", err);
       setError("Failed to fetch auction record details. Please try again.");
     } finally {
       setLoading(false);
@@ -63,8 +87,60 @@ export default function AuctionRecordDetailPage() {
   }, [recordId]);
 
   useEffect(() => {
-    fetchAuctionRecord();
-  }, [fetchAuctionRecord]);
+    fetchAuctionRecordAndGroup();
+  }, [fetchAuctionRecordAndGroup]);
+
+  useEffect(() => {
+    if (auctionRecord && groupData) {
+      let commAmount: number | null = null;
+      if (typeof groupData.commission === 'number' && typeof groupData.totalAmount === 'number') {
+        commAmount = (groupData.commission * groupData.totalAmount) / 100;
+        setCalculatedCommissionAmount(commAmount);
+      } else {
+        setCalculatedCommissionAmount(null);
+      }
+
+      let disc: number | null = null;
+      if (typeof groupData.totalAmount === 'number' && typeof auctionRecord.winningBidAmount === 'number') {
+        disc = groupData.totalAmount - auctionRecord.winningBidAmount;
+        setCalculatedDiscount(disc);
+      } else {
+        setCalculatedDiscount(null);
+      }
+      
+      let netDisc: number | null = null;
+      if (disc !== null && commAmount !== null) {
+        netDisc = disc - commAmount;
+        setCalculatedNetDiscount(netDisc);
+      } else {
+        setCalculatedNetDiscount(null);
+      }
+
+      let dividend: number | null = null;
+      if (netDisc !== null && typeof groupData.totalPeople === 'number' && groupData.totalPeople > 0) {
+        dividend = netDisc / groupData.totalPeople;
+        setCalculatedDividendPerMember(dividend);
+      } else {
+        setCalculatedDividendPerMember(null);
+      }
+
+      let finalAmount: number | null = null;
+      if (typeof groupData.rate === 'number' && dividend !== null) {
+        finalAmount = groupData.rate - dividend;
+        setCalculatedFinalAmountToBePaidByMember(finalAmount);
+      } else {
+        setCalculatedFinalAmountToBePaidByMember(null);
+      }
+
+    } else {
+      setCalculatedCommissionAmount(null);
+      setCalculatedDiscount(null);
+      setCalculatedNetDiscount(null);
+      setCalculatedDividendPerMember(null);
+      setCalculatedFinalAmountToBePaidByMember(null);
+    }
+  }, [auctionRecord, groupData]);
+
 
   if (loading) {
     return (
@@ -99,12 +175,13 @@ export default function AuctionRecordDetailPage() {
     return <div className="container mx-auto py-8 text-center text-muted-foreground">Auction record data not available.</div>;
   }
 
-  const DetailItem = ({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: React.ReactNode }) => (
+  const DetailItem = ({ icon: Icon, label, value, subValue }: { icon: React.ElementType; label: string; value: React.ReactNode; subValue?: React.ReactNode }) => (
     <div className="flex items-start py-2">
       <Icon className="mr-3 h-5 w-5 text-muted-foreground flex-shrink-0 mt-1" />
       <div>
         <p className="font-medium text-foreground">{label}</p>
         <p className="text-sm text-muted-foreground">{value || "N/A"}</p>
+        {subValue && <p className="text-xs text-muted-foreground/80">{subValue}</p>}
       </div>
     </div>
   );
@@ -138,7 +215,7 @@ export default function AuctionRecordDetailPage() {
           <section>
             <h3 className="text-lg font-semibold text-primary mb-2 flex items-center"><Info className="mr-2 h-5 w-5" />Group & Auction Info</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-              <DetailItem icon={Landmark} label="Chit Group Name" value={auctionRecord.groupName} />
+              <DetailItem icon={Landmark} label="Chit Group Name" value={auctionRecord.groupName} subValue={groupData ? `(Commission: ${groupData.commission?.toString() ?? 'N/A'}%, Total: ${formatCurrency(groupData.totalAmount)}, Rate: ${formatCurrency(groupData.rate)})` : ''} />
               <DetailItem icon={Info} label="Chit Group ID" value={auctionRecord.groupId} />
               <DetailItem icon={CalendarDays} label="Auction Month" value={auctionRecord.auctionMonth} />
               <DetailItem icon={CalendarDays} label="Auction Date" value={formatDateSafe(auctionRecord.auctionDate)} />
@@ -162,12 +239,28 @@ export default function AuctionRecordDetailPage() {
           <Separator />
 
           <section>
-            <h3 className="text-lg font-semibold text-primary mb-2 flex items-center"><Percent className="mr-2 h-5 w-5" />Financials</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-              <DetailItem icon={Percent} label="Discount" value={formatCurrency(auctionRecord.discount)} />
-              <DetailItem icon={Landmark} label="Commission Amount" value={formatCurrency(auctionRecord.commissionAmount)} />
-              <DetailItem icon={Landmark} label="Final Amount to be Paid" value={formatCurrency(auctionRecord.finalAmountToBePaid)} />
+            <h3 className="text-lg font-semibold text-primary mb-2 flex items-center"><Percent className="mr-2 h-5 w-5" />Stored Financials (from Auction Record)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6">
+              <DetailItem icon={Percent} label="Discount (Stored)" value={formatCurrency(auctionRecord.discount)} />
+              <DetailItem icon={Landmark} label="Commission Amount (Stored)" value={formatCurrency(auctionRecord.commissionAmount)} />
+              <DetailItem icon={Landmark} label="Final Amount to be Paid (Stored)" value={formatCurrency(auctionRecord.finalAmountToBePaid)} />
             </div>
+          </section>
+
+          <Separator />
+
+          <section>
+            <h3 className="text-lg font-semibold text-primary mb-2 flex items-center"><Calculator className="mr-2 h-5 w-5" />Calculated Financials (based on Group & Auction data)</h3>
+             {!groupData && <p className="text-muted-foreground text-sm">Group data not available for calculations.</p>}
+            {groupData && (
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6">
+                    <DetailItem icon={Landmark} label="Calculated Commission Amount" value={formatCurrency(calculatedCommissionAmount)} subValue={groupData?.commission ? `(${groupData.commission}% of ${formatCurrency(groupData.totalAmount)})` : ''} />
+                    <DetailItem icon={Percent} label="Calculated Discount" value={formatCurrency(calculatedDiscount)} subValue={auctionRecord?.winningBidAmount ? `(${formatCurrency(groupData.totalAmount)} - ${formatCurrency(auctionRecord.winningBidAmount)})` : ''} />
+                    <DetailItem icon={BarChartHorizontalBig} label="Calculated Net Discount" value={formatCurrency(calculatedNetDiscount)} subValue={(calculatedDiscount !== null && calculatedCommissionAmount !== null) ? `(${formatCurrency(calculatedDiscount)} - ${formatCurrency(calculatedCommissionAmount)})` : ''}/>
+                    <DetailItem icon={Users} label="Calculated Dividend Per Member" value={formatCurrency(calculatedDividendPerMember)} subValue={(calculatedNetDiscount !== null && groupData?.totalPeople) ? `(${formatCurrency(calculatedNetDiscount)} / ${groupData.totalPeople})` : ''}/>
+                    <DetailItem icon={Landmark} label="Calculated Final Amount (per Member)" value={formatCurrency(calculatedFinalAmountToBePaidByMember)} subValue={(groupData?.rate !== null && calculatedDividendPerMember !== null) ? `(${formatCurrency(groupData.rate)} - ${formatCurrency(calculatedDividendPerMember)})` : ''}/>
+                </div>
+            )}
           </section>
         </CardContent>
         <CardFooter>
