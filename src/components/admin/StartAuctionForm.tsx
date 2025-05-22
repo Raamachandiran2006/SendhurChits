@@ -138,7 +138,7 @@ export function StartAuctionForm() {
       setCompletedAuctionNumbers([]);
       setAuctionNumberOptions([]);
       setMaxWinningBidAllowed(null);
-      const currentGroupId = form.getValues("selectedGroupId"); // Keep preselected if it was already set
+      const currentGroupId = form.getValues("selectedGroupId"); 
       reset({
         selectedGroupId: preselectedGroupId === currentGroupId ? currentGroupId : "",
         auctionNumber: undefined,
@@ -178,16 +178,10 @@ export function StartAuctionForm() {
       setValue("auctionTime", currentSelectedGroup.auctionScheduledTime || "");
       setValue("auctionMode", currentSelectedGroup.biddingType === "auction" ? "Manual" : (currentSelectedGroup.biddingType === "random" ? "Online" : (currentSelectedGroup.biddingType === "pre-fixed" ? "Online" : "Manual")));
 
-      // Calculate Max Winning Bid Allowed
-      if (typeof currentSelectedGroup.totalAmount === 'number') {
-        const groupTotalAmount = currentSelectedGroup.totalAmount;
-        const groupCommissionPercent = (typeof currentSelectedGroup.commission === 'number' && currentSelectedGroup.commission >= 0) ? currentSelectedGroup.commission : 0;
-        const commissionAmount = (groupCommissionPercent / 100) * groupTotalAmount;
-        setMaxWinningBidAllowed(groupTotalAmount - commissionAmount);
-      } else {
-        setMaxWinningBidAllowed(null);
-      }
-
+      const groupTotalAmount = typeof currentSelectedGroup.totalAmount === 'number' ? currentSelectedGroup.totalAmount : 0;
+      const groupCommissionPercent = (typeof currentSelectedGroup.commission === 'number' && currentSelectedGroup.commission >= 0) ? currentSelectedGroup.commission : 0;
+      const commissionAmount = (groupCommissionPercent / 100) * groupTotalAmount;
+      setMaxWinningBidAllowed(groupTotalAmount - commissionAmount);
 
       if (currentSelectedGroup.tenure && currentSelectedGroup.tenure > 0) {
         setAuctionNumberOptions(Array.from({ length: currentSelectedGroup.tenure }, (_, i) => i + 1));
@@ -231,19 +225,18 @@ export function StartAuctionForm() {
           setCompletedAuctionNumbers(completedNums);
 
           let defaultAuctionNumber: number | undefined = undefined;
-          if (currentSelectedGroup.tenure && currentSelectedGroup.tenure > 0) {
-              for (let i = 1; i <= currentSelectedGroup.tenure; i++) {
-                  if (!completedNums.includes(i)) {
-                      defaultAuctionNumber = i;
-                      break;
-                  }
-              }
-              // If all auctions completed or no auctions yet, and tenure exists, default to 1
-              if (!defaultAuctionNumber && fetchedAuctionHistory.length === 0 && currentSelectedGroup.tenure > 0) {
-                  defaultAuctionNumber = 1;
-              }
-          }
-          setValue("auctionNumber", defaultAuctionNumber, { shouldValidate: true });
+            if (currentSelectedGroup.tenure && currentSelectedGroup.tenure > 0) {
+                for (let i = 1; i <= currentSelectedGroup.tenure; i++) {
+                    if (!completedNums.includes(i)) {
+                        defaultAuctionNumber = i;
+                        break;
+                    }
+                }
+                 if (!defaultAuctionNumber && completedNums.length === 0 && currentSelectedGroup.tenure > 0) {
+                    defaultAuctionNumber = 1;
+                }
+            }
+            setValue("auctionNumber", defaultAuctionNumber, { shouldValidate: true });
         } catch (error) {
           console.error("Error fetching group members or auction history:", error);
           toast({ title: "Error", description: "Could not load members or auction history.", variant: "destructive" });
@@ -284,7 +277,6 @@ export function StartAuctionForm() {
         return;
     }
 
-    // Validation for winning bid amount
     const groupTotalAmountVal = typeof selectedGroup.totalAmount === 'number' ? selectedGroup.totalAmount : 0;
     const groupCommissionPercentVal = (typeof selectedGroup.commission === 'number' && selectedGroup.commission >= 0) ? selectedGroup.commission : 0;
     const calculatedCommissionForValidation = (groupCommissionPercentVal / 100) * groupTotalAmountVal;
@@ -296,6 +288,14 @@ export function StartAuctionForm() {
       toast({ title: "Invalid Bid Amount", description: errorMessage, variant: "destructive" });
       return;
     }
+
+    if (selectedGroup.minBid && typeof selectedGroup.minBid === 'number' && values.winningBidAmount < selectedGroup.minBid) {
+      const errorMessage = `Winning bid cannot be less than the minimum required bid of ${formatCurrency(selectedGroup.minBid)}.`;
+      setFormError("winningBidAmount", { type: "manual", message: errorMessage });
+      toast({ title: "Invalid Bid Amount", description: errorMessage, variant: "destructive" });
+      return;
+    }
+
 
     if (previousWinnerIds.includes(winnerUser.id)) {
       toast({
@@ -317,19 +317,19 @@ export function StartAuctionForm() {
 
     setIsSubmitting(true);
     try {
-        const commissionPercent = typeof selectedGroup.commission === 'number' ? selectedGroup.commission : 0;
-        const totalGroupAmount = typeof selectedGroup.totalAmount === 'number' ? selectedGroup.totalAmount : 0;
-        const groupRateInstallment = typeof selectedGroup.rate === 'number' ? selectedGroup.rate : 0;
-        const totalGroupPeople = typeof selectedGroup.totalPeople === 'number' && selectedGroup.totalPeople > 0 ? selectedGroup.totalPeople : 1;
+        const commission = typeof selectedGroup.commission === 'number' ? selectedGroup.commission : 0;
+        const totalAmount = typeof selectedGroup.totalAmount === 'number' ? selectedGroup.totalAmount : 0;
+        const groupRate = typeof selectedGroup.rate === 'number' ? selectedGroup.rate : 0;
+        const totalPeople = typeof selectedGroup.totalPeople === 'number' && selectedGroup.totalPeople > 0 ? selectedGroup.totalPeople : 1;
         
         let calculatedCommissionAmount: number | null = null;
-        if (selectedGroup.commission !== undefined && selectedGroup.commission !== null && totalGroupAmount > 0) {
-            calculatedCommissionAmount = (commissionPercent * totalGroupAmount) / 100;
+        if (selectedGroup.commission !== undefined && selectedGroup.commission !== null && totalAmount > 0) {
+            calculatedCommissionAmount = (commission * totalAmount) / 100;
         }
 
         let calculatedDiscount: number | null = null;
-        if (totalGroupAmount > 0 && typeof values.winningBidAmount === 'number') {
-            calculatedDiscount = totalGroupAmount - values.winningBidAmount;
+        if (totalAmount > 0 && typeof values.winningBidAmount === 'number') {
+            calculatedDiscount = totalAmount - values.winningBidAmount;
         }
 
         let calculatedNetDiscount: number | null = null;
@@ -338,20 +338,19 @@ export function StartAuctionForm() {
         }
 
         let calculatedDividendPerMember: number | null = null;
-        if (calculatedNetDiscount !== null && totalGroupPeople > 0) {
-            calculatedDividendPerMember = calculatedNetDiscount / totalGroupPeople;
+        if (calculatedNetDiscount !== null && totalPeople > 0) {
+            calculatedDividendPerMember = calculatedNetDiscount / totalPeople;
         }
 
         let calculatedFinalAmountToBePaid: number | null = null; 
-        if (groupRateInstallment > 0 && calculatedDividendPerMember !== null) {
-            calculatedFinalAmountToBePaid = groupRateInstallment - calculatedDividendPerMember;
+        if (groupRate > 0 && calculatedDividendPerMember !== null) {
+            calculatedFinalAmountToBePaid = groupRate - calculatedDividendPerMember;
         }
         
         let amountPaidToWinnerCalc: number | null = null;
         if (typeof values.winningBidAmount === 'number' && calculatedFinalAmountToBePaid !== null) {
           amountPaidToWinnerCalc = values.winningBidAmount - calculatedFinalAmountToBePaid;
         }
-
 
       const auctionRecordData: Omit<AuctionRecord, "id" | "recordedAt"> & { recordedAt?: any } = {
         groupId: selectedGroup.id,
@@ -369,8 +368,8 @@ export function StartAuctionForm() {
         discount: calculatedDiscount,
         netDiscount: calculatedNetDiscount,
         dividendPerMember: calculatedDividendPerMember,
-        finalAmountToBePaid: calculatedFinalAmountToBePaid, // Installment by all
-        amountPaidToWinner: amountPaidToWinnerCalc, // Amount paid to winner
+        finalAmountToBePaid: calculatedFinalAmountToBePaid,
+        amountPaidToWinner: amountPaidToWinnerCalc,
       };
 
       await addDoc(collection(db, "auctionRecords"), {
@@ -389,19 +388,20 @@ export function StartAuctionForm() {
 
       toast({ title: "Auction Recorded", description: `Auction for ${selectedGroup.groupName} successfully recorded.` });
 
-      // Update dueAmount for ALL members
       if (calculatedFinalAmountToBePaid !== null && calculatedFinalAmountToBePaid > 0) {
-        const batch = writeBatch(db);
-        
-        for (const member of groupMembers) {
-          const userDocRef = doc(db, "users", member.id);
-          const currentDue = member.dueAmount || 0;
-          const newDueAmount = currentDue + calculatedFinalAmountToBePaid;
-          batch.update(userDocRef, { dueAmount: newDueAmount });
-        }
-        await batch.commit();
-        toast({ title: "Due Amounts Updated", description: `Due amounts for all group members have been updated.` });
+          const batch = writeBatch(db);
+          const nonWinningMembers = groupMembers.filter(member => member.id !== winnerUser.id);
+          
+          for (const member of groupMembers) { // Update for ALL members
+            const userDocRef = doc(db, "users", member.id);
+            const currentDue = member.dueAmount || 0;
+            const newDueAmount = currentDue + calculatedFinalAmountToBePaid;
+            batch.update(userDocRef, { dueAmount: newDueAmount });
+          }
+          await batch.commit();
+          toast({ title: "Due Amounts Updated", description: `Due amounts for all group members have been updated.` });
       }
+
 
       router.push(`/admin/groups/${selectedGroup.id}`);
     } catch (error) {
@@ -645,25 +645,30 @@ export function StartAuctionForm() {
                     <div className="flex items-center gap-2">
                         <DollarSign className="h-5 w-5 text-muted-foreground" />
                         <FormControl>
-                          <Input
-                            type="text" // Changed to text for controlled parsing
+                           <Input
+                            type="text"
                             placeholder="e.g., 70000"
                             value={field.value === undefined ? "" : String(field.value)}
                             onChange={(e) => {
                                 const val = e.target.value;
                                 if (val === "") {
-                                  field.onChange(undefined);
+                                field.onChange(undefined);
                                 } else {
-                                  const num = parseInt(val, 10);
-                                  field.onChange(isNaN(num) ? undefined : num);
+                                const num = parseInt(val, 10);
+                                field.onChange(isNaN(num) ? undefined : num);
                                 }
                             }}
-                          />
+                            />
                         </FormControl>
                     </div>
                     {maxWinningBidAllowed !== null && (
                       <FormDescription>
                         Maximum allowed bid: {formatCurrency(maxWinningBidAllowed)}
+                      </FormDescription>
+                    )}
+                    {selectedGroup?.minBid && typeof selectedGroup.minBid === 'number' && (
+                      <FormDescription>
+                        Minimum required bid: {formatCurrency(selectedGroup.minBid)}
                       </FormDescription>
                     )}
                   <FormMessage />
@@ -685,5 +690,3 @@ export function StartAuctionForm() {
     </Card>
   );
 }
-
-    
