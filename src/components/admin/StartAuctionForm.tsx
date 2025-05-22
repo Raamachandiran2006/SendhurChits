@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, where, doc, updateDoc, serverTimestamp, Timestamp, orderBy } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where, doc, updateDoc, serverTimestamp, Timestamp, orderBy, writeBatch, getDoc } from "firebase/firestore";
 import type { Group, User, AuctionRecord } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -131,10 +131,9 @@ export function StartAuctionForm() {
       setPreviousWinnerIds([]);
       setCompletedAuctionNumbers([]);
       setAuctionNumberOptions([]);
-      // Reset relevant form fields except selectedGroupId if it came from URL
       const currentGroupId = form.getValues("selectedGroupId");
       reset({
-        selectedGroupId: preselectedGroupId === currentGroupId ? currentGroupId : "", // Keep if from URL
+        selectedGroupId: preselectedGroupId === currentGroupId ? currentGroupId : "", 
         auctionNumber: undefined,
         auctionMonth: "",
         auctionDate: new Date(),
@@ -157,7 +156,6 @@ export function StartAuctionForm() {
           const localDate = dateParts.length === 3
             ? new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]))
             : parseISO(currentSelectedGroup.auctionScheduledDate);
-
           if (!isNaN(localDate.getTime())) {
             setValue("auctionDate", localDate);
           } else {
@@ -185,14 +183,12 @@ export function StartAuctionForm() {
         setLoadingMembers(true);
         setLoadingPreviousWinnersAndCount(true);
         try {
-          // Fetch Members
           if (currentSelectedGroup.members.length > 0) {
             const usersRef = collection(db, "users");
             const memberUsernamesBatches: string[][] = [];
             for (let i = 0; i < currentSelectedGroup.members.length; i += 30) {
               memberUsernamesBatches.push(currentSelectedGroup.members.slice(i, i + 30));
             }
-
             const fetchedMembers: User[] = [];
             for (const batch of memberUsernamesBatches) {
               if (batch.length > 0) {
@@ -206,15 +202,12 @@ export function StartAuctionForm() {
             setGroupMembers([]);
           }
 
-          // Fetch Auction Records for winners and count
           const auctionRecordsRef = collection(db, "auctionRecords");
           const qAuction = query(auctionRecordsRef, where("groupId", "==", currentSelectedGroup.id));
           const auctionSnapshot = await getDocs(qAuction);
-
           const fetchedAuctionHistory = auctionSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as AuctionRecord));
           const winnerIds = fetchedAuctionHistory.map(rec => rec.winnerUserId);
           setPreviousWinnerIds(winnerIds);
-
           const completedNums = fetchedAuctionHistory
             .map(rec => rec.auctionNumber)
             .filter((num): num is number => typeof num === 'number' && num > 0);
@@ -233,11 +226,9 @@ export function StartAuctionForm() {
               }
           }
           setValue("auctionNumber", defaultAuctionNumber, { shouldValidate: true });
-
-
         } catch (error) {
           console.error("Error fetching group members or auction history:", error);
-          toast({ title: "Error", description: "Could not load members or auction history for the selected group.", variant: "destructive" });
+          toast({ title: "Error", description: "Could not load members or auction history.", variant: "destructive" });
           setGroupMembers([]);
           setPreviousWinnerIds([]);
           setCompletedAuctionNumbers([]);
@@ -255,7 +246,7 @@ export function StartAuctionForm() {
         setAuctionNumberOptions([]);
         setValue("auctionNumber", undefined);
     }
-    setValue("winnerUserId", ""); // Reset winner when group changes
+    setValue("winnerUserId", ""); 
   }, [watchedGroupId, groups, setValue, toast, reset, form, preselectedGroupId]);
 
   const getSelectedWinner = useCallback(() => {
@@ -277,7 +268,7 @@ export function StartAuctionForm() {
     if (previousWinnerIds.includes(winnerUser.id)) {
       toast({
         title: "Selection Blocked",
-        description: `${winnerUser.fullname} has already won an auction in this group and cannot be selected again.`,
+        description: `${winnerUser.fullname} has already won an auction in this group.`,
         variant: "destructive"
       });
       return;
@@ -286,46 +277,45 @@ export function StartAuctionForm() {
     if (completedAuctionNumbers.includes(values.auctionNumber)) {
        toast({
         title: "Selection Blocked",
-        description: `Auction #${values.auctionNumber} has already been recorded for this group.`,
+        description: `Auction #${values.auctionNumber} has already been recorded.`,
         variant: "destructive"
       });
       return;
     }
 
-    // Ensure selectedGroup and its numeric properties are valid before calculation
-    const commission = typeof selectedGroup.commission === 'number' ? selectedGroup.commission : 0;
-    const totalAmount = typeof selectedGroup.totalAmount === 'number' ? selectedGroup.totalAmount : 0;
-    const groupRate = typeof selectedGroup.rate === 'number' ? selectedGroup.rate : 0;
-    const totalPeople = typeof selectedGroup.totalPeople === 'number' && selectedGroup.totalPeople > 0 ? selectedGroup.totalPeople : 1; // Avoid division by zero
-
-    let calculatedCommissionAmount: number | null = null;
-    if (selectedGroup.commission !== undefined && selectedGroup.commission !== null && totalAmount > 0) {
-        calculatedCommissionAmount = (commission * totalAmount) / 100;
-    }
-
-    let calculatedDiscount: number | null = null;
-    if (totalAmount > 0 && typeof values.winningBidAmount === 'number') {
-        calculatedDiscount = totalAmount - values.winningBidAmount;
-    }
-
-    let calculatedNetDiscount: number | null = null;
-    if (calculatedDiscount !== null && calculatedCommissionAmount !== null) {
-        calculatedNetDiscount = calculatedDiscount - calculatedCommissionAmount;
-    }
-
-    let calculatedDividendPerMember: number | null = null;
-    if (calculatedNetDiscount !== null && totalPeople > 0) {
-        calculatedDividendPerMember = calculatedNetDiscount / totalPeople;
-    }
-
-    let calculatedFinalAmountToBePaid: number | null = null;
-    if (groupRate > 0 && calculatedDividendPerMember !== null) {
-        calculatedFinalAmountToBePaid = groupRate - calculatedDividendPerMember;
-    }
-
-
     setIsSubmitting(true);
     try {
+        const commission = typeof selectedGroup.commission === 'number' ? selectedGroup.commission : 0;
+        const totalAmount = typeof selectedGroup.totalAmount === 'number' ? selectedGroup.totalAmount : 0;
+        const groupRate = typeof selectedGroup.rate === 'number' ? selectedGroup.rate : 0;
+        const totalPeople = typeof selectedGroup.totalPeople === 'number' && selectedGroup.totalPeople > 0 ? selectedGroup.totalPeople : 1;
+        const winningBid = typeof values.winningBidAmount === 'number' ? values.winningBidAmount : 0;
+
+        let calculatedCommissionAmount: number | null = null;
+        if (selectedGroup.commission !== undefined && selectedGroup.commission !== null && totalAmount > 0) {
+            calculatedCommissionAmount = (commission * totalAmount) / 100;
+        }
+
+        let calculatedDiscount: number | null = null;
+        if (totalAmount > 0 && winningBid > 0) { // Assuming winningBid is also positive
+            calculatedDiscount = totalAmount - winningBid;
+        }
+
+        let calculatedNetDiscount: number | null = null;
+        if (calculatedDiscount !== null && calculatedCommissionAmount !== null) {
+            calculatedNetDiscount = calculatedDiscount - calculatedCommissionAmount;
+        }
+
+        let calculatedDividendPerMember: number | null = null;
+        if (calculatedNetDiscount !== null && totalPeople > 0) {
+            calculatedDividendPerMember = calculatedNetDiscount / totalPeople;
+        }
+
+        let calculatedFinalAmountToBePaid: number | null = null;
+        if (groupRate > 0 && calculatedDividendPerMember !== null) {
+            calculatedFinalAmountToBePaid = groupRate - calculatedDividendPerMember;
+        }
+
       const auctionRecordData: Omit<AuctionRecord, "id" | "recordedAt"> & { recordedAt?: any } = {
         groupId: selectedGroup.id,
         groupName: selectedGroup.groupName,
@@ -337,7 +327,7 @@ export function StartAuctionForm() {
         winnerUserId: winnerUser.id,
         winnerFullname: winnerUser.fullname,
         winnerUsername: winnerUser.username,
-        winningBidAmount: values.winningBidAmount, // This is now an integer from the form
+        winningBidAmount: values.winningBidAmount,
         commissionAmount: calculatedCommissionAmount,
         discount: calculatedDiscount,
         netDiscount: calculatedNetDiscount,
@@ -360,6 +350,25 @@ export function StartAuctionForm() {
       });
 
       toast({ title: "Auction Recorded", description: `Auction for ${selectedGroup.groupName} successfully recorded.` });
+
+      // Update dueAmount for non-winning members
+      if (calculatedFinalAmountToBePaid !== null && calculatedFinalAmountToBePaid > 0) {
+        const batch = writeBatch(db);
+        const nonWinningMembers = groupMembers.filter(member => member.id !== winnerUser.id);
+
+        for (const member of nonWinningMembers) {
+          const userDocRef = doc(db, "users", member.id);
+          // It's better to read the current dueAmount in a transaction if precise increment is critical.
+          // For simplicity here, we assume dueAmount is fetched with groupMembers or we fetch it individually.
+          // Let's assume groupMembers state has the latest User object including dueAmount
+          const currentDue = member.dueAmount || 0;
+          const newDueAmount = currentDue + calculatedFinalAmountToBePaid;
+          batch.update(userDocRef, { dueAmount: newDueAmount });
+        }
+        await batch.commit();
+        toast({ title: "Due Amounts Updated", description: `Due amounts for non-winning members have been updated.` });
+      }
+
       router.push(`/admin/groups/${selectedGroup.id}`);
     } catch (error) {
       console.error("Error recording auction:", error);
@@ -612,7 +621,7 @@ export function StartAuctionForm() {
                                 if (val === "") {
                                   field.onChange(undefined);
                                 } else {
-                                  const num = parseInt(val, 10);
+                                  const num = parseInt(val, 10); // Use parseInt
                                   field.onChange(isNaN(num) ? undefined : num); 
                                 }
                             }}
@@ -638,6 +647,3 @@ export function StartAuctionForm() {
     </Card>
   );
 }
-
-
-    
