@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { PaymentRecord, Employee } from "@/types";
+import type { CollectionRecord, Employee } from "@/types"; // Updated to CollectionRecord
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query as firestoreQuery, where } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +34,7 @@ const formatCurrency = (amount: number | null | undefined) => {
 export default function EmployeeCollectionPage() {
   const { loggedInEntity } = useAuth();
   const employee = loggedInEntity as Employee | null;
-  const [collectionHistory, setCollectionHistory] = useState<PaymentRecord[]>([]);
+  const [collectionHistory, setCollectionHistory] = useState<CollectionRecord[]>([]); // Updated to CollectionRecord
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
   const refreshId = searchParams.get('refreshId');
@@ -47,11 +47,14 @@ export default function EmployeeCollectionPage() {
       }
       setLoading(true);
       try {
-        const paymentsRef = collection(db, "paymentRecords");
-        // For now, showing all payments. Could be filtered by employee.recordedByEmployeeId === employee.id later
-        const q = firestoreQuery(paymentsRef, orderBy("recordedAt", "desc"));
+        // Fetch from 'collectionRecords' instead of 'paymentRecords'
+        const collectionsRef = collection(db, "collectionRecords"); 
+        // Example: Filter by employee who recorded it, if needed.
+        // const q = firestoreQuery(collectionsRef, where("recordedByEmployeeId", "==", employee.id), orderBy("recordedAt", "desc"));
+        // For now, showing all collections, ordered by recordedAt
+        const q = firestoreQuery(collectionsRef, orderBy("recordedAt", "desc"));
         const querySnapshot = await getDocs(q);
-        const fetchedHistory = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PaymentRecord));
+        const fetchedHistory = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CollectionRecord));
         setCollectionHistory(fetchedHistory);
       } catch (error) {
         console.error("Error fetching collection history:", error);

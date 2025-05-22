@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import type { Group, User, AuctionRecord, PaymentRecord } from "@/types";
+import type { Group, User, AuctionRecord, CollectionRecord } from "@/types"; // Updated to CollectionRecord
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, arrayRemove, updateDoc, orderBy } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -161,7 +161,7 @@ export default function AdminGroupDetailPage() {
   const [group, setGroup] = useState<Group | null>(null);
   const [membersDetails, setMembersDetails] = useState<User[]>([]);
   const [auctionHistory, setAuctionHistory] = useState<AuctionRecord[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<PaymentRecord[]>([]);
+  const [collectionHistory, setCollectionHistory] = useState<CollectionRecord[]>([]); // Updated to CollectionRecord
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -169,7 +169,7 @@ export default function AdminGroupDetailPage() {
   const [isEditingAuctionDetails, setIsEditingAuctionDetails] = useState(false);
   const [isSavingAuctionDetails, setIsSavingAuctionDetails] = useState(false);
   const [loadingAuctionHistory, setLoadingAuctionHistory] = useState(true);
-  const [loadingPaymentHistory, setLoadingPaymentHistory] = useState(true);
+  const [loadingPaymentHistory, setLoadingPaymentHistory] = useState(true); // Renamed for clarity, now fetches collection history
 
 
   const auctionForm = useForm<AuctionDetailsFormValues>({
@@ -245,12 +245,12 @@ export default function AdminGroupDetailPage() {
       setAuctionHistory(fetchedAuctionHistory);
       setLoadingAuctionHistory(false);
 
-      // Fetch Payment History
-      const paymentRecordsRef = collection(db, "paymentRecords");
-      const qPayment = query(paymentRecordsRef, where("groupId", "==", groupId), orderBy("recordedAt", "desc"));
-      const paymentSnapshot = await getDocs(qPayment);
-      const fetchedPaymentHistory = paymentSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as PaymentRecord));
-      setPaymentHistory(fetchedPaymentHistory);
+      // Fetch Collection History (formerly Payment History)
+      const collectionRecordsRef = collection(db, "collectionRecords"); // Changed to collectionRecords
+      const qCollection = query(collectionRecordsRef, where("groupId", "==", groupId), orderBy("recordedAt", "desc"));
+      const collectionSnapshot = await getDocs(qCollection);
+      const fetchedCollectionHistory = collectionSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as CollectionRecord));
+      setCollectionHistory(fetchedCollectionHistory); // Updated state variable name
       setLoadingPaymentHistory(false);
 
 
@@ -683,7 +683,7 @@ export default function AdminGroupDetailPage() {
                   <Card className="bg-secondary/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
                     <CardHeader className="pb-3 pt-4">
                       <CardTitle className="text-md font-semibold text-primary">
-                         Auction #{auction.auctionNumber ? auction.auctionNumber : auctionHistory.length - index}
+                         Auction #{auction.auctionNumber ? auction.auctionNumber : index + 1}
                       </CardTitle>
                       <CardDescription>Group: {auction.groupName}</CardDescription>
                     </CardHeader>
@@ -716,7 +716,7 @@ export default function AdminGroupDetailPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 <p className="ml-3 text-muted-foreground">Loading payment history...</p>
              </div>
-          ) : paymentHistory.length === 0 ? (
+          ) : collectionHistory.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">
               No payment history found for this group.
             </p>
@@ -735,7 +735,7 @@ export default function AdminGroupDetailPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {paymentHistory.map((payment) => (
+                        {collectionHistory.map((payment) => ( // Use collectionHistory
                             <TableRow key={payment.id}>
                                 <TableCell>
                                     {payment.userFullname}<br/>
@@ -762,4 +762,3 @@ export default function AdminGroupDetailPage() {
     </div>
   );
 }
-

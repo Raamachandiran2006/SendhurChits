@@ -98,7 +98,8 @@ export interface ExpenseRecord {
   recordedAt: import('firebase/firestore').Timestamp;
 }
 
-export interface PaymentRecord {
+// Renamed from PaymentRecord to CollectionRecord
+export interface CollectionRecord {
   id: string; // Firestore document ID
   groupId: string;
   groupName: string;

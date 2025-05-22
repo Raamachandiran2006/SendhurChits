@@ -17,8 +17,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, orderBy } from "firebase/firestore";
-import type { Group, User, AuctionRecord, PaymentRecord } from "@/types";
+import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, orderBy, doc } from "firebase/firestore"; // Added doc for referencing collection
+import type { Group, User, AuctionRecord, CollectionRecord } from "@/types"; // Updated to CollectionRecord
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 
@@ -66,7 +66,7 @@ const recordPaymentFormSchema = z.object({
 
 type RecordPaymentFormValues = z.infer<typeof recordPaymentFormSchema>;
 
-const NO_AUCTION_SELECTED_VALUE = "no-auction-selected"; // Unique value for "None" option
+const NO_AUCTION_SELECTED_VALUE = "no-auction-selected"; 
 
 export function RecordPaymentForm() {
   const { toast } = useToast();
@@ -130,7 +130,6 @@ export function RecordPaymentForm() {
     setSelectedGroupObject(group || null);
 
     if (group) {
-      // Fetch Auctions for the selected group
       const fetchAuctions = async () => {
         setLoadingAuctions(true);
         try {
@@ -147,7 +146,6 @@ export function RecordPaymentForm() {
       };
       fetchAuctions();
 
-      // Fetch Members for the selected group
       const fetchMembers = async () => {
         setLoadingMembers(true);
         try {
@@ -197,7 +195,7 @@ export function RecordPaymentForm() {
       : null;
 
     try {
-      const paymentData: Omit<PaymentRecord, "id" | "recordedAt"> & { recordedAt?: any } = {
+      const collectionData: Omit<CollectionRecord, "id" | "recordedAt"> & { recordedAt?: any } = { // Updated to CollectionRecord
         groupId: selectedGroupObject.id,
         groupName: selectedGroupObject.groupName,
         auctionId: selectedAuction ? selectedAuction.id : null,
@@ -209,16 +207,21 @@ export function RecordPaymentForm() {
         paymentTime: values.paymentTime, 
         paymentType: values.paymentType,
         paymentMode: values.paymentMode,
-        amount: values.amount, // amount should be a number here due to Zod coerce
+        amount: values.amount,
         remarks: values.remarks || null,
+        // Collection specific fields that admin might not fill, or fill differently
+        collectionLocation: "Office", // Default for admin portal
+        recordedByEmployeeId: null, // Admin is recording
+        recordedByEmployeeName: "Admin", 
       };
 
-      await addDoc(collection(db, "paymentRecords"), {
-        ...paymentData,
+      // Save to 'collectionRecords' instead of 'paymentRecords'
+      await addDoc(collection(db, "collectionRecords"), { 
+        ...collectionData,
         recordedAt: serverTimestamp() as Timestamp,
       });
 
-      toast({ title: "Payment Recorded", description: "Payment details saved successfully." });
+      toast({ title: "Payment Recorded", description: "Payment details saved successfully to collection records." });
       form.reset({
         selectedGroupId: values.selectedGroupId,
         selectedAuctionId: undefined,
@@ -464,5 +467,3 @@ export function RecordPaymentForm() {
     </Card>
   );
 }
-
-    

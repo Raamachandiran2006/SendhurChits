@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Card, CardHeader, CardContent } from "@/components/ui/card"; // Removed CardTitle, CardDescription as not used
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, Users as UsersIcon, Layers as LayersIcon, MapPin, LocateFixed } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc } from "firebase/firestore";
-import type { Group, User, Employee } from "@/types";
+import type { Group, User, Employee, CollectionRecord } from "@/types"; // Updated to CollectionRecord
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
@@ -234,11 +234,11 @@ export function RecordCollectionForm() {
             const newDueAmount = currentDueAmount - values.amount;
             transaction.update(userDocRef, { dueAmount: newDueAmount });
 
-            const paymentRecordData = {
+            const collectionRecordData: Omit<CollectionRecord, "id" | "recordedAt"> & { recordedAt?: any } = { // Updated type to CollectionRecord
                 groupId: selectedGroup.id,
                 groupName: selectedGroup.groupName,
-                auctionId: null, 
-                auctionNumber: null,
+                auctionId: null, // Assuming collection is not tied to a specific auction for now
+                auctionNumber: null, // Can be linked later if needed
                 userId: selectedUser.id,
                 userUsername: selectedUser.username,
                 userFullname: selectedUser.fullname,
@@ -251,10 +251,13 @@ export function RecordCollectionForm() {
                 collectionLocation: collectionLocationValue,
                 recordedByEmployeeId: employee.id,
                 recordedByEmployeeName: employee.fullname,
-                recordedAt: serverTimestamp() as Timestamp,
             };
-            const paymentRecordRef = doc(collection(db, "paymentRecords"));
-            transaction.set(paymentRecordRef, paymentRecordData);
+            // Save to 'collectionRecords' collection
+            const collectionRecordRef = doc(collection(db, "collectionRecords")); 
+            transaction.set(collectionRecordRef, {
+                ...collectionRecordData,
+                recordedAt: serverTimestamp() as Timestamp,
+            });
         });
 
       toast({ title: "Collection Recorded", description: `Payment of ${formatCurrency(values.amount)} from ${selectedUser.fullname} recorded.` });
@@ -513,5 +516,3 @@ export function RecordCollectionForm() {
     </Card>
   );
 }
-
-    
