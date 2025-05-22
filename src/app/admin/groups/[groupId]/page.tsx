@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import type { Group, User, AuctionRecord } from "@/types";
+import type { Group, User, AuctionRecord, PaymentRecord } from "@/types";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, arrayRemove, updateDoc, orderBy } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -33,7 +33,8 @@ import {
   XCircle,
   PlayCircle,
   History,
-  DollarSign
+  DollarSign,
+  ReceiptText
 } from "lucide-react";
 import { 
   AlertDialog, 
@@ -74,6 +75,16 @@ const formatDateSafe = (dateString: string | Date | undefined | null, outputForm
     return "N/A";
   }
 };
+
+const formatTimestampSafe = (timestamp: any, outputFormat: string = "dd MMM yyyy, hh:mm a") => {
+  if (!timestamp || typeof timestamp.toDate !== 'function') return "N/A";
+  try {
+    return format(timestamp.toDate(), outputFormat);
+  } catch (e) {
+    return "N/A";
+  }
+};
+
 
 const formatCurrency = (amount: number | null | undefined) => {
   if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
@@ -150,6 +161,7 @@ export default function AdminGroupDetailPage() {
   const [group, setGroup] = useState<Group | null>(null);
   const [membersDetails, setMembersDetails] = useState<User[]>([]);
   const [auctionHistory, setAuctionHistory] = useState<AuctionRecord[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -157,6 +169,7 @@ export default function AdminGroupDetailPage() {
   const [isEditingAuctionDetails, setIsEditingAuctionDetails] = useState(false);
   const [isSavingAuctionDetails, setIsSavingAuctionDetails] = useState(false);
   const [loadingAuctionHistory, setLoadingAuctionHistory] = useState(true);
+  const [loadingPaymentHistory, setLoadingPaymentHistory] = useState(true);
 
 
   const auctionForm = useForm<AuctionDetailsFormValues>({
@@ -174,10 +187,12 @@ export default function AdminGroupDetailPage() {
       setError("Group ID is missing.");
       setLoading(false);
       setLoadingAuctionHistory(false);
+      setLoadingPaymentHistory(false);
       return;
     }
     setLoading(true);
     setLoadingAuctionHistory(true);
+    setLoadingPaymentHistory(true);
     setError(null);
     try {
       // Fetch Group Details
@@ -188,6 +203,7 @@ export default function AdminGroupDetailPage() {
         setError("Group not found.");
         setLoading(false);
         setLoadingAuctionHistory(false);
+        setLoadingPaymentHistory(false);
         return;
       }
       const groupData = { id: groupDocSnap.id, ...groupDocSnap.data() } as Group;
@@ -223,17 +239,26 @@ export default function AdminGroupDetailPage() {
 
       // Fetch Auction History
       const auctionRecordsRef = collection(db, "auctionRecords");
-      const qAuction = query(auctionRecordsRef, where("groupId", "==", groupId), orderBy("auctionDate", "asc")); 
+      const qAuction = query(auctionRecordsRef, where("groupId", "==", groupId), orderBy("auctionDate", "desc")); 
       const auctionSnapshot = await getDocs(qAuction);
       const fetchedAuctionHistory = auctionSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as AuctionRecord));
       setAuctionHistory(fetchedAuctionHistory);
+      setLoadingAuctionHistory(false);
+
+      // Fetch Payment History
+      const paymentRecordsRef = collection(db, "paymentRecords");
+      const qPayment = query(paymentRecordsRef, where("groupId", "==", groupId), orderBy("recordedAt", "desc"));
+      const paymentSnapshot = await getDocs(qPayment);
+      const fetchedPaymentHistory = paymentSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as PaymentRecord));
+      setPaymentHistory(fetchedPaymentHistory);
+      setLoadingPaymentHistory(false);
+
 
     } catch (err) {
       console.error("Error fetching group details:", err);
       setError("Failed to fetch group details. Please try again.");
     } finally {
       setLoading(false);
-      setLoadingAuctionHistory(false);
     }
   }, [groupId, auctionForm]);
 
@@ -658,7 +683,7 @@ export default function AdminGroupDetailPage() {
                   <Card className="bg-secondary/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
                     <CardHeader className="pb-3 pt-4">
                       <CardTitle className="text-md font-semibold text-primary">
-                         Auction #{auction.auctionNumber ? auction.auctionNumber : index + 1}
+                         Auction #{auction.auctionNumber ? auction.auctionNumber : auctionHistory.length - index}
                       </CardTitle>
                       <CardDescription>Group: {auction.groupName}</CardDescription>
                     </CardHeader>
@@ -681,16 +706,56 @@ export default function AdminGroupDetailPage() {
       <Card className="shadow-xl">
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-3">
-            <DollarSign className="h-6 w-6 text-primary" /> 
+            <ReceiptText className="h-6 w-6 text-primary" /> 
             <CardTitle className="text-xl font-bold text-foreground">Payment History</CardTitle>
           </div>
-          {/* Placeholder for a button like "Add Payment Record" if needed later */}
-          {/* <Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Add Payment</Button> */}
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground text-center py-4">
-            Payment history feature is currently under development.
-          </p>
+          {loadingPaymentHistory ? (
+             <div className="flex justify-center items-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="ml-3 text-muted-foreground">Loading payment history...</p>
+             </div>
+          ) : paymentHistory.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">
+              No payment history found for this group.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-md border">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>User</TableHead>
+                            <TableHead>Date & Time</TableHead>
+                            <TableHead className="text-right">Amount (₹)</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Mode</TableHead>
+                            <TableHead>Auction #</TableHead>
+                            <TableHead>Remarks</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {paymentHistory.map((payment) => (
+                            <TableRow key={payment.id}>
+                                <TableCell>
+                                    {payment.userFullname}<br/>
+                                    <span className="text-xs text-muted-foreground">({payment.userUsername})</span>
+                                </TableCell>
+                                <TableCell>
+                                    {formatDateSafe(payment.paymentDate, "dd MMM yy")}<br/>
+                                    <span className="text-xs text-muted-foreground">{payment.paymentTime}</span>
+                                </TableCell>
+                                <TableCell className="text-right font-mono">{formatCurrency(payment.amount)}</TableCell>
+                                <TableCell>{payment.paymentType}</TableCell>
+                                <TableCell>{payment.paymentMode}</TableCell>
+                                <TableCell className="text-center">{payment.auctionNumber || "N/A"}</TableCell>
+                                <TableCell className="max-w-xs truncate">{payment.remarks || "N/A"}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+           )}
         </CardContent>
       </Card>
 
