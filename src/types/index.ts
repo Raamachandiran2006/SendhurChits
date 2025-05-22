@@ -33,7 +33,7 @@ export interface Group {
   auctionScheduledDate?: string; // e.g., "YYYY-MM-DD" or descriptive string
   auctionScheduledTime?: string; // e.g., "03:00 PM IST"
   lastAuctionWinner?: string; // e.g., username or "To be determined"
-  lastWinningBidAmount?: number; // New field for the last winning bid amount
+  lastWinningBidAmount?: number; 
 }
 
 export interface Employee {
@@ -77,5 +77,8 @@ export interface AuctionRecord {
   winnerFullname: string;
   winnerUsername: string; // The user00X style ID of the winner
   winningBidAmount: number;
+  discount?: number | null;
+  commissionAmount?: number | null;
+  finalAmountToBePaid?: number | null;
   recordedAt: import('firebase/firestore').Timestamp;
 }

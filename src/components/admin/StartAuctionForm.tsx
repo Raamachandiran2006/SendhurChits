@@ -225,7 +225,7 @@ export function StartAuctionForm() {
                       break;
                   }
               }
-              if (!defaultAuctionNumber && fetchedAuctionHistory.length === 0) { // If all are somehow 'completed' but no previous auctions, default to 1
+              if (!defaultAuctionNumber && fetchedAuctionHistory.length === 0) { 
                   defaultAuctionNumber = 1;
               }
           }
@@ -292,7 +292,7 @@ export function StartAuctionForm() {
 
     setIsSubmitting(true);
     try {
-      const auctionRecordData: Omit<AuctionRecord, "id" | "recordedAt"> = {
+      const auctionRecordData: Omit<AuctionRecord, "id" | "recordedAt"> & { recordedAt?: any } = {
         groupId: selectedGroup.id,
         groupName: selectedGroup.groupName,
         auctionNumber: values.auctionNumber,
@@ -304,6 +304,9 @@ export function StartAuctionForm() {
         winnerFullname: winnerUser.fullname,
         winnerUsername: winnerUser.username,
         winningBidAmount: values.winningBidAmount,
+        discount: null,
+        commissionAmount: null,
+        finalAmountToBePaid: null,
       };
 
       await addDoc(collection(db, "auctionRecords"), {
@@ -567,7 +570,7 @@ export function StartAuctionForm() {
                             type="number"
                             placeholder="e.g., 12000"
                             {...field}
-                            value={field.value === undefined ? "" : field.value} // Ensure controlled component
+                            value={field.value === undefined ? "" : field.value} 
                             onChange={(e) => {
                                 const val = e.target.value;
                                 field.onChange(val === "" ? undefined : parseFloat(val));
@@ -594,4 +597,3 @@ export function StartAuctionForm() {
     </Card>
   );
 }
-

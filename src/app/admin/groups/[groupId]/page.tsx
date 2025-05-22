@@ -644,7 +644,7 @@ export default function AdminGroupDetailPage() {
                       Auction #{auction.auctionNumber || index + 1}
                     </CardTitle>
                     <CardDescription>
-                      {auction.auctionMonth} - {formatDateSafe(auction.auctionDate, "PPP")}
+                      {auction.groupName} ({auction.auctionMonth} - {formatDateSafe(auction.auctionDate, "PPP")})
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="text-sm space-y-1 pb-4">
@@ -663,4 +663,3 @@ export default function AdminGroupDetailPage() {
     </div>
   );
 }
-
