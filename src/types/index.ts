@@ -28,7 +28,7 @@ export interface Group {
   rate?: number; // Monthly installment amount
   commission?: number; // Optional: foreman commission percentage
   biddingType?: "auction" | "random" | "pre-fixed"; // Optional: type of bidding
-  minBid?: number; // Optional: minimum bid amount
+  minBid?: number; // Optional: min bid amount
   auctionMonth?: string;
   auctionScheduledDate?: string; // e.g., "YYYY-MM-DD" or descriptive string
   auctionScheduledTime?: string; // e.g., "03:00 PM"
@@ -95,6 +95,24 @@ export interface ExpenseRecord {
   reason?: string | null; // For spend
   fromPerson?: string | null; // For received
   paymentMode?: 'Cash' | 'UPI' | 'Netbanking' | null; // For received
+  remarks?: string | null;
+  recordedAt: import('firebase/firestore').Timestamp;
+}
+
+export interface PaymentRecord {
+  id: string; // Firestore document ID
+  groupId: string;
+  groupName: string;
+  auctionId?: string | null; // Firestore doc ID of the AuctionRecord, if applicable
+  auctionNumber?: number | null; // Number of the auction, if applicable
+  userId: string; // Firestore doc ID of the User making/receiving payment
+  userUsername: string;
+  userFullname: string;
+  paymentDate: string; // YYYY-MM-DD
+  paymentTime: string; // HH:MM AM/PM
+  paymentType: "Full Payment" | "Partial Payment";
+  paymentMode: "Cash" | "UPI" | "Netbanking";
+  amount: number;
   remarks?: string | null;
   recordedAt: import('firebase/firestore').Timestamp;
 }
