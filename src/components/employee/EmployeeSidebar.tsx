@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Layers, Briefcase, LogOut, DollarSign } from "lucide-react";
+import { Home, Users, Layers, Briefcase, LogOut, DollarSign, ArchiveRestore } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -24,6 +24,7 @@ const navItems = [
   { href: "/employee/groups", label: "View Groups", icon: Layers },
   { href: "/employee/employees", label: "View Colleagues", icon: Briefcase },
   { href: "/employee/salary", label: "My Salary", icon: DollarSign },
+  { href: "/employee/collection", label: "Collection", icon: ArchiveRestore },
 ];
 
 export function EmployeeSidebar() {

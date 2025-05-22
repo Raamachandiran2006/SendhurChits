@@ -114,4 +114,7 @@ export interface PaymentRecord {
   amount: number;
   remarks?: string | null;
   recordedAt: import('firebase/firestore').Timestamp;
+  collectionLocation?: string | null; // "Office" or "lat,lng"
+  recordedByEmployeeId?: string | null;
+  recordedByEmployeeName?: string | null;
 }
