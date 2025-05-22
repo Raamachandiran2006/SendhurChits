@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc } from "firebase/firestore";
-import type { Group, User, Employee, CollectionRecord } from "@/types"; // Updated to CollectionRecord
+import type { Group, User, Employee, CollectionRecord } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
@@ -87,7 +87,8 @@ export function RecordCollectionForm() {
   const [groupMembers, setGroupMembers] = useState<User[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
 
-  const [currentLocation, setCurrentLocation] = useState<string | null>(null);
+  const [currentLocationDisplay, setCurrentLocationDisplay] = useState<string | null>(null); // For displaying to user
+  const [currentLocationValue, setCurrentLocationValue] = useState<string | null>(null); // For storing as GMaps URL
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
 
@@ -173,10 +174,13 @@ export function RecordCollectionForm() {
     if (navigator.geolocation) {
       setIsFetchingLocation(true);
       setLocationError(null);
-      setCurrentLocation(null);
+      setCurrentLocationDisplay(null);
+      setCurrentLocationValue(null);
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setCurrentLocation(`${position.coords.latitude},${position.coords.longitude}`);
+          const { latitude, longitude } = position.coords;
+          setCurrentLocationDisplay(`Lat: ${latitude.toFixed(5)}, Lon: ${longitude.toFixed(5)}`);
+          setCurrentLocationValue(`https://www.google.com/maps?q=${latitude},${longitude}`);
           setIsFetchingLocation(false);
         },
         (error) => {
@@ -194,7 +198,8 @@ export function RecordCollectionForm() {
     if (watchedCollectionLocationOption === "Your Location") {
       handleFetchLocation();
     } else {
-      setCurrentLocation(null);
+      setCurrentLocationDisplay(null);
+      setCurrentLocationValue(null);
       setLocationError(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -206,7 +211,7 @@ export function RecordCollectionForm() {
       toast({ title: "Error", description: "Employee details not found. Please re-login.", variant: "destructive" });
       return;
     }
-    if (values.collectionLocationOption === "Your Location" && !currentLocation) {
+    if (values.collectionLocationOption === "Your Location" && !currentLocationValue) {
         toast({ title: "Location Required", description: "Please fetch your location or select 'Office'.", variant: "destructive" });
         return;
     }
@@ -221,7 +226,7 @@ export function RecordCollectionForm() {
       return;
     }
     
-    const collectionLocationValue = values.collectionLocationOption === "Office" ? "Office" : currentLocation;
+    const collectionLocationToStore = values.collectionLocationOption === "Office" ? "Office" : currentLocationValue;
 
     try {
         await runTransaction(db, async (transaction) => {
@@ -234,11 +239,11 @@ export function RecordCollectionForm() {
             const newDueAmount = currentDueAmount - values.amount;
             transaction.update(userDocRef, { dueAmount: newDueAmount });
 
-            const collectionRecordData: Omit<CollectionRecord, "id" | "recordedAt"> & { recordedAt?: any } = { // Updated type to CollectionRecord
+            const collectionRecordData: Omit<CollectionRecord, "id" | "recordedAt"> & { recordedAt?: any } = {
                 groupId: selectedGroup.id,
                 groupName: selectedGroup.groupName,
-                auctionId: null, // Assuming collection is not tied to a specific auction for now
-                auctionNumber: null, // Can be linked later if needed
+                auctionId: null, 
+                auctionNumber: null, 
                 userId: selectedUser.id,
                 userUsername: selectedUser.username,
                 userFullname: selectedUser.fullname,
@@ -248,11 +253,10 @@ export function RecordCollectionForm() {
                 paymentMode: values.paymentMode,
                 amount: values.amount,
                 remarks: values.remarks || null,
-                collectionLocation: collectionLocationValue,
+                collectionLocation: collectionLocationToStore,
                 recordedByEmployeeId: employee.id,
                 recordedByEmployeeName: employee.fullname,
             };
-            // Save to 'collectionRecords' collection
             const collectionRecordRef = doc(collection(db, "collectionRecords")); 
             transaction.set(collectionRecordRef, {
                 ...collectionRecordData,
@@ -272,7 +276,8 @@ export function RecordCollectionForm() {
         collectionLocationOption: undefined,
         remarks: "",
       });
-      setCurrentLocation(null);
+      setCurrentLocationDisplay(null);
+      setCurrentLocationValue(null);
       setLocationError(null);
       router.push(`/employee/collection?refreshId=${Date.now()}`);
     } catch (error) {
@@ -485,7 +490,7 @@ export function RecordCollectionForm() {
                         {isFetchingLocation && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         <LocateFixed className="mr-2 h-4 w-4" /> Fetch Current Location
                       </Button>
-                      {currentLocation && <p className="text-sm text-muted-foreground">Fetched: {currentLocation}</p>}
+                      {currentLocationDisplay && <p className="text-sm text-muted-foreground">Fetched: {currentLocationDisplay}</p>}
                       {locationError && <Alert variant="destructive"><AlertTitle>Location Error</AlertTitle><AlertDescription>{locationError}</AlertDescription></Alert>}
                     </div>
                   )}

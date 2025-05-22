@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { CollectionRecord, Employee } from "@/types"; // Updated to CollectionRecord
+import type { CollectionRecord, Employee } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query as firestoreQuery, where } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +34,7 @@ const formatCurrency = (amount: number | null | undefined) => {
 export default function EmployeeCollectionPage() {
   const { loggedInEntity } = useAuth();
   const employee = loggedInEntity as Employee | null;
-  const [collectionHistory, setCollectionHistory] = useState<CollectionRecord[]>([]); // Updated to CollectionRecord
+  const [collectionHistory, setCollectionHistory] = useState<CollectionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
   const refreshId = searchParams.get('refreshId');
@@ -47,11 +47,7 @@ export default function EmployeeCollectionPage() {
       }
       setLoading(true);
       try {
-        // Fetch from 'collectionRecords' instead of 'paymentRecords'
         const collectionsRef = collection(db, "collectionRecords"); 
-        // Example: Filter by employee who recorded it, if needed.
-        // const q = firestoreQuery(collectionsRef, where("recordedByEmployeeId", "==", employee.id), orderBy("recordedAt", "desc"));
-        // For now, showing all collections, ordered by recordedAt
         const q = firestoreQuery(collectionsRef, orderBy("recordedAt", "desc"));
         const querySnapshot = await getDocs(q);
         const fetchedHistory = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CollectionRecord));
@@ -139,7 +135,15 @@ export default function EmployeeCollectionPage() {
                       <TableCell className="text-right font-mono">{formatCurrency(record.amount)}</TableCell>
                       <TableCell>{record.paymentType}</TableCell>
                       <TableCell>{record.paymentMode}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{record.collectionLocation || "N/A"}</TableCell>
+                      <TableCell className="max-w-[150px] truncate">
+                        {record.collectionLocation && record.collectionLocation.startsWith('http') ? (
+                          <a href={record.collectionLocation} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                            View on Map
+                          </a>
+                        ) : (
+                          record.collectionLocation || "N/A"
+                        )}
+                      </TableCell>
                       <TableCell>{record.recordedByEmployeeName || "N/A"}</TableCell>
                       <TableCell className="max-w-xs truncate">{record.remarks || "N/A"}</TableCell>
                     </TableRow>

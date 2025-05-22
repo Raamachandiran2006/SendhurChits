@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import type { Group, User, AuctionRecord, CollectionRecord } from "@/types"; // Updated to CollectionRecord
+import type { Group, User, AuctionRecord, CollectionRecord } from "@/types";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, arrayRemove, updateDoc, orderBy } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -161,7 +161,7 @@ export default function AdminGroupDetailPage() {
   const [group, setGroup] = useState<Group | null>(null);
   const [membersDetails, setMembersDetails] = useState<User[]>([]);
   const [auctionHistory, setAuctionHistory] = useState<AuctionRecord[]>([]);
-  const [collectionHistory, setCollectionHistory] = useState<CollectionRecord[]>([]); // Updated to CollectionRecord
+  const [collectionHistory, setCollectionHistory] = useState<CollectionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -169,7 +169,7 @@ export default function AdminGroupDetailPage() {
   const [isEditingAuctionDetails, setIsEditingAuctionDetails] = useState(false);
   const [isSavingAuctionDetails, setIsSavingAuctionDetails] = useState(false);
   const [loadingAuctionHistory, setLoadingAuctionHistory] = useState(true);
-  const [loadingPaymentHistory, setLoadingPaymentHistory] = useState(true); // Renamed for clarity, now fetches collection history
+  const [loadingPaymentHistory, setLoadingPaymentHistory] = useState(true);
 
 
   const auctionForm = useForm<AuctionDetailsFormValues>({
@@ -245,12 +245,12 @@ export default function AdminGroupDetailPage() {
       setAuctionHistory(fetchedAuctionHistory);
       setLoadingAuctionHistory(false);
 
-      // Fetch Collection History (formerly Payment History)
-      const collectionRecordsRef = collection(db, "collectionRecords"); // Changed to collectionRecords
+      // Fetch Collection History
+      const collectionRecordsRef = collection(db, "collectionRecords");
       const qCollection = query(collectionRecordsRef, where("groupId", "==", groupId), orderBy("recordedAt", "desc"));
       const collectionSnapshot = await getDocs(qCollection);
       const fetchedCollectionHistory = collectionSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as CollectionRecord));
-      setCollectionHistory(fetchedCollectionHistory); // Updated state variable name
+      setCollectionHistory(fetchedCollectionHistory);
       setLoadingPaymentHistory(false);
 
 
@@ -731,11 +731,12 @@ export default function AdminGroupDetailPage() {
                             <TableHead>Type</TableHead>
                             <TableHead>Mode</TableHead>
                             <TableHead>Auction #</TableHead>
+                             <TableHead>Location</TableHead>
                             <TableHead>Remarks</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {collectionHistory.map((payment) => ( // Use collectionHistory
+                        {collectionHistory.map((payment) => (
                             <TableRow key={payment.id}>
                                 <TableCell>
                                     {payment.userFullname}<br/>
@@ -749,6 +750,15 @@ export default function AdminGroupDetailPage() {
                                 <TableCell>{payment.paymentType}</TableCell>
                                 <TableCell>{payment.paymentMode}</TableCell>
                                 <TableCell className="text-center">{payment.auctionNumber || "N/A"}</TableCell>
+                                <TableCell className="max-w-[150px] truncate">
+                                  {payment.collectionLocation && payment.collectionLocation.startsWith('http') ? (
+                                    <a href={payment.collectionLocation} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                      View on Map
+                                    </a>
+                                  ) : (
+                                    payment.collectionLocation || "N/A"
+                                  )}
+                                </TableCell>
                                 <TableCell className="max-w-xs truncate">{payment.remarks || "N/A"}</TableCell>
                             </TableRow>
                         ))}
