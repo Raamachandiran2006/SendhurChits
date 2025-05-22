@@ -9,22 +9,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardContent } from "@/components/ui/card"; // Removed CardTitle, CardDescription as not used
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, Users as UsersIcon, Layers as LayersIcon, ListNumbers, MapPin, LocateFixed } from "lucide-react";
+import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, Users as UsersIcon, Layers as LayersIcon, MapPin, LocateFixed } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc } from "firebase/firestore";
-import type { Group, User, Employee } from "@/types"; // PaymentRecord is now in types
+import type { Group, User, Employee } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-// Helper for time formatting (consistent with other forms)
+// Helper for time formatting
 const formatTimeTo12Hour = (timeStr?: string): string => {
   if (!timeStr) return "";
   if (/^([01]\d|2[0-3]):([0-5]\d)$/.test(timeStr)) {
@@ -52,6 +52,11 @@ const formatTimeTo24HourInput = (timeStr?: string): string => {
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
     }
     return "";
+};
+
+const formatCurrency = (amount: number | null | undefined) => {
+  if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
+  return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 };
 
 const recordCollectionFormSchema = z.object({
@@ -232,7 +237,7 @@ export function RecordCollectionForm() {
             const paymentRecordData = {
                 groupId: selectedGroup.id,
                 groupName: selectedGroup.groupName,
-                auctionId: null, // Not tied to a specific auction for general collection
+                auctionId: null, 
                 auctionNumber: null,
                 userId: selectedUser.id,
                 userUsername: selectedUser.username,
@@ -248,13 +253,13 @@ export function RecordCollectionForm() {
                 recordedByEmployeeName: employee.fullname,
                 recordedAt: serverTimestamp() as Timestamp,
             };
-            const paymentRecordRef = doc(collection(db, "paymentRecords")); // Auto-generate ID
+            const paymentRecordRef = doc(collection(db, "paymentRecords"));
             transaction.set(paymentRecordRef, paymentRecordData);
         });
 
       toast({ title: "Collection Recorded", description: `Payment of ${formatCurrency(values.amount)} from ${selectedUser.fullname} recorded.` });
       form.reset({
-        selectedGroupId: "", // Or keep selected group if desired
+        selectedGroupId: "", 
         selectedUserId: "",
         paymentDate: new Date(),
         paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
@@ -508,3 +513,5 @@ export function RecordCollectionForm() {
     </Card>
   );
 }
+
+    
