@@ -23,8 +23,8 @@ import { useRouter } from "next/navigation";
 import type { ExpenseRecord } from "@/types";
 
 const addExpenseFormSchema = z.object({
-  date: z.date().optional(),
-  time: z.string().optional(),
+  date: z.date().optional(), // Optional for 'received', required for 'spend'
+  time: z.string().optional(), // Optional for 'received', required for 'spend'
   amount: z.coerce.number({ required_error: "Amount is required." }).positive("Amount must be a positive number."),
   reason: z.string().optional(), // For 'spend'
   fromPerson: z.string().optional(), // For 'received'
@@ -34,19 +34,22 @@ const addExpenseFormSchema = z.object({
 
 type AddExpenseFormValues = z.infer<typeof addExpenseFormSchema>;
 
+// Converts "HH:mm" (24h) to "hh:mm AM/PM" (12h)
 const formatTimeTo12Hour = (timeStr?: string): string => {
   if (!timeStr) return "";
+  // Check if it's already in HH:mm format
   if (/^([01]\d|2[0-3]):([0-5]\d)$/.test(timeStr)) {
     const [hoursStr, minutesStr] = timeStr.split(':');
     let hours = parseInt(hoursStr, 10);
     const ampm = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12;
-    hours = hours ? hours : 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
     return `${String(hours).padStart(2, '0')}:${minutesStr} ${ampm}`;
   }
-  return timeStr; // Return as is if not in HH:mm format
+  return timeStr; // Return as is if not in expected format
 };
 
+// Converts "hh:mm AM/PM" (and other variants) to "HH:mm" (24h) for time input
 const formatTimeTo24HourInput = (timeStr?: string): string => {
     if (!timeStr) return "";
     // Check if already in 24-hour format
@@ -75,8 +78,8 @@ export function AddExpenseForm() {
   const form = useForm<AddExpenseFormValues>({
     resolver: zodResolver(addExpenseFormSchema),
     defaultValues: {
-      date: new Date(),
-      time: format(new Date(), "HH:mm"), // Default to current time in 24h for input
+      date: new Date(), // Default to today for spend
+      time: format(new Date(), "HH:mm"), // Default to current time for spend
       amount: undefined,
       reason: "",
       fromPerson: "",
@@ -88,7 +91,7 @@ export function AddExpenseForm() {
   const handleTypeChange = (type: 'spend' | 'received') => {
     setExpenseType(type);
     form.reset({ // Reset form to defaults appropriate for the type
-      date: type === 'spend' ? new Date() : undefined, // Date only for spend by default
+      date: type === 'spend' ? new Date() : undefined,
       time: type === 'spend' ? format(new Date(), "HH:mm") : undefined,
       amount: undefined,
       reason: "",
@@ -127,11 +130,11 @@ export function AddExpenseForm() {
       dataToSave = {
         ...dataToSave,
         date: format(values.date, "yyyy-MM-dd"),
-        time: formatTimeTo12Hour(values.time),
+        time: formatTimeTo12Hour(values.time), // Save in 12hr format
         reason: values.reason,
       };
     } else { // 'received'
-      if (!values.fromPerson || values.fromPerson.trim().length < 3) {
+       if (!values.fromPerson || values.fromPerson.trim().length < 3) {
         toast({ title: "Validation Error", description: "'From' field must be at least 3 characters for received income.", variant: "destructive" });
         setIsSubmitting(false); return;
       }
@@ -141,9 +144,10 @@ export function AddExpenseForm() {
       }
       dataToSave = {
         ...dataToSave,
-        date: format(new Date(), "yyyy-MM-dd"), // Default to today for received
+        date: format(values.date || new Date(), "yyyy-MM-dd"), // Use selected date or default to today for received
         fromPerson: values.fromPerson,
         paymentMode: values.paymentMode,
+        // time is typically not recorded for 'received' unless specified
       };
     }
 
@@ -195,45 +199,44 @@ export function AddExpenseForm() {
         </Button>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Common date field for both, but might be auto-filled for 'received' */}
+             <FormField control={form.control} name="date" render={({ field }) => (
+                <FormItem className="flex flex-col">
+                <FormLabel>{expenseType === 'spend' ? 'Date of Spending' : 'Date of Receipt (Optional)'}</FormLabel>
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <FormControl>
+                        <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                    </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                    </PopoverContent>
+                </Popover>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
             {expenseType === 'spend' && (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField control={form.control} name="date" render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                        <FormLabel>Date</FormLabel>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                            <FormControl>
-                                <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                            </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
-                            </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                     <FormField control={form.control} name="time" render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Time</FormLabel>
-                        <FormControl>
-                            <Input 
-                                type="time" 
-                                {...field} 
-                                value={formatTimeTo24HourInput(field.value)}
-                                onChange={(e) => field.onChange(e.target.value)} // Store as HH:mm
-                            />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                </div>
+                <FormField control={form.control} name="time" render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Time of Spending</FormLabel>
+                    <FormControl>
+                        <Input 
+                            type="time" 
+                            {...field} 
+                            value={formatTimeTo24HourInput(field.value)}
+                            onChange={(e) => field.onChange(e.target.value)} // Store as HH:mm
+                        />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
                 <FormField control={form.control} name="reason" render={({ field }) => (
                     <FormItem>
                     <FormLabel>Reason for Spending</FormLabel>
@@ -279,7 +282,13 @@ export function AddExpenseForm() {
                 <FormItem>
                 <FormLabel>Amount (₹)</FormLabel>
                 <FormControl>
-                    <Input type="number" placeholder="e.g., 5000" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                    <Input 
+                        type="number" 
+                        placeholder="e.g., 5000" 
+                        {...field} 
+                        value={field.value === undefined ? "" : String(field.value)}
+                        onChange={e => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
+                    />
                 </FormControl>
                 <FormMessage />
                 </FormItem>
