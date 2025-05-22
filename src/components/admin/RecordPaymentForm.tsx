@@ -60,7 +60,7 @@ const recordPaymentFormSchema = z.object({
   paymentTime: z.string().min(1, "Payment time is required."),
   paymentType: z.enum(["Full Payment", "Partial Payment"], { required_error: "Payment type is required." }),
   paymentMode: z.enum(["Cash", "UPI", "Netbanking"], { required_error: "Payment mode is required." }),
-  amount: z.coerce.number().positive("Amount must be a positive number."),
+  amount: z.coerce.number().int("Amount must be a whole number.").positive("Amount must be a positive number."),
   remarks: z.string().optional(),
 });
 
@@ -85,7 +85,7 @@ export function RecordPaymentForm() {
     resolver: zodResolver(recordPaymentFormSchema),
     defaultValues: {
       selectedGroupId: "",
-      selectedAuctionId: undefined, // Use undefined for placeholder to show
+      selectedAuctionId: undefined,
       selectedUserId: "",
       paymentDate: new Date(),
       paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
@@ -121,7 +121,7 @@ export function RecordPaymentForm() {
       setSelectedGroupObject(null);
       setGroupAuctions([]);
       setGroupMembers([]);
-      setValue("selectedAuctionId", undefined); // Reset to undefined
+      setValue("selectedAuctionId", undefined); 
       setValue("selectedUserId", "");
       return;
     }
@@ -209,7 +209,7 @@ export function RecordPaymentForm() {
         paymentTime: values.paymentTime, 
         paymentType: values.paymentType,
         paymentMode: values.paymentMode,
-        amount: values.amount,
+        amount: values.amount, // amount should be a number here due to Zod coerce
         remarks: values.remarks || null,
       };
 
@@ -220,7 +220,7 @@ export function RecordPaymentForm() {
 
       toast({ title: "Payment Recorded", description: "Payment details saved successfully." });
       form.reset({
-        selectedGroupId: values.selectedGroupId, // Keep group selected
+        selectedGroupId: values.selectedGroupId,
         selectedAuctionId: undefined,
         selectedUserId: "",
         paymentDate: new Date(),
@@ -241,7 +241,6 @@ export function RecordPaymentForm() {
   return (
     <Card className="shadow-xl w-full max-w-2xl mx-auto">
       <CardHeader>
-         {/* Title is handled by the page component */}
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -423,11 +422,18 @@ export function RecordPaymentForm() {
                     <div className="flex items-center gap-2">
                         <DollarSign className="h-5 w-5 text-muted-foreground" />
                         <Input
-                        type="number"
+                        type="text" 
                         placeholder="e.g., 10000"
-                        {...field}
                         value={field.value === undefined ? "" : String(field.value)}
-                        onChange={e => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
+                        onChange={e => {
+                            const val = e.target.value;
+                            if (val === "") {
+                                field.onChange(undefined);
+                            } else {
+                                const num = parseInt(val, 10);
+                                field.onChange(isNaN(num) ? undefined : num);
+                            }
+                        }}
                         />
                     </div>
                   </FormControl>
@@ -458,3 +464,5 @@ export function RecordPaymentForm() {
     </Card>
   );
 }
+
+    
