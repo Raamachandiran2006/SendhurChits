@@ -117,34 +117,16 @@ export default function AuctionRecordDetailPage() {
     return <div className="container mx-auto py-8 text-center text-muted-foreground">Auction record data not available.</div>;
   }
 
-  const DetailItem = ({ icon: Icon, label, value, subValue }: { icon: React.ElementType; label: string; value: React.ReactNode; subValue?: React.ReactNode }) => (
+  const DetailItem = ({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: React.ReactNode; }) => (
     <div className="flex items-start py-2">
       <Icon className="mr-3 h-5 w-5 text-muted-foreground flex-shrink-0 mt-1" />
       <div>
         <p className="font-medium text-foreground">{label}</p>
         <p className="text-sm text-muted-foreground">{value || "N/A"}</p>
-        {subValue && <p className="text-xs text-muted-foreground/80">{subValue}</p>}
       </div>
     </div>
   );
   
-  const commissionHint = groupData?.commission && groupData?.totalAmount 
-    ? `(${groupData.commission}% of ${formatCurrency(groupData.totalAmount)})` 
-    : '';
-  const discountHint = groupData?.totalAmount && auctionRecord?.winningBidAmount
-    ? `(${formatCurrency(groupData.totalAmount)} - ${formatCurrency(auctionRecord.winningBidAmount)})`
-    : '';
-  const netDiscountHint = auctionRecord?.discount !== null && auctionRecord?.commissionAmount !== null
-    ? `(${formatCurrency(auctionRecord.discount)} - ${formatCurrency(auctionRecord.commissionAmount)})`
-    : '';
-  const dividendHint = auctionRecord?.netDiscount !== null && groupData?.totalPeople
-    ? `(${formatCurrency(auctionRecord.netDiscount)} / ${groupData.totalPeople})`
-    : '';
-  const finalAmountHint = groupData?.rate !== null && auctionRecord?.dividendPerMember !== null
-    ? `(${formatCurrency(groupData.rate)} - ${formatCurrency(auctionRecord.dividendPerMember)})`
-    : '';
-
-
   return (
     <div className="container mx-auto py-8 space-y-6">
       <Button
@@ -174,7 +156,7 @@ export default function AuctionRecordDetailPage() {
           <section>
             <h3 className="text-lg font-semibold text-primary mb-2 flex items-center"><Info className="mr-2 h-5 w-5" />Group & Auction Info</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-              <DetailItem icon={Landmark} label="Chit Group Name" value={auctionRecord.groupName} subValue={groupData ? `(Commission: ${groupData.commission?.toString() ?? 'N/A'}%, Total: ${formatCurrency(groupData.totalAmount)}, Rate: ${formatCurrency(groupData.rate)})` : ''} />
+              <DetailItem icon={Landmark} label="Chit Group Name" value={auctionRecord.groupName} />
               <DetailItem icon={Info} label="Chit Group ID" value={auctionRecord.groupId} />
               <DetailItem icon={CalendarDays} label="Auction Month" value={auctionRecord.auctionMonth} />
               <DetailItem icon={CalendarDays} label="Auction Date" value={formatDateSafe(auctionRecord.auctionDate)} />
@@ -198,15 +180,15 @@ export default function AuctionRecordDetailPage() {
           <Separator />
 
           <section>
-            <h3 className="text-lg font-semibold text-primary mb-2 flex items-center"><Calculator className="mr-2 h-5 w-5" />Financials (Stored from Auction Record)</h3>
+            <h3 className="text-lg font-semibold text-primary mb-2 flex items-center"><Calculator className="mr-2 h-5 w-5" />Financials</h3>
              {!groupData && <p className="text-muted-foreground text-sm">Group data not available for full context.</p>}
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6">
-                <DetailItem icon={Landmark} label="Commission Amount" value={formatCurrency(auctionRecord.commissionAmount)} subValue={commissionHint} />
-                <DetailItem icon={Percent} label="Discount" value={formatCurrency(auctionRecord.discount)} subValue={discountHint} />
-                <DetailItem icon={BarChartHorizontalBig} label="Net Discount" value={formatCurrency(auctionRecord.netDiscount)} subValue={netDiscountHint} />
-                <DetailItem icon={UsersIcon} label="Dividend Per Member" value={formatCurrency(auctionRecord.dividendPerMember)} subValue={dividendHint} />
+                <DetailItem icon={Landmark} label="Commission Amount" value={formatCurrency(auctionRecord.commissionAmount)} />
+                <DetailItem icon={Percent} label="Discount" value={formatCurrency(auctionRecord.discount)} />
+                <DetailItem icon={BarChartHorizontalBig} label="Net Discount" value={formatCurrency(auctionRecord.netDiscount)} />
+                <DetailItem icon={UsersIcon} label="Dividend Per Member" value={formatCurrency(auctionRecord.dividendPerMember)} />
                 <DetailItem icon={Landmark} label="Final Amount (Paid by Winner)" value={formatCurrency(auctionRecord.winningBidAmount)} />
-                <DetailItem icon={Landmark} label="Installment (Paid by other Members)" value={formatCurrency(auctionRecord.finalAmountToBePaid)} subValue={finalAmountHint} />
+                <DetailItem icon={Landmark} label="Installment (Paid by other Members)" value={formatCurrency(auctionRecord.finalAmountToBePaid)} />
             </div>
           </section>
         </CardContent>
