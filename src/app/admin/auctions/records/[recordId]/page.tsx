@@ -8,7 +8,7 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, CalendarDays, Clock, User, Tag, Landmark, Percent, FileText, Info, AlertTriangle, BarChartHorizontalBig, Calculator } from "lucide-react";
+import { Loader2, ArrowLeft, CalendarDays, Clock, User, Tag, Landmark, Percent, FileText, Info, AlertTriangle, BarChartHorizontalBig, Calculator, Users as UsersIcon } from "lucide-react"; // Added UsersIcon alias
 import { format, parseISO } from "date-fns";
 import { Separator } from "@/components/ui/separator";
 
@@ -257,7 +257,7 @@ export default function AuctionRecordDetailPage() {
                     <DetailItem icon={Landmark} label="Calculated Commission Amount" value={formatCurrency(calculatedCommissionAmount)} subValue={groupData?.commission ? `(${groupData.commission}% of ${formatCurrency(groupData.totalAmount)})` : ''} />
                     <DetailItem icon={Percent} label="Calculated Discount" value={formatCurrency(calculatedDiscount)} subValue={auctionRecord?.winningBidAmount ? `(${formatCurrency(groupData.totalAmount)} - ${formatCurrency(auctionRecord.winningBidAmount)})` : ''} />
                     <DetailItem icon={BarChartHorizontalBig} label="Calculated Net Discount" value={formatCurrency(calculatedNetDiscount)} subValue={(calculatedDiscount !== null && calculatedCommissionAmount !== null) ? `(${formatCurrency(calculatedDiscount)} - ${formatCurrency(calculatedCommissionAmount)})` : ''}/>
-                    <DetailItem icon={Users} label="Calculated Dividend Per Member" value={formatCurrency(calculatedDividendPerMember)} subValue={(calculatedNetDiscount !== null && groupData?.totalPeople) ? `(${formatCurrency(calculatedNetDiscount)} / ${groupData.totalPeople})` : ''}/>
+                    <DetailItem icon={UsersIcon} label="Calculated Dividend Per Member" value={formatCurrency(calculatedDividendPerMember)} subValue={(calculatedNetDiscount !== null && groupData?.totalPeople) ? `(${formatCurrency(calculatedNetDiscount)} / ${groupData.totalPeople})` : ''}/>
                     <DetailItem icon={Landmark} label="Calculated Final Amount (per Member)" value={formatCurrency(calculatedFinalAmountToBePaidByMember)} subValue={(groupData?.rate !== null && calculatedDividendPerMember !== null) ? `(${formatCurrency(groupData.rate)} - ${formatCurrency(calculatedDividendPerMember)})` : ''}/>
                 </div>
             )}
