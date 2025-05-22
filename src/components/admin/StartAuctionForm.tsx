@@ -29,7 +29,7 @@ const startAuctionFormSchema = z.object({
   auctionTime: z.string().min(1, "Auction time is required."),
   auctionMode: z.enum(["Manual", "Online"]).optional(),
   winnerUserId: z.string().min(1, "Please select a winner."),
-  winningBidAmount: z.coerce.number().positive("Winning bid amount must be a positive number."),
+  winningBidAmount: z.coerce.number().int("Winning bid amount must be a whole number.").positive("Winning bid amount must be a positive number."),
 });
 
 type StartAuctionFormValues = z.infer<typeof startAuctionFormSchema>;
@@ -131,8 +131,10 @@ export function StartAuctionForm() {
       setPreviousWinnerIds([]);
       setCompletedAuctionNumbers([]);
       setAuctionNumberOptions([]);
-      reset({ // Reset relevant fields
-        selectedGroupId: "",
+      // Reset relevant form fields except selectedGroupId if it came from URL
+      const currentGroupId = form.getValues("selectedGroupId");
+      reset({
+        selectedGroupId: preselectedGroupId === currentGroupId ? currentGroupId : "", // Keep if from URL
         auctionNumber: undefined,
         auctionMonth: "",
         auctionDate: new Date(),
@@ -254,7 +256,7 @@ export function StartAuctionForm() {
         setValue("auctionNumber", undefined);
     }
     setValue("winnerUserId", ""); // Reset winner when group changes
-  }, [watchedGroupId, groups, setValue, toast, reset]);
+  }, [watchedGroupId, groups, setValue, toast, reset, form, preselectedGroupId]);
 
   const getSelectedWinner = useCallback(() => {
     return groupMembers.find(member => member.id === watchedWinnerUserId) || null;
@@ -290,27 +292,35 @@ export function StartAuctionForm() {
       return;
     }
 
-    // Perform calculations
-    let calculatedCommissionAmount: number | null = null;
-    let calculatedDiscount: number | null = null;
-    let calculatedNetDiscount: number | null = null;
-    let calculatedDividendPerMember: number | null = null;
-    let calculatedFinalAmountToBePaid: number | null = null;
+    // Ensure selectedGroup and its numeric properties are valid before calculation
+    const commission = typeof selectedGroup.commission === 'number' ? selectedGroup.commission : 0;
+    const totalAmount = typeof selectedGroup.totalAmount === 'number' ? selectedGroup.totalAmount : 0;
+    const groupRate = typeof selectedGroup.rate === 'number' ? selectedGroup.rate : 0;
+    const totalPeople = typeof selectedGroup.totalPeople === 'number' && selectedGroup.totalPeople > 0 ? selectedGroup.totalPeople : 1; // Avoid division by zero
 
-    if (typeof selectedGroup.commission === 'number' && typeof selectedGroup.totalAmount === 'number') {
-      calculatedCommissionAmount = (selectedGroup.commission * selectedGroup.totalAmount) / 100;
+    let calculatedCommissionAmount: number | null = null;
+    if (selectedGroup.commission !== undefined && selectedGroup.commission !== null && totalAmount > 0) {
+        calculatedCommissionAmount = (commission * totalAmount) / 100;
     }
-    if (typeof selectedGroup.totalAmount === 'number' && typeof values.winningBidAmount === 'number') {
-      calculatedDiscount = selectedGroup.totalAmount - values.winningBidAmount;
+
+    let calculatedDiscount: number | null = null;
+    if (totalAmount > 0 && typeof values.winningBidAmount === 'number') {
+        calculatedDiscount = totalAmount - values.winningBidAmount;
     }
+
+    let calculatedNetDiscount: number | null = null;
     if (calculatedDiscount !== null && calculatedCommissionAmount !== null) {
-      calculatedNetDiscount = calculatedDiscount - calculatedCommissionAmount;
+        calculatedNetDiscount = calculatedDiscount - calculatedCommissionAmount;
     }
-    if (calculatedNetDiscount !== null && typeof selectedGroup.totalPeople === 'number' && selectedGroup.totalPeople > 0) {
-      calculatedDividendPerMember = calculatedNetDiscount / selectedGroup.totalPeople;
+
+    let calculatedDividendPerMember: number | null = null;
+    if (calculatedNetDiscount !== null && totalPeople > 0) {
+        calculatedDividendPerMember = calculatedNetDiscount / totalPeople;
     }
-    if (typeof selectedGroup.rate === 'number' && calculatedDividendPerMember !== null) {
-      calculatedFinalAmountToBePaid = selectedGroup.rate - calculatedDividendPerMember;
+
+    let calculatedFinalAmountToBePaid: number | null = null;
+    if (groupRate > 0 && calculatedDividendPerMember !== null) {
+        calculatedFinalAmountToBePaid = groupRate - calculatedDividendPerMember;
     }
 
 
@@ -327,7 +337,7 @@ export function StartAuctionForm() {
         winnerUserId: winnerUser.id,
         winnerFullname: winnerUser.fullname,
         winnerUsername: winnerUser.username,
-        winningBidAmount: values.winningBidAmount,
+        winningBidAmount: values.winningBidAmount, // This is now an integer from the form
         commissionAmount: calculatedCommissionAmount,
         discount: calculatedDiscount,
         netDiscount: calculatedNetDiscount,
@@ -344,7 +354,7 @@ export function StartAuctionForm() {
       await updateDoc(groupDocRef, {
         lastAuctionWinner: winnerUser.fullname,
         lastWinningBidAmount: values.winningBidAmount,
-        auctionMonth: values.auctionMonth, // Update group's auction month to the current one
+        auctionMonth: values.auctionMonth, 
         auctionScheduledDate: format(values.auctionDate, "yyyy-MM-dd"),
         auctionScheduledTime: formatTimeTo12Hour(values.auctionTime),
       });
@@ -594,12 +604,17 @@ export function StartAuctionForm() {
                         <FormControl>
                           <Input
                             type="number"
-                            placeholder="e.g., 12000"
-                            {...field}
+                            placeholder="e.g., 70000"
+                            {...field} 
                             value={field.value === undefined ? "" : field.value} 
                             onChange={(e) => {
                                 const val = e.target.value;
-                                field.onChange(val === "" ? undefined : parseFloat(val));
+                                if (val === "") {
+                                  field.onChange(undefined);
+                                } else {
+                                  const num = parseInt(val, 10);
+                                  field.onChange(isNaN(num) ? undefined : num); 
+                                }
                             }}
                           />
                         </FormControl>
@@ -624,3 +639,5 @@ export function StartAuctionForm() {
   );
 }
 
+
+    
