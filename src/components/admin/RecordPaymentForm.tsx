@@ -9,16 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, Users as UsersIcon, Layers as LayersIcon, ListNumbers } from "lucide-react";
+import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, Users as UsersIcon, Layers as LayersIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, orderBy, doc } from "firebase/firestore"; // Added doc for referencing collection
-import type { Group, User, AuctionRecord, CollectionRecord } from "@/types"; // Updated to CollectionRecord
+import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, orderBy, doc } from "firebase/firestore";
+import type { Group, User, AuctionRecord, CollectionRecord } from "@/types"; // Keep CollectionRecord for structure similarity for now
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 
@@ -66,7 +66,7 @@ const recordPaymentFormSchema = z.object({
 
 type RecordPaymentFormValues = z.infer<typeof recordPaymentFormSchema>;
 
-const NO_AUCTION_SELECTED_VALUE = "no-auction-selected"; 
+const NO_AUCTION_SELECTED_VALUE = "no-auction-selected";
 
 export function RecordPaymentForm() {
   const { toast } = useToast();
@@ -195,7 +195,8 @@ export function RecordPaymentForm() {
       : null;
 
     try {
-      const collectionData: Omit<CollectionRecord, "id" | "recordedAt"> & { recordedAt?: any } = { // Updated to CollectionRecord
+      // Using CollectionRecord type here for structure, but saving to 'paymentRecords'
+      const paymentData: Omit<CollectionRecord, "id" | "recordedAt" | "collectionLocation" | "recordedByEmployeeId" | "recordedByEmployeeName"> & { recordedAt?: any } = { 
         groupId: selectedGroupObject.id,
         groupName: selectedGroupObject.groupName,
         auctionId: selectedAuction ? selectedAuction.id : null,
@@ -209,19 +210,16 @@ export function RecordPaymentForm() {
         paymentMode: values.paymentMode,
         amount: values.amount,
         remarks: values.remarks || null,
-        // Collection specific fields that admin might not fill, or fill differently
-        collectionLocation: "Office", // Default for admin portal
-        recordedByEmployeeId: null, // Admin is recording
-        recordedByEmployeeName: "Admin", 
       };
 
-      // Save to 'collectionRecords' instead of 'paymentRecords'
-      await addDoc(collection(db, "collectionRecords"), { 
-        ...collectionData,
+      await addDoc(collection(db, "paymentRecords"), { // Changed to "paymentRecords"
+        ...paymentData,
         recordedAt: serverTimestamp() as Timestamp,
+        // Admin-specific recording details (if needed) can be added here
+        recordedBy: "Admin", // Example
       });
 
-      toast({ title: "Payment Recorded", description: "Payment details saved successfully to collection records." });
+      toast({ title: "Payment Recorded", description: "Payment details saved successfully to payment records." }); // Updated toast
       form.reset({
         selectedGroupId: values.selectedGroupId,
         selectedAuctionId: undefined,
@@ -285,7 +283,7 @@ export function RecordPaymentForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Auction No (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={!watchedGroupId || loadingAuctions}>
+                  <Select onValueChange={field.onChange} value={field.value || NO_AUCTION_SELECTED_VALUE} disabled={!watchedGroupId || loadingAuctions}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder={!watchedGroupId ? "Select group first" : (loadingAuctions ? "Loading auctions..." : "Select auction (if applicable)")} />
@@ -467,3 +465,5 @@ export function RecordPaymentForm() {
     </Card>
   );
 }
+
+    
