@@ -25,15 +25,16 @@ export default function EmployeeDueSheetPage() {
       setLoading(true);
       try {
         const usersRef = collection(db, "users");
-        // Fetch all users, you might want to add filtering later if needed (e.g., only users in specific groups)
-        // Order by fullname for consistent listing
         const q = query(usersRef, orderBy("fullname"));
         const querySnapshot = await getDocs(q);
         const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-        setUsers(fetchedUsers);
+        
+        // Filter out admin users
+        const nonAdminUsers = fetchedUsers.filter(user => !(user.isAdmin || user.username === 'admin'));
+        setUsers(nonAdminUsers);
+
       } catch (error) {
         console.error("Error fetching users for due sheet:", error);
-        // Optionally, set an error state and display a message
       } finally {
         setLoading(false);
       }
@@ -48,7 +49,7 @@ export default function EmployeeDueSheetPage() {
           <SheetIcon className="h-8 w-8 text-primary" />
           <div>
             <h1 className="text-3xl font-bold text-foreground">Customer Due Sheet</h1>
-            <p className="text-muted-foreground">Overview of pending dues from all customers.</p>
+            <p className="text-muted-foreground">Overview of pending dues from customers.</p>
           </div>
         </div>
         <Button variant="outline" asChild className="mt-4 sm:mt-0">
@@ -62,7 +63,7 @@ export default function EmployeeDueSheetPage() {
       <Card className="shadow-xl">
         <CardHeader>
           <CardTitle>Due Amounts List</CardTitle>
-          <CardDescription>List of all users and their current due amounts.</CardDescription>
+          <CardDescription>List of customers and their current due amounts (excluding admins).</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -72,7 +73,7 @@ export default function EmployeeDueSheetPage() {
             </div>
           ) : users.length === 0 ? (
             <div className="text-center py-10">
-              <p className="text-muted-foreground">No users found.</p>
+              <p className="text-muted-foreground">No customer data found.</p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-md border">
