@@ -1,14 +1,14 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react"; // Added React import
 import type { ExpenseRecord } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query as firestoreQuery } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Receipt, PlusCircle, ArrowLeft, ListChecks, Loader2 } from "lucide-react";
+import { Receipt, PlusCircle, ArrowLeft, ListChecks, Loader2, ChevronRight, ChevronDown } from "lucide-react"; // Added Chevron icons
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, parseISO } from "date-fns";
 import { useSearchParams } from "next/navigation";
@@ -18,42 +18,40 @@ export default function ExpensesManagementPage() {
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
   const refreshId = searchParams.get('refreshId');
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({}); // State for expanded rows
+
+  const toggleRowExpansion = (recordId: string) => {
+    setExpandedRows(prev => ({ ...prev, [recordId]: !prev[recordId] }));
+  };
 
   useEffect(() => {
     const fetchExpenseHistory = async () => {
       setLoading(true);
       try {
         const historyRef = collection(db, "expenses");
-        // Order by recordedAt in descending order to show latest first
         const q = firestoreQuery(historyRef, orderBy("recordedAt", "desc"));
         const querySnapshot = await getDocs(q);
         const fetchedHistory = querySnapshot.docs.map(doc => {
           const data = doc.data() as ExpenseRecord;
-          // Convert Firestore Timestamp to Date for recordedAt if it's not already
-          // This might not be strictly necessary if using serverTimestamp for writing,
-          // but good for consistency if some records have JS Dates.
           return { 
             id: doc.id, 
             ...data,
-            // recordedAt is already a Timestamp from Firestore, so no conversion needed for sorting.
-            // For display, we'll format it directly.
           } as ExpenseRecord;
         });
         setExpenseHistory(fetchedHistory);
       } catch (error) {
         console.error("Error fetching expense history:", error);
-        // Consider adding a user-facing error message or toast
       } finally {
         setLoading(false);
       }
     };
     fetchExpenseHistory();
-  }, [refreshId]); // Re-fetch when refreshId changes
+  }, [refreshId]);
 
   const formatDateSafe = (dateString: string | undefined | null, dateFormat: string = "dd MMM yyyy"): string => {
     if (!dateString) return "N/A";
     try {
-      const date = parseISO(dateString); // Assumes date is stored as YYYY-MM-DD string
+      const date = parseISO(dateString);
       return format(date, dateFormat);
     } catch (e) {
       return "N/A";
@@ -117,6 +115,7 @@ export default function ExpensesManagementPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>S.No</TableHead>
                     <TableHead>Recorded At</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Date & Time</TableHead>
@@ -126,22 +125,44 @@ export default function ExpensesManagementPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {expenseHistory.map((record) => (
-                    <TableRow key={record.id}>
-                      <TableCell>{formatTimestamp(record.recordedAt)}</TableCell>
-                      <TableCell className="capitalize">{record.type}</TableCell>
-                      <TableCell>
-                        {formatDateSafe(record.date)}
-                        {record.type === 'spend' && record.time ? ` at ${record.time}` : ''}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">₹{record.amount.toLocaleString()}</TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {record.type === 'spend' ? record.reason : record.fromPerson}
-                        {record.type === 'received' && record.paymentMode ? ` (Mode: ${record.paymentMode})` : ''}
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">{record.remarks || "N/A"}</TableCell>
-                    </TableRow>
-                  ))}
+                  {expenseHistory.map((record, index) => {
+                    const isExpanded = expandedRows[record.id];
+                    return (
+                    <React.Fragment key={record.id}>
+                      <TableRow>
+                        <TableCell>
+                          <div className="flex items-center">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleRowExpansion(record.id)}
+                                className="mr-1 p-1 h-auto"
+                            >
+                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </Button>
+                            {index + 1}
+                          </div>
+                          {isExpanded && (
+                            <div className="pl-7 mt-1 text-xs text-muted-foreground">
+                                Virtual ID: {record.virtualTransactionId || "N/A"}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>{formatTimestamp(record.recordedAt)}</TableCell>
+                        <TableCell className="capitalize">{record.type}</TableCell>
+                        <TableCell>
+                          {formatDateSafe(record.date)}
+                          {record.type === 'spend' && record.time ? ` at ${record.time}` : ''}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">₹{record.amount.toLocaleString()}</TableCell>
+                        <TableCell className="max-w-xs truncate">
+                          {record.type === 'spend' ? record.reason : record.fromPerson}
+                          {record.type === 'received' && record.paymentMode ? ` (Mode: ${record.paymentMode})` : ''}
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate">{record.remarks || "N/A"}</TableCell>
+                      </TableRow>
+                    </React.Fragment>
+                  )})}
                 </TableBody>
               </Table>
             </div>
