@@ -1,14 +1,14 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react"; // Added React import
 import type { CollectionRecord, PaymentRecord as AdminPaymentRecordType } from "@/types"; // Using AdminPaymentRecordType alias for clarity
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query as firestoreQuery, Timestamp } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ArrowLeft, Landmark, Loader2, AlertTriangle, ReceiptText } from "lucide-react";
+import { ArrowLeft, Landmark, Loader2, AlertTriangle, ReceiptText, ChevronRight, ChevronDown } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ interface UnifiedAuctionTransaction {
   mode: string | null;
   remarks: string | null;
   originalSource: "Payment Record" | "Collection Record"; // To distinguish origin if needed
+  virtualTransactionId?: string;
 }
 
 const formatDateSafe = (dateInput: string | Date | Timestamp | undefined | null, outputFormat: string = "dd MMM yyyy, hh:mm a") => {
@@ -107,6 +108,11 @@ export default function AuctionPaymentRecordPage() {
   const [allAuctionTransactions, setAllAuctionTransactions] = useState<UnifiedAuctionTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+
+  const toggleRowExpansion = (transactionKey: string) => {
+    setExpandedRows(prev => ({ ...prev, [transactionKey]: !prev[transactionKey] }));
+  };
 
   useEffect(() => {
     const fetchAuctionRelatedTransactions = async () => {
@@ -136,7 +142,7 @@ export default function AuctionPaymentRecordPage() {
           if (result.status === "fulfilled") {
             console.log(`AuctionPaymentRecordPage: Fetched from ${collectionsToFetch[index].name}, ${result.value.docs.length} docs`);
             result.value.docs.forEach(doc => {
-              const data = doc.data() as CollectionRecord | AdminPaymentRecordType; // Assuming structures are compatible for now
+              const data = doc.data() as CollectionRecord | AdminPaymentRecordType; 
               const id = doc.id;
               let transformed: UnifiedAuctionTransaction | null = null;
 
@@ -155,6 +161,7 @@ export default function AuctionPaymentRecordPage() {
                   mode: data.paymentMode,
                   remarks: data.remarks || "Company Payment",
                   originalSource: sourceName,
+                  virtualTransactionId: data.virtualTransactionId,
                 };
               } else if (sourceType === "Received") { // From collectionRecords
                 transformed = {
@@ -167,6 +174,7 @@ export default function AuctionPaymentRecordPage() {
                   mode: data.paymentMode,
                   remarks: data.remarks || "User Collection",
                   originalSource: sourceName,
+                  virtualTransactionId: data.virtualTransactionId,
                 };
               }
               if (transformed) combinedTransactions.push(transformed);
@@ -271,26 +279,48 @@ export default function AuctionPaymentRecordPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {allAuctionTransactions.map((tx, index) => (
-                    <TableRow key={tx.id + tx.originalSource}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell>
-                        <span className={cn(
-                          "font-semibold px-2 py-1 rounded-full text-xs",
-                          tx.type === "Sent" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" 
-                                             : "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                        )}>
-                          {tx.type}
-                        </span>
-                      </TableCell>
-                      <TableCell>{formatDateSafe(tx.dateTime)}</TableCell>
-                      <TableCell className="max-w-xs truncate">{tx.fromParty}</TableCell>
-                      <TableCell className="max-w-xs truncate">{tx.toParty}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(tx.amount)}</TableCell>
-                      <TableCell>{tx.mode || "N/A"}</TableCell>
-                      <TableCell className="max-w-xs truncate">{tx.remarks || "N/A"}</TableCell>
-                    </TableRow>
-                  ))}
+                  {allAuctionTransactions.map((tx, index) => {
+                    const transactionKey = tx.id + tx.originalSource;
+                    const isExpanded = expandedRows[transactionKey];
+                    return (
+                    <React.Fragment key={transactionKey}>
+                      <TableRow>
+                        <TableCell>
+                          <div className="flex items-center">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleRowExpansion(transactionKey)}
+                                className="mr-1 p-1 h-auto"
+                            >
+                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </Button>
+                            {index + 1}
+                          </div>
+                          {isExpanded && (
+                            <div className="pl-7 mt-1 text-xs text-muted-foreground">
+                                Virtual ID: {tx.virtualTransactionId || "N/A"}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className={cn(
+                            "font-semibold px-2 py-1 rounded-full text-xs",
+                            tx.type === "Sent" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" 
+                                               : "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                          )}>
+                            {tx.type}
+                          </span>
+                        </TableCell>
+                        <TableCell>{formatDateSafe(tx.dateTime)}</TableCell>
+                        <TableCell className="max-w-xs truncate">{tx.fromParty}</TableCell>
+                        <TableCell className="max-w-xs truncate">{tx.toParty}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(tx.amount)}</TableCell>
+                        <TableCell>{tx.mode || "N/A"}</TableCell>
+                        <TableCell className="max-w-xs truncate">{tx.remarks || "N/A"}</TableCell>
+                      </TableRow>
+                    </React.Fragment>
+                  )})}
                 </TableBody>
               </Table>
             </div>
@@ -300,5 +330,3 @@ export default function AuctionPaymentRecordPage() {
     </div>
   );
 }
-
-    
