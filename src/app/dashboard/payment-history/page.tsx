@@ -17,11 +17,13 @@ import { cn } from "@/lib/utils";
 interface UserTransaction {
   id: string;
   dateTime: Date;
-  description: string;
+  fromParty: string;
+  toParty: string;
   amount: number;
   type: "Sent" | "Received"; // Sent by user, Received by user
   mode: string | null;
-  sourceCollection: "Collections" | "Payments by Admin";
+  remarks: string | null;
+  sourceCollection: "CollectionRecords" | "PaymentRecords"; // More specific source
 }
 
 const formatDateSafe = (dateInput: Date | string | Timestamp | undefined | null, outputFormat: string = "dd MMM yyyy, hh:mm a") => {
@@ -31,9 +33,9 @@ const formatDateSafe = (dateInput: Date | string | Timestamp | undefined | null,
     if (dateInput instanceof Timestamp) {
       date = dateInput.toDate();
     } else if (typeof dateInput === 'string') {
-       const parsedDate = new Date(dateInput.replace(/-/g, '/')); // Handle YYYY-MM-DD
+       const parsedDate = new Date(dateInput.replace(/-/g, '/')); 
       if (isNaN(parsedDate.getTime())) {
-        const isoParsed = parseISO(dateInput); // Handle full ISO strings if direct parse fails
+        const isoParsed = parseISO(dateInput); 
         if(isNaN(isoParsed.getTime())) return "N/A";
         date = isoParsed;
       } else {
@@ -58,7 +60,7 @@ const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestam
   
   let baseDate: Date;
   if (dateStr) {
-    const d = new Date(dateStr.replace(/-/g, '/')); // Handle YYYY-MM-DD
+    const d = new Date(dateStr.replace(/-/g, '/')); 
     if (isNaN(d.getTime())) { 
         const isoD = parseISO(dateStr);
         if(isNaN(isoD.getTime())) return new Date(0); 
@@ -132,28 +134,33 @@ export default function UserPaymentHistoryPage() {
           combinedTransactions.push({
             id: doc.id,
             dateTime: parseDateTimeForSort(data.paymentDate, data.paymentTime, data.recordedAt),
-            description: data.remarks || `Payment for ${data.groupName}`,
-            amount: data.amount,
             type: "Sent",
+            fromParty: `You (${user.fullname})`,
+            toParty: "ChitConnect (Company)",
+            amount: data.amount,
             mode: data.paymentMode,
-            sourceCollection: "Collections"
+            remarks: data.remarks || `Payment for Group: ${data.groupName}`,
+            sourceCollection: "CollectionRecords"
           });
         });
 
-        // Fetch from paymentRecords (payments RECEIVED BY user from admin)
+        // Fetch from paymentRecords (payments RECEIVED BY user from admin/company)
+        // Assuming AdminPaymentRecord is the type for data in 'paymentRecords' collection
         const paymentsRef = collection(db, "paymentRecords");
         const paymentsQuery = query(paymentsRef, where("userId", "==", user.id), orderBy("recordedAt", "desc"));
         const paymentsSnapshot = await getDocs(paymentsQuery);
         paymentsSnapshot.forEach(doc => {
-          const data = doc.data() as AdminPaymentRecord; // Using AdminPaymentRecord for structure
+          const data = doc.data() as AdminPaymentRecord; 
           combinedTransactions.push({
             id: doc.id,
             dateTime: parseDateTimeForSort(data.paymentDate, data.paymentTime, data.recordedAt),
-            description: data.remarks || `Payment received from Admin/Company for ${data.groupName}`,
-            amount: data.amount,
             type: "Received",
+            fromParty: "ChitConnect (Company)",
+            toParty: `You (${user.fullname})`,
+            amount: data.amount,
             mode: data.paymentMode,
-            sourceCollection: "Payments by Admin"
+            remarks: data.remarks || `Payment from Company for ${data.groupName || 'General Payment'}`,
+            sourceCollection: "PaymentRecords"
           });
         });
         
@@ -169,7 +176,7 @@ export default function UserPaymentHistoryPage() {
     };
 
     fetchTransactions();
-  }, [user?.id]);
+  }, [user?.id, user?.fullname]);
 
   if (loading) {
     return (
@@ -232,18 +239,23 @@ export default function UserPaymentHistoryPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>S.No</TableHead>
                     <TableHead>Date & Time</TableHead>
-                    <TableHead>Description</TableHead>
+                    <TableHead>From</TableHead>
+                    <TableHead>To</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead className="text-right">Amount (₹)</TableHead>
                     <TableHead>Mode</TableHead>
+                    <TableHead>Remarks</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {transactions.map((tx) => (
+                  {transactions.map((tx, index) => (
                     <TableRow key={tx.id + tx.sourceCollection}>
+                      <TableCell>{index + 1}</TableCell>
                       <TableCell>{formatDateSafe(tx.dateTime)}</TableCell>
-                      <TableCell className="max-w-xs truncate">{tx.description}</TableCell>
+                      <TableCell className="max-w-xs truncate">{tx.fromParty}</TableCell>
+                      <TableCell className="max-w-xs truncate">{tx.toParty}</TableCell>
                       <TableCell>
                         <span className={cn(
                           "font-semibold px-2 py-1 rounded-full text-xs",
@@ -255,6 +267,7 @@ export default function UserPaymentHistoryPage() {
                       </TableCell>
                       <TableCell className="text-right font-mono">{formatCurrency(tx.amount)}</TableCell>
                       <TableCell>{tx.mode || "N/A"}</TableCell>
+                      <TableCell className="max-w-xs truncate">{tx.remarks || "N/A"}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
