@@ -2,20 +2,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { CollectionRecord, ExpenseRecord, SalaryRecord, PaymentRecord as AdminPaymentRecord } from "@/types"; // Assuming PaymentRecord is for admin-recorded payments
+import type { CollectionRecord, ExpenseRecord, SalaryRecord, PaymentRecord as AdminPaymentRecord } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query as firestoreQuery, Timestamp } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ArrowLeft, BookOpenCheck, Loader2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, Loader2, AlertTriangle, ChevronRight, ChevronDown } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, parseISO } from "date-fns";
-import { cn } from "@/lib/utils"; // Ensure cn is imported
+import { cn } from "@/lib/utils";
 
 interface MasterTransaction {
-  id: string;
-  transactionDisplayId: string;
+  id: string; // Original document ID
+  transactionDisplayId: string; // A display-friendly ID for the row
   direction: "Sent" | "Received";
   dateTime: Date;
   fromParty: string;
@@ -23,7 +23,8 @@ interface MasterTransaction {
   amount: number;
   mode: string | null;
   remarksOrSource: string;
-  originalSource: string; // e.g., "Collection", "Salary", "Expense"
+  originalSource: string; // e.g., "Collection", "Salary", "Expense", "Payment"
+  virtualTransactionId?: string; // The 6-digit random ID
 }
 
 const formatDateSafe = (dateInput: string | Date | Timestamp | undefined | null, outputFormat: string = "dd MMM yyyy, hh:mm a") => {
@@ -60,16 +61,16 @@ const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestam
   
   let baseDate: Date;
   if (dateStr) {
-    const d = new Date(dateStr.replace(/-/g, '/')); // Handle YYYY-MM-DD
-    if (isNaN(d.getTime())) { // try ISO if direct fails
+    const d = new Date(dateStr.replace(/-/g, '/')); 
+    if (isNaN(d.getTime())) { 
         const isoD = parseISO(dateStr);
-        if(isNaN(isoD.getTime())) return new Date(0); // Invalid date, sort to epoch
+        if(isNaN(isoD.getTime())) return new Date(0); 
         baseDate = isoD;
     } else {
         baseDate = d;
     }
   } else {
-    baseDate = new Date(); // Default to now if no date string
+    baseDate = new Date(); 
   }
 
   if (isNaN(baseDate.getTime())) return new Date(0); 
@@ -87,7 +88,6 @@ const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestam
       baseDate.setHours(hours, minutes, 0, 0);
       return baseDate;
     }
-    // Handle HH:mm (24-hour format)
     const time24hMatch = timeStr.match(/^(\d{2}):(\d{2})$/);
     if (time24hMatch) {
         const hours = parseInt(time24hMatch[1], 10);
@@ -96,7 +96,7 @@ const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestam
         return baseDate;
     }
   }
-  baseDate.setHours(0,0,0,0); // Default to start of the day if no time
+  baseDate.setHours(0,0,0,0); 
   return baseDate;
 };
 
@@ -110,6 +110,11 @@ export default function MasterRecordPage() {
   const [allTransactions, setAllTransactions] = useState<MasterTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+
+  const toggleRowExpansion = (transactionKey: string) => {
+    setExpandedRows(prev => ({ ...prev, [transactionKey]: !prev[transactionKey] }));
+  };
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -120,7 +125,7 @@ export default function MasterRecordPage() {
       try {
         const collectionsToFetch = [
           { name: "collectionRecords", type: "Collection" as const, dateField: "recordedAt" },
-          { name: "paymentRecords", type: "Payment" as const, dateField: "recordedAt" }, // Changed type for clarity
+          { name: "paymentRecords", type: "Payment" as const, dateField: "recordedAt" }, 
           { name: "salaryRecords", type: "Salary" as const, dateField: "recordedAt" },
           { name: "expenses", type: "Expense" as const, dateField: "recordedAt" },
         ];
@@ -154,22 +159,24 @@ export default function MasterRecordPage() {
                   toParty: "ChitConnect (Company)",
                   amount: record.amount,
                   mode: record.paymentMode,
-                  remarksOrSource: record.remarks || `Collection from ${record.userFullname}`,
+                  remarksOrSource: record.remarks || `Collection for Group: ${record.groupName}`,
                   originalSource: "Collection",
+                  virtualTransactionId: record.virtualTransactionId,
                 };
               } else if (sourceType === "Payment" && data) {
                 const record = data as AdminPaymentRecord; 
                 transformed = {
                   id,
                   transactionDisplayId: `PAY-${id.substring(0,6)}`,
-                  direction: "Sent", // Admin recorded payments are typically 'Sent' by company
+                  direction: "Sent", 
                   dateTime: parseDateTimeForSort(record.paymentDate, record.paymentTime, record.recordedAt),
                   fromParty: "ChitConnect (Company)",
                   toParty: `User: ${record.userFullname} (${record.userUsername})`,
                   amount: record.amount,
                   mode: record.paymentMode,
-                  remarksOrSource: record.remarks || `Payment to ${record.userFullname}`,
+                  remarksOrSource: record.remarks || `Payment for Group: ${record.groupName}`,
                   originalSource: "Payment",
+                  virtualTransactionId: record.virtualTransactionId,
                 };
               } else if (sourceType === "Salary" && data) {
                 const record = data as SalaryRecord;
@@ -184,6 +191,7 @@ export default function MasterRecordPage() {
                   mode: "Bank Transfer", 
                   remarksOrSource: record.remarks || `Salary for ${record.employeeName}`,
                   originalSource: "Salary",
+                  virtualTransactionId: record.virtualTransactionId,
                 };
               } else if (sourceType === "Expense" && data) {
                 const record = data as ExpenseRecord;
@@ -198,6 +206,7 @@ export default function MasterRecordPage() {
                   mode: record.paymentMode || (record.type === "spend" ? "Company Account" : "N/A"),
                   remarksOrSource: record.remarks || (record.type === "spend" ? record.reason : `Income from ${record.fromPerson}` ) || "Expense Record",
                   originalSource: "Expense",
+                  virtualTransactionId: record.virtualTransactionId,
                 };
               }
               if (transformed) combinedTransactions.push(transformed);
@@ -234,7 +243,7 @@ export default function MasterRecordPage() {
     );
   }
 
-  if (error && allTransactions.length === 0) { // Show error only if no transactions loaded
+  if (error && allTransactions.length === 0) { 
     return (
       <div className="container mx-auto py-8 text-center">
         <Card className="max-w-md mx-auto shadow-lg">
@@ -298,27 +307,50 @@ export default function MasterRecordPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {allTransactions.map((tx, index) => (
-                    <TableRow key={tx.id + tx.originalSource}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell>
-                        <span className={cn("font-semibold", tx.direction === "Sent" ? "text-destructive" : "text-green-600")}>
-                          {tx.direction}
-                        </span>
-                      </TableCell>
-                      <TableCell>{formatDateSafe(tx.dateTime)}</TableCell>
-                      <TableCell className="max-w-xs truncate">{tx.fromParty}</TableCell>
-                      <TableCell className="max-w-xs truncate">{tx.toParty}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(tx.amount)}</TableCell>
-                      <TableCell>{tx.mode || "N/A"}</TableCell>
-                      <TableCell className="max-w-xs truncate">{tx.remarksOrSource}</TableCell>
-                      <TableCell>
-                        <span className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground">
-                          {tx.originalSource}
-                        </span>
-                        </TableCell>
-                    </TableRow>
-                  ))}
+                  {allTransactions.map((tx, index) => {
+                    const transactionKey = tx.id + tx.originalSource; // Unique key for expansion state
+                    const isExpanded = expandedRows[transactionKey];
+                    return (
+                      <React.Fragment key={transactionKey}>
+                        <TableRow>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleRowExpansion(transactionKey)}
+                                className="mr-1 p-1 h-auto"
+                              >
+                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              </Button>
+                              {index + 1}
+                            </div>
+                            {isExpanded && (
+                              <div className="pl-7 mt-1 text-xs text-muted-foreground">
+                                Virtual ID: {tx.virtualTransactionId || "N/A"}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <span className={cn("font-semibold px-2 py-1 rounded-full text-xs", tx.direction === "Sent" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" : "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300")}>
+                              {tx.direction}
+                            </span>
+                          </TableCell>
+                          <TableCell>{formatDateSafe(tx.dateTime)}</TableCell>
+                          <TableCell className="max-w-xs truncate">{tx.fromParty}</TableCell>
+                          <TableCell className="max-w-xs truncate">{tx.toParty}</TableCell>
+                          <TableCell className="text-right font-mono">{formatCurrency(tx.amount)}</TableCell>
+                          <TableCell>{tx.mode || "N/A"}</TableCell>
+                          <TableCell className="max-w-xs truncate">{tx.remarksOrSource}</TableCell>
+                          <TableCell>
+                            <span className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground">
+                              {tx.originalSource}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      </React.Fragment>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -328,3 +360,5 @@ export default function MasterRecordPage() {
     </div>
   );
 }
+
+    
