@@ -7,11 +7,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Loader2, UserSearch, DollarSign, FilePenLine, Send } from "lucide-react";
+import { CalendarIcon, Loader2, DollarSign, Send } from "lucide-react"; // Removed UserSearch, FilePenLine
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -200,10 +199,18 @@ export function AddSalaryRecordForm() {
               name="remarks"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Remarks (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Any notes about this payment..." {...field} />
-                  </FormControl>
+                  <FormLabel>Remarks</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select remark type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Salary">Salary</SelectItem>
+                      {/* Add other remark options here if needed in the future */}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
