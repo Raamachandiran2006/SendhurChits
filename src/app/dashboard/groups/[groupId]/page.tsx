@@ -3,9 +3,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import type { Group } from "@/types";
+import type { Group, AuctionRecord } from "@/types"; // Added AuctionRecord
 import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, orderBy, getDocs } from "firebase/firestore"; // Added collection, query, where, orderBy, getDocs
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -21,26 +21,41 @@ import {
   Tag, 
   SearchCode,
   Megaphone,
-  CalendarClock
+  CalendarClock,
+  History // Added History icon
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
-const formatDateSafe = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
-  if (!dateString) return "N/A";
+// Updated formatDateSafe to handle potential Date objects directly
+const formatDateSafe = (dateInput: string | Date | undefined | null, outputFormat: string = "dd MMM yyyy") => {
+  if (!dateInput) return "N/A";
   try {
-    const date = typeof dateString === 'string' && dateString.includes('T') 
-      ? parseISO(dateString) 
-      : (typeof dateString === 'string' ? new Date(dateString.replace(/-/g, '/')) : dateString); 
+    let date: Date;
+    if (dateInput instanceof Date) {
+      date = dateInput;
+    } else if (typeof dateInput === 'string') {
+      // Handle 'YYYY-MM-DD' or full ISO strings
+      date = dateInput.includes('T') ? parseISO(dateInput) : new Date(dateInput.replace(/-/g, '/'));
+    } else {
+      return "N/A"; // Should not happen with current types
+    }
 
     if (isNaN(date.getTime())) return "N/A";
     return format(date, outputFormat);
   } catch (e) {
+    console.error("Error formatting date:", dateInput, e);
     return "N/A";
   }
 };
+
+const formatCurrency = (amount: number | null | undefined) => {
+  if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
+  return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+};
+
 
 const getBiddingTypeLabel = (type: string | undefined) => {
   if (!type) return "N/A";
@@ -58,38 +73,56 @@ export default function UserGroupDetailPage() {
   const groupId = params.groupId as string;
 
   const [group, setGroup] = useState<Group | null>(null);
+  const [auctionHistory, setAuctionHistory] = useState<AuctionRecord[]>([]); // State for auction history
   const [loading, setLoading] = useState(true);
+  const [loadingAuctionHistory, setLoadingAuctionHistory] = useState(true); // Loading state for auction history
   const [error, setError] = useState<string | null>(null);
 
-  const fetchGroupDetails = useCallback(async () => {
+  const fetchGroupDetailsAndHistory = useCallback(async () => {
     if (!groupId) {
       setError("Group ID is missing.");
       setLoading(false);
+      setLoadingAuctionHistory(false);
       return;
     }
     setLoading(true);
+    setLoadingAuctionHistory(true);
     setError(null);
     try {
+      // Fetch Group Details
       const groupDocRef = doc(db, "groups", groupId);
       const groupDocSnap = await getDoc(groupDocRef);
 
       if (!groupDocSnap.exists()) {
         setError("Group not found.");
+        setGroup(null);
       } else {
         const groupData = { id: groupDocSnap.id, ...groupDocSnap.data() } as Group;
         setGroup(groupData);
+
+        // Fetch Auction History for this group
+        const auctionRecordsRef = collection(db, "auctionRecords");
+        const qAuction = query(
+          auctionRecordsRef, 
+          where("groupId", "==", groupId), 
+          orderBy("auctionDate", "desc") // Show newest first
+        );
+        const auctionSnapshot = await getDocs(qAuction);
+        const fetchedAuctionHistory = auctionSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as AuctionRecord));
+        setAuctionHistory(fetchedAuctionHistory);
       }
     } catch (err) {
-      console.error("Error fetching group details:", err);
-      setError("Failed to fetch group details. Please try again.");
+      console.error("Error fetching group details or history:", err);
+      setError("Failed to fetch group details or auction history. Please try again.");
     } finally {
       setLoading(false);
+      setLoadingAuctionHistory(false);
     }
   }, [groupId]);
 
   useEffect(() => {
-    fetchGroupDetails();
-  }, [fetchGroupDetails]);
+    fetchGroupDetailsAndHistory();
+  }, [fetchGroupDetailsAndHistory]);
 
   if (loading) {
     return (
@@ -226,6 +259,49 @@ export default function UserGroupDetailPage() {
           <AuctionDetailItemReadOnly icon={Info} label="Last Auction Winner" value={group.lastAuctionWinner} />
         </CardContent>
       </Card>
+
+      <Separator />
+
+      <Card className="shadow-xl">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <History className="h-6 w-6 text-primary" /> 
+            <CardTitle className="text-xl font-bold text-foreground">Auction History</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+           {loadingAuctionHistory ? (
+             <div className="flex justify-center items-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="ml-3 text-muted-foreground">Loading auction history...</p>
+             </div>
+           ) : auctionHistory.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">
+              No auction history found for this group.
+            </p>
+           ) : (
+            <div className="space-y-4">
+              {auctionHistory.map((auction, index) => (
+                <Card key={auction.id} className="bg-secondary/50 shadow-sm">
+                  <CardHeader className="pb-3 pt-4">
+                    <CardTitle className="text-md font-semibold text-primary">
+                       Auction #{auction.auctionNumber ? auction.auctionNumber : (index + 1)}
+                    </CardTitle>
+                    <CardDescription>Period: {auction.auctionMonth} - {formatDateSafe(auction.auctionDate, "PP")}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-sm space-y-2 pb-4">
+                      {auction.auctionTime && <div><strong className="text-foreground">Time:</strong> {auction.auctionTime}</div>}
+                      <div><strong className="text-foreground">Winner:</strong> {auction.winnerFullname} ({auction.winnerUsername})</div>
+                      <div><strong className="text-foreground">Winning Bid:</strong> {formatCurrency(auction.winningBidAmount)}</div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+           )}
+        </CardContent>
+      </Card>
+
     </div>
   );
 }
+
