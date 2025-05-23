@@ -29,9 +29,12 @@ export default function EmployeeDueSheetPage() {
         const querySnapshot = await getDocs(q);
         const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
         
-        // Filter out admin users
-        const nonAdminUsers = fetchedUsers.filter(user => !(user.isAdmin || user.username === 'admin'));
-        setUsers(nonAdminUsers);
+        // Filter out admin users and users with no positive due amount
+        const relevantUsers = fetchedUsers.filter(user => 
+          !(user.isAdmin || user.username === 'admin') &&
+          (user.dueAmount && user.dueAmount > 0)
+        );
+        setUsers(relevantUsers);
 
       } catch (error) {
         console.error("Error fetching users for due sheet:", error);
@@ -49,7 +52,7 @@ export default function EmployeeDueSheetPage() {
           <SheetIcon className="h-8 w-8 text-primary" />
           <div>
             <h1 className="text-3xl font-bold text-foreground">Customer Due Sheet</h1>
-            <p className="text-muted-foreground">Overview of pending dues from customers.</p>
+            <p className="text-muted-foreground">Overview of pending dues from customers (excluding admins and zero/negative dues).</p>
           </div>
         </div>
         <Button variant="outline" asChild className="mt-4 sm:mt-0">
@@ -62,8 +65,8 @@ export default function EmployeeDueSheetPage() {
 
       <Card className="shadow-xl">
         <CardHeader>
-          <CardTitle>Due Amounts List</CardTitle>
-          <CardDescription>List of customers and their current due amounts (excluding admins).</CardDescription>
+          <CardTitle>Outstanding Due Amounts</CardTitle>
+          <CardDescription>List of customers with positive due amounts (excluding admins).</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -73,7 +76,7 @@ export default function EmployeeDueSheetPage() {
             </div>
           ) : users.length === 0 ? (
             <div className="text-center py-10">
-              <p className="text-muted-foreground">No customer data found.</p>
+              <p className="text-muted-foreground">No customers with outstanding dues found.</p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-md border">
