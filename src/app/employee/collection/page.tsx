@@ -1,14 +1,14 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react"; // Added React import
 import type { CollectionRecord, Employee } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query as firestoreQuery, where } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Loader2, ArchiveRestore, PlusCircle, ArrowLeft, ListChecks } from "lucide-react";
+import { Loader2, ArchiveRestore, PlusCircle, ArrowLeft, ListChecks, ChevronRight, ChevronDown } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, parseISO } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,6 +38,11 @@ export default function EmployeeCollectionPage() {
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
   const refreshId = searchParams.get('refreshId');
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+
+  const toggleRowExpansion = (recordId: string) => {
+    setExpandedRows(prev => ({ ...prev, [recordId]: !prev[recordId] }));
+  };
 
   useEffect(() => {
     const fetchCollectionHistory = async () => {
@@ -109,6 +114,7 @@ export default function EmployeeCollectionPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>S.No</TableHead>
                     <TableHead>Group Name</TableHead>
                     <TableHead>User</TableHead>
                     <TableHead>Date & Time</TableHead>
@@ -121,33 +127,55 @@ export default function EmployeeCollectionPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {collectionHistory.map((record) => (
-                    <TableRow key={record.id}>
-                      <TableCell>{record.groupName}</TableCell>
-                      <TableCell>
-                        {record.userFullname}<br/>
-                        <span className="text-xs text-muted-foreground">({record.userUsername})</span>
-                      </TableCell>
-                      <TableCell>
-                        {formatDateSafe(record.paymentDate, "dd MMM yy")}<br/>
-                        <span className="text-xs text-muted-foreground">{record.paymentTime}</span>
-                      </TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(record.amount)}</TableCell>
-                      <TableCell>{record.paymentType}</TableCell>
-                      <TableCell>{record.paymentMode}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">
-                        {record.collectionLocation && record.collectionLocation.startsWith('http') ? (
-                          <a href={record.collectionLocation} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                            View on Map
-                          </a>
-                        ) : (
-                          record.collectionLocation || "N/A"
-                        )}
-                      </TableCell>
-                      <TableCell>{record.recordedByEmployeeName || "N/A"}</TableCell>
-                      <TableCell className="max-w-xs truncate">{record.remarks || "N/A"}</TableCell>
-                    </TableRow>
-                  ))}
+                  {collectionHistory.map((record, index) => {
+                    const isExpanded = expandedRows[record.id];
+                    return (
+                    <React.Fragment key={record.id}>
+                      <TableRow>
+                        <TableCell>
+                          <div className="flex items-center">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleRowExpansion(record.id)}
+                                className="mr-1 p-1 h-auto"
+                            >
+                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </Button>
+                            {index + 1}
+                          </div>
+                          {isExpanded && (
+                            <div className="pl-7 mt-1 text-xs text-muted-foreground">
+                                Virtual ID: {record.virtualTransactionId || "N/A"}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>{record.groupName}</TableCell>
+                        <TableCell>
+                          {record.userFullname}<br/>
+                          <span className="text-xs text-muted-foreground">({record.userUsername})</span>
+                        </TableCell>
+                        <TableCell>
+                          {formatDateSafe(record.paymentDate, "dd MMM yy")}<br/>
+                          <span className="text-xs text-muted-foreground">{record.paymentTime}</span>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(record.amount)}</TableCell>
+                        <TableCell>{record.paymentType}</TableCell>
+                        <TableCell>{record.paymentMode}</TableCell>
+                        <TableCell className="max-w-[150px] truncate">
+                          {record.collectionLocation && record.collectionLocation.startsWith('http') ? (
+                            <a href={record.collectionLocation} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                              View on Map
+                            </a>
+                          ) : (
+                            record.collectionLocation || "N/A"
+                          )}
+                        </TableCell>
+                        <TableCell>{record.recordedByEmployeeName || "N/A"}</TableCell>
+                        <TableCell className="max-w-xs truncate">{record.remarks || "N/A"}</TableCell>
+                      </TableRow>
+                    </React.Fragment>
+                  )})}
                 </TableBody>
               </Table>
             </div>
