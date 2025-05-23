@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react"; // Added React import
 import type { CollectionRecord, ExpenseRecord, SalaryRecord, PaymentRecord as AdminPaymentRecord } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query as firestoreQuery, Timestamp } from "firebase/firestore";
@@ -61,19 +61,21 @@ const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestam
   
   let baseDate: Date;
   if (dateStr) {
-    const d = new Date(dateStr.replace(/-/g, '/')); 
+    // Attempt to parse YYYY-MM-DD or other common date strings
+    const d = new Date(dateStr.replace(/-/g, '/')); // Replace hyphens for better cross-browser compatibility
     if (isNaN(d.getTime())) { 
+        // If direct parsing fails, try parseISO for ISO 8601 strings
         const isoD = parseISO(dateStr);
-        if(isNaN(isoD.getTime())) return new Date(0); 
+        if(isNaN(isoD.getTime())) return new Date(0); // Return an early date if unparseable
         baseDate = isoD;
     } else {
         baseDate = d;
     }
   } else {
-    baseDate = new Date(); 
+    baseDate = new Date(); // Default to now if no date string, though this should be rare
   }
 
-  if (isNaN(baseDate.getTime())) return new Date(0); 
+  if (isNaN(baseDate.getTime())) return new Date(0); // Safety check
 
   if (timeStr) {
     const timePartsMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
@@ -83,11 +85,12 @@ const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestam
       const period = timePartsMatch[3]?.toUpperCase();
 
       if (period === "PM" && hours < 12) hours += 12;
-      if (period === "AM" && hours === 12) hours = 0;
+      if (period === "AM" && hours === 12) hours = 0; // Midnight case
 
       baseDate.setHours(hours, minutes, 0, 0);
       return baseDate;
     }
+    // Check for 24-hour format HH:MM
     const time24hMatch = timeStr.match(/^(\d{2}):(\d{2})$/);
     if (time24hMatch) {
         const hours = parseInt(time24hMatch[1], 10);
@@ -96,6 +99,8 @@ const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestam
         return baseDate;
     }
   }
+  // If no time provided, or invalid format, default to start of the day (or current time if baseDate was set to new Date())
+  // For sorting consistency, setting to 00:00:00 for dates without time is better
   baseDate.setHours(0,0,0,0); 
   return baseDate;
 };
@@ -138,6 +143,7 @@ export default function MasterRecordPage() {
         console.log("Master Record: Fetch results from Promise.allSettled:", results);
 
         let combinedTransactions: MasterTransaction[] = [];
+        let fetchErrorOccurred = false;
 
         results.forEach((result, index) => {
           const sourceType = collectionsToFetch[index].type;
@@ -213,7 +219,11 @@ export default function MasterRecordPage() {
             });
           } else {
             console.error(`Master Record: Error fetching from ${collectionsToFetch[index].name}:`, result.reason);
-            setError(prev => prev ? `${prev}\nFailed to load ${collectionsToFetch[index].name}.` : `Failed to load ${collectionsToFetch[index].name}.`);
+            setError(prev => {
+                const newError = `Failed to load ${collectionsToFetch[index].name}.`;
+                return prev ? `${prev}\n${newError}` : newError;
+            });
+            fetchErrorOccurred = true;
           }
         });
         
@@ -332,7 +342,11 @@ export default function MasterRecordPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <span className={cn("font-semibold px-2 py-1 rounded-full text-xs", tx.direction === "Sent" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" : "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300")}>
+                            <span className={cn(
+                                "font-semibold px-2 py-1 rounded-full text-xs", 
+                                tx.direction === "Sent" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" 
+                                                        : "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                                )}>
                               {tx.direction}
                             </span>
                           </TableCell>
@@ -361,4 +375,3 @@ export default function MasterRecordPage() {
   );
 }
 
-    
