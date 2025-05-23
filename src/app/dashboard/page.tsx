@@ -7,18 +7,19 @@ import type { Group, User } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where, documentId } from "firebase/firestore";
 import { UserGroupCard } from "@/components/dashboard/UserGroupCard";
-import { Loader2, ListX, UserCircle } from "lucide-react";
+import { Loader2, ListX, Landmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 export default function DashboardPage() {
-  const { loggedInEntity, userType } = useAuth(); // Use loggedInEntity which will be User type here
+  const { loggedInEntity } = useAuth();
   const [groups, setGroups] = useState<Group[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingGroups, setLoadingGroups] = useState(true);
 
-  const user = loggedInEntity as User | null; // Cast to User
+  const user = loggedInEntity as User | null;
 
   const getInitials = (name: string | undefined) => {
     if (!name) return "U";
@@ -30,7 +31,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (user && user.groups && user.groups.length > 0) {
       const fetchGroups = async () => {
-        setLoading(true);
+        setLoadingGroups(true);
         try {
           const groupsRef = collection(db, "groups");
           const q = query(groupsRef, where(documentId(), "in", user.groups.slice(0,30) ));
@@ -40,28 +41,28 @@ export default function DashboardPage() {
         } catch (error) {
           console.error("Error fetching groups:", error);
         } finally {
-          setLoading(false);
+          setLoadingGroups(false);
         }
       };
       fetchGroups();
     } else {
-      setLoading(false);
+      setLoadingGroups(false);
       setGroups([]);
     }
   }, [user]);
 
-  if (loading) {
+  if (loadingGroups && (!user || (user.groups && user.groups.length > 0))) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-lg">Loading your groups...</p>
+        <p className="mt-4 text-lg">Loading your dashboard...</p>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+    <div className="container mx-auto py-8 space-y-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
         <div className="flex items-center gap-4 mb-4 sm:mb-0">
           {user?.photoUrl ? (
             <Image 
@@ -81,29 +82,34 @@ export default function DashboardPage() {
           )}
           <div>
             <h1 className="text-3xl font-bold text-foreground">Welcome, {user?.fullname}!</h1>
-            <p className="text-muted-foreground">Here are your chit groups.</p>
+            <p className="text-muted-foreground">Here's an overview of your account.</p>
           </div>
         </div>
-        {user?.isAdmin && (
-          <Button asChild variant="outline">
-            <Link href="/admin/groups/create">Create New Group</Link>
-          </Button>
-        )}
       </div>
 
-      {groups.length === 0 ? (
+      <Card className="shadow-md">
+        <CardHeader>
+          <CardTitle>Quick Access</CardTitle>
+          <CardDescription>Manage your payments and groups.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Button asChild variant="outline" className="w-full sm:w-auto">
+              <Link href="/dashboard/payment-history">
+                <Landmark className="mr-2 h-4 w-4" /> View Payment History
+              </Link>
+            </Button>
+        </CardContent>
+      </Card>
+
+
+      {groups.length === 0 && !loadingGroups ? (
         <div className="text-center py-10 bg-card rounded-lg shadow-md">
           <ListX className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
           <h2 className="text-xl font-semibold text-foreground">No Groups Yet</h2>
           <p className="text-muted-foreground mt-2">
             You are not part of any chit groups.
-            {user?.isAdmin ? " As an admin, you can create new groups." : " Contact an admin to be added to a group."}
+            Contact an admin to be added to a group.
           </p>
-          {user?.isAdmin && (
-             <Button asChild className="mt-6" variant="default">
-                <Link href="/admin/groups/create">Create Group</Link>
-             </Button>
-          )}
         </div>
       ) : (
         <div>
@@ -118,4 +124,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

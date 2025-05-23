@@ -68,7 +68,7 @@ export interface AuctionRecord {
   id: string; // Firestore document ID for this auction record
   groupId: string; // Firestore doc ID of the group
   groupName: string;
-  auctionNumber?: number; // Explicit auction number
+  auctionNumber?: number; 
   auctionMonth: string; // e.g., "August 2024"
   auctionDate: string; // YYYY-MM-DD
   auctionTime: string; // e.g., "03:00 PM"
@@ -81,7 +81,7 @@ export interface AuctionRecord {
   commissionAmount?: number | null;
   netDiscount?: number | null;
   dividendPerMember?: number | null;
-  finalAmountToBePaid?: number | null; // Amount to be paid by each member for this round (installment)
+  finalAmountToBePaid?: number | null; 
   recordedAt: import('firebase/firestore').Timestamp;
 }
 
@@ -98,13 +98,12 @@ export interface ExpenseRecord {
   recordedAt: import('firebase/firestore').Timestamp;
 }
 
-// Renamed from PaymentRecord to CollectionRecord
 export interface CollectionRecord {
   id: string; // Firestore document ID
   groupId: string;
   groupName: string;
-  auctionId?: string | null; // Firestore doc ID of the AuctionRecord, if applicable
-  auctionNumber?: number | null; // Number of the auction, if applicable
+  auctionId?: string | null; 
+  auctionNumber?: number | null; 
   userId: string; // Firestore doc ID of the User making/receiving payment
   userUsername: string;
   userFullname: string;
@@ -115,7 +114,28 @@ export interface CollectionRecord {
   amount: number;
   remarks?: string | null;
   recordedAt: import('firebase/firestore').Timestamp;
-  collectionLocation?: string | null; // "Office" or "lat,lng"
+  collectionLocation?: string | null; 
   recordedByEmployeeId?: string | null;
   recordedByEmployeeName?: string | null;
+}
+
+// This type will be used by Admin's "Record Payment" (Payment Portal)
+// For payments made BY THE COMPANY (e.g., to auction winners, other payouts)
+export interface PaymentRecord { // Distinct from CollectionRecord
+  id: string; // Firestore document ID
+  groupId?: string | null; // Optional, if payment is related to a group
+  groupName?: string | null;
+  auctionId?: string | null;
+  auctionNumber?: number | null;
+  userId?: string | null; // Firestore doc ID of the User receiving payment
+  userUsername?: string | null;
+  userFullname?: string | null;
+  paymentDate: string; // YYYY-MM-DD
+  paymentTime: string; // HH:MM AM/PM
+  paymentReason: string; // E.g., "Auction Payout", "Refund", "Advance"
+  paymentMode: "Cash" | "UPI" | "Netbanking" | "Cheque";
+  amount: number;
+  remarks?: string | null;
+  recordedAt: import('firebase/firestore').Timestamp;
+  recordedBy: "Admin" | string; // Could be Admin or specific employee ID if delegated
 }

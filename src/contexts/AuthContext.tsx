@@ -2,7 +2,7 @@
 "use client";
 
 import type { User, Employee } from "@/types";
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import {
@@ -14,6 +14,7 @@ import {
   setDoc,
   runTransaction,
   updateDoc,
+  onSnapshot, // Import onSnapshot
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
@@ -36,16 +37,73 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const { toast } = useToast();
 
+  // Load initial state from localStorage
   useEffect(() => {
-    const storedEntity = localStorage.getItem("chitConnectEntity");
+    const storedEntityString = localStorage.getItem("chitConnectEntity");
     const storedUserType = localStorage.getItem("chitConnectUserType") as 'user' | 'admin' | 'employee' | null;
     
-    if (storedEntity && storedUserType) {
-      setLoggedInEntity(JSON.parse(storedEntity));
-      setUserType(storedUserType);
+    if (storedEntityString && storedUserType) {
+      try {
+        const storedEntity = JSON.parse(storedEntityString);
+        setLoggedInEntity(storedEntity);
+        setUserType(storedUserType);
+      } catch (error) {
+        console.error("Error parsing stored entity from localStorage:", error);
+        localStorage.removeItem("chitConnectEntity");
+        localStorage.removeItem("chitConnectUserType");
+      }
     }
     setLoading(false);
   }, []);
+
+  // Real-time listener for user data updates (e.g., dueAmount)
+  useEffect(() => {
+    if (loggedInEntity && userType === 'user' && 'id' in loggedInEntity) {
+      const userDocRef = doc(db, "users", loggedInEntity.id);
+      const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const updatedUserData = { id: docSnap.id, ...docSnap.data() } as User;
+          setLoggedInEntity(prevEntity => {
+            // Only update if it's still the same user and type to avoid race conditions on logout/login
+            if (prevEntity && prevEntity.id === updatedUserData.id && userType === 'user') {
+              localStorage.setItem("chitConnectEntity", JSON.stringify(updatedUserData));
+              return updatedUserData;
+            }
+            return prevEntity;
+          });
+        } else {
+          // User document might have been deleted, handle logout or error
+          console.warn("Logged in user document no longer exists.");
+          // Optionally, logout the user here
+        }
+      }, (error) => {
+        console.error("Error listening to user document:", error);
+      });
+
+      return () => unsubscribe(); // Cleanup listener on component unmount or when loggedInEntity changes
+    }
+    // Also listen for employee data updates if needed (e.g., hasUnreadSalaryNotification)
+    if (loggedInEntity && userType === 'employee' && 'id' in loggedInEntity) {
+        const employeeDocRef = doc(db, "employees", loggedInEntity.id);
+        const unsubscribe = onSnapshot(employeeDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const updatedEmployeeData = { id: docSnap.id, ...docSnap.data()} as Employee;
+                setLoggedInEntity(prevEntity => {
+                    if (prevEntity && prevEntity.id === updatedEmployeeData.id && userType === 'employee') {
+                        localStorage.setItem("chitConnectEntity", JSON.stringify(updatedEmployeeData));
+                        return updatedEmployeeData;
+                    }
+                    return prevEntity;
+                });
+            }
+        }, (error) => {
+            console.error("Error listening to employee document:", error);
+        });
+        return () => unsubscribe();
+    }
+
+
+  }, [loggedInEntity?.id, userType]); // Re-run if loggedInEntity.id or userType changes
 
   const login = async (phoneInput: string, passwordInput: string) => {
     setLoading(true);
@@ -119,7 +177,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const signup = async (userData: Omit<User, "id" | "username" | "groups" | "isAdmin" | "password"> & {password: string}) => {
+  const signup = async (userData: Omit<User, "id" | "username" | "groups" | "isAdmin" | "password" | "dueAmount"> & {password: string}) => {
     setLoading(true);
     try {
       const phoneQuery = query(collection(db, "users"), where("phone", "==", userData.phone));
@@ -159,7 +217,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         panCardUrl: userData.panCardUrl || "",
         photoUrl: userData.photoUrl || "",
         groups: [], 
-        isAdmin: newUsername === "admin", 
+        isAdmin: newUsername === "admin",
+        dueAmount: 0, // Initialize dueAmount to 0
       };
 
       await setDoc(newUserDocRef, newUserOmitId);
@@ -183,22 +242,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Logged Out", description: "You have been successfully logged out." });
   };
 
-  const clearSalaryNotificationForEmployee = async () => {
+  const clearSalaryNotificationForEmployee = useCallback(async () => {
     if (loggedInEntity && userType === 'employee' && 'hasUnreadSalaryNotification' in loggedInEntity && loggedInEntity.hasUnreadSalaryNotification) {
       try {
         const employeeDocRef = doc(db, "employees", loggedInEntity.id);
         await updateDoc(employeeDocRef, { hasUnreadSalaryNotification: false });
         
-        const updatedEmployeeEntity = { ...loggedInEntity, hasUnreadSalaryNotification: false };
-        setLoggedInEntity(updatedEmployeeEntity);
-        localStorage.setItem("chitConnectEntity", JSON.stringify(updatedEmployeeEntity));
+        // No need to update local state directly, onSnapshot will handle it
+        // const updatedEmployeeEntity = { ...loggedInEntity, hasUnreadSalaryNotification: false };
+        // setLoggedInEntity(updatedEmployeeEntity);
+        // localStorage.setItem("chitConnectEntity", JSON.stringify(updatedEmployeeEntity));
 
       } catch (error) {
         console.error("Error clearing salary notification:", error);
         toast({ title: "Error", description: "Could not clear salary notification.", variant: "destructive" });
       }
     }
-  };
+  }, [loggedInEntity, userType, toast]);
 
 
   return (

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, UserCircle, Shield, Briefcase } from "lucide-react"; // Added Briefcase for employee
+import { LogOut, UserCircle, Shield, Briefcase, Landmark, CreditCard, Wallet } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +16,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { User, Employee } from "@/types";
 
+const formatCurrency = (amount: number | null | undefined) => {
+  if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
+  return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
 
 export function AppHeader() {
   const { loggedInEntity, userType, logout } = useAuth();
@@ -29,9 +33,8 @@ export function AppHeader() {
   }
 
   const entityFullname = loggedInEntity.fullname;
-  // Username might not exist on Employee type, handle this gracefully
   const entityUsername = 'username' in loggedInEntity ? loggedInEntity.username : loggedInEntity.employeeId;
-
+  const userDueAmount = (userType === 'user' && loggedInEntity && 'dueAmount' in loggedInEntity) ? (loggedInEntity as User).dueAmount : undefined;
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-card shadow-sm">
@@ -52,18 +55,26 @@ export function AppHeader() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar className="h-9 w-9">
-                  <AvatarImage src={`https://placehold.co/100x100.png?text=${getInitials(entityFullname)}`} alt={entityFullname} data-ai-hint="profile avatar"/>
+                  <AvatarImage src={(loggedInEntity as User)?.photoUrl || `https://placehold.co/100x100.png?text=${getInitials(entityFullname)}`} alt={entityFullname} data-ai-hint="profile avatar"/>
                   <AvatarFallback>{getInitials(entityFullname)}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
+            <DropdownMenuContent className="w-64" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium leading-none">{entityFullname}</p>
                   <p className="text-xs leading-none text-muted-foreground">
-                    {userType === 'employee' ? `Employee ID: ${entityUsername}` : `@${entityUsername}`}
+                    {userType === 'employee' ? `Employee ID: ${entityUsername}` : (userType === 'admin' ? `@${entityUsername}` : `@${entityUsername}`)}
                   </p>
+                  {userType === 'user' && (
+                    <div className="mt-2 flex items-center">
+                        <Wallet className="mr-2 h-4 w-4 text-muted-foreground" />
+                        <p className="text-xs leading-none">
+                            Due: <span className={cn("font-semibold", (userDueAmount ?? 0) > 0 ? "text-destructive" : "text-green-600")}>{formatCurrency(userDueAmount)}</span>
+                        </p>
+                    </div>
+                  )}
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -76,12 +87,20 @@ export function AppHeader() {
                  </DropdownMenuItem>
               )}
               {userType === 'user' && (
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard" className="flex items-center">
-                    <UserCircle className="mr-2 h-4 w-4" />
-                    User Dashboard
-                  </Link>
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard" className="flex items-center">
+                      <UserCircle className="mr-2 h-4 w-4" />
+                      My Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/payment-history" className="flex items-center">
+                      <Landmark className="mr-2 h-4 w-4" />
+                      Payment History
+                    </Link>
+                  </DropdownMenuItem>
+                </>
               )}
               {userType === 'employee' && (
                 <DropdownMenuItem asChild>
@@ -103,5 +122,3 @@ export function AppHeader() {
     </header>
   );
 }
-
-    
