@@ -3,9 +3,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import type { Group, User, AuctionRecord, CollectionRecord } from "@/types";
+import type { Group, User, AuctionRecord, CollectionRecord, PaymentRecord as AdminPaymentRecordType } from "@/types"; // Assuming PaymentRecord is for admin payments
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, arrayRemove, updateDoc, orderBy } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, arrayRemove, updateDoc, orderBy, Timestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,29 +60,78 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 
-
 // Helper function to format date safely
-const formatDateSafe = (dateString: string | Date | undefined | null, outputFormat: string = "dd MMM yyyy") => {
-  if (!dateString) return "N/A";
+const formatDateSafe = (dateInput: string | Date | Timestamp | undefined | null, outputFormat: string = "dd MMM yyyy") => {
+  if (!dateInput) return "N/A";
   try {
-    const date = typeof dateString === 'string' && dateString.includes('T') 
-      ? parseISO(dateString) 
-      : (typeof dateString === 'string' ? new Date(dateString.replace(/-/g, '/')) : dateString); 
-
+    let date: Date;
+    if (dateInput instanceof Timestamp) {
+      date = dateInput.toDate();
+    } else if (typeof dateInput === 'string') {
+      const parsedDate = new Date(dateInput.replace(/-/g, '/'));
+      if (isNaN(parsedDate.getTime())) {
+        const isoParsed = parseISO(dateInput);
+        if(isNaN(isoParsed.getTime())) return "N/A";
+        date = isoParsed;
+      } else {
+        date = parsedDate;
+      }
+    } else if (dateInput instanceof Date) {
+      date = dateInput;
+    } else {
+      return "N/A";
+    }
+    
     if (isNaN(date.getTime())) return "N/A";
     return format(date, outputFormat);
   } catch (e) {
+    console.error("Error formatting date:", dateInput, e);
     return "N/A";
   }
 };
 
-const formatTimestampSafe = (timestamp: any, outputFormat: string = "dd MMM yyyy, hh:mm a") => {
-  if (!timestamp || typeof timestamp.toDate !== 'function') return "N/A";
-  try {
-    return format(timestamp.toDate(), outputFormat);
-  } catch (e) {
-    return "N/A";
+const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestamp?: Timestamp): Date => {
+  if (recordTimestamp) return recordTimestamp.toDate();
+  
+  let baseDate: Date;
+  if (dateStr) {
+    const d = new Date(dateStr.replace(/-/g, '/')); 
+    if (isNaN(d.getTime())) { 
+        const isoD = parseISO(dateStr);
+        if(isNaN(isoD.getTime())) return new Date(0); 
+        baseDate = isoD;
+    } else {
+        baseDate = d;
+    }
+  } else {
+    baseDate = new Date(); 
   }
+
+  if (isNaN(baseDate.getTime())) return new Date(0); 
+
+  if (timeStr) {
+    const timePartsMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (timePartsMatch) {
+      let hours = parseInt(timePartsMatch[1], 10);
+      const minutes = parseInt(timePartsMatch[2], 10);
+      const period = timePartsMatch[3]?.toUpperCase();
+
+      if (period === "PM" && hours < 12) hours += 12;
+      if (period === "AM" && hours === 12) hours = 0;
+
+      baseDate.setHours(hours, minutes, 0, 0);
+      return baseDate;
+    }
+    const time24hMatch = timeStr.match(/^(\d{2}):(\d{2})$/);
+    if (time24hMatch) {
+        const hours = parseInt(time24hMatch[1], 10);
+        const minutes = parseInt(time24hMatch[2], 10);
+        baseDate.setHours(hours, minutes, 0, 0);
+        return baseDate;
+    }
+  }
+  baseDate.setHours(0,0,0,0); 
+  return baseDate;
 };
 
 
@@ -111,7 +160,6 @@ const auctionDetailsFormSchema = z.object({
 
 type AuctionDetailsFormValues = z.infer<typeof auctionDetailsFormSchema>;
 
-// Converts "HH:mm" (24h) to "hh:mm AM/PM" (12h)
 const convert24hTo12hFormat = (time24?: string): string => {
   if (!time24 || !/^([01]\d|2[0-3]):([0-5]\d)$/.test(time24)) {
     return time24 || ""; 
@@ -125,7 +173,6 @@ const convert24hTo12hFormat = (time24?: string): string => {
   return `${hours12Str}:${minutesStr} ${ampm}`;
 };
 
-// Converts "hh:mm AM/PM" (and other variants) to "HH:mm" (24h) for time input
 const convert12hTo24hFormat = (time12?: string): string => {
   if (!time12 || time12.trim() === "") return "";
 
@@ -151,6 +198,18 @@ const convert12hTo24hFormat = (time12?: string): string => {
   return ""; 
 };
 
+interface CombinedPaymentHistoryTransaction {
+  id: string;
+  type: "Sent" | "Received"; // "Sent" by company, "Received" by company
+  dateTime: Date;
+  fromParty: string;
+  toParty: string;
+  amount: number;
+  mode: string | null;
+  remarks: string | null;
+  originalSource: "Collection Record" | "Payment Record";
+}
+
 
 export default function AdminGroupDetailPage() {
   const params = useParams();
@@ -161,7 +220,7 @@ export default function AdminGroupDetailPage() {
   const [group, setGroup] = useState<Group | null>(null);
   const [membersDetails, setMembersDetails] = useState<User[]>([]);
   const [auctionHistory, setAuctionHistory] = useState<AuctionRecord[]>([]);
-  const [collectionHistory, setCollectionHistory] = useState<CollectionRecord[]>([]);
+  const [combinedPaymentHistory, setCombinedPaymentHistory] = useState<CombinedPaymentHistoryTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -185,25 +244,17 @@ export default function AdminGroupDetailPage() {
   const fetchGroupData = useCallback(async () => {
     if (!groupId) {
       setError("Group ID is missing.");
-      setLoading(false);
-      setLoadingAuctionHistory(false);
-      setLoadingPaymentHistory(false);
+      setLoading(false); setLoadingAuctionHistory(false); setLoadingPaymentHistory(false);
       return;
     }
-    setLoading(true);
-    setLoadingAuctionHistory(true);
-    setLoadingPaymentHistory(true);
-    setError(null);
+    setLoading(true); setLoadingAuctionHistory(true); setLoadingPaymentHistory(true); setError(null);
     try {
-      // Fetch Group Details
       const groupDocRef = doc(db, "groups", groupId);
       const groupDocSnap = await getDoc(groupDocRef);
 
       if (!groupDocSnap.exists()) {
         setError("Group not found.");
-        setLoading(false);
-        setLoadingAuctionHistory(false);
-        setLoadingPaymentHistory(false);
+        setLoading(false); setLoadingAuctionHistory(false); setLoadingPaymentHistory(false);
         return;
       }
       const groupData = { id: groupDocSnap.id, ...groupDocSnap.data() } as Group;
@@ -215,12 +266,10 @@ export default function AdminGroupDetailPage() {
         lastAuctionWinner: groupData.lastAuctionWinner || "",
       });
 
-      // Fetch Members Details
       if (groupData.members && groupData.members.length > 0) {
         const memberUsernames = groupData.members;
         const fetchedMembers: User[] = [];
         const batchSize = 30; 
-
         for (let i = 0; i < memberUsernames.length; i += batchSize) {
           const batchUsernames = memberUsernames.slice(i, i + batchSize);
           if (batchUsernames.length > 0) {
@@ -237,22 +286,54 @@ export default function AdminGroupDetailPage() {
         setMembersDetails([]);
       }
 
-      // Fetch Auction History
       const auctionRecordsRef = collection(db, "auctionRecords");
       const qAuction = query(auctionRecordsRef, where("groupId", "==", groupId), orderBy("auctionDate", "desc")); 
       const auctionSnapshot = await getDocs(qAuction);
       const fetchedAuctionHistory = auctionSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as AuctionRecord));
       setAuctionHistory(fetchedAuctionHistory);
       setLoadingAuctionHistory(false);
-
-      // Fetch Collection History
+      
+      // Fetch Collection Records (Received by Company for this group)
       const collectionRecordsRef = collection(db, "collectionRecords");
       const qCollection = query(collectionRecordsRef, where("groupId", "==", groupId), orderBy("recordedAt", "desc"));
       const collectionSnapshot = await getDocs(qCollection);
-      const fetchedCollectionHistory = collectionSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as CollectionRecord));
-      setCollectionHistory(fetchedCollectionHistory);
-      setLoadingPaymentHistory(false);
+      const fetchedCollections = collectionSnapshot.docs.map(docSnap => {
+        const data = docSnap.data() as CollectionRecord;
+        return {
+          id: docSnap.id,
+          type: "Received" as const,
+          dateTime: parseDateTimeForSort(data.paymentDate, data.paymentTime, data.recordedAt),
+          fromParty: `User: ${data.userFullname} (${data.userUsername})`,
+          toParty: "ChitConnect (Company)",
+          amount: data.amount,
+          mode: data.paymentMode,
+          remarks: data.remarks || "User Collection",
+          originalSource: "Collection Record" as const,
+        } as CombinedPaymentHistoryTransaction;
+      });
 
+      // Fetch Payment Records (Sent by Company for this group)
+      const paymentRecordsRef = collection(db, "paymentRecords");
+      const qPayment = query(paymentRecordsRef, where("groupId", "==", groupId), orderBy("recordedAt", "desc"));
+      const paymentSnapshot = await getDocs(qPayment);
+      const fetchedPayments = paymentSnapshot.docs.map(docSnap => {
+        const data = docSnap.data() as AdminPaymentRecordType; // Assuming CollectionRecord structure for now
+        return {
+          id: docSnap.id,
+          type: "Sent" as const,
+          dateTime: parseDateTimeForSort(data.paymentDate, data.paymentTime, data.recordedAt),
+          fromParty: "ChitConnect (Company)",
+          toParty: `User: ${data.userFullname} (${data.userUsername})`,
+          amount: data.amount,
+          mode: data.paymentMode,
+          remarks: data.remarks || "Company Payment",
+          originalSource: "Payment Record" as const,
+        } as CombinedPaymentHistoryTransaction;
+      });
+
+      const combined = [...fetchedCollections, ...fetchedPayments].sort((a,b) => b.dateTime.getTime() - a.dateTime.getTime());
+      setCombinedPaymentHistory(combined);
+      setLoadingPaymentHistory(false);
 
     } catch (err) {
       console.error("Error fetching group details:", err);
@@ -515,26 +596,12 @@ export default function AdminGroupDetailPage() {
             <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Full Name</TableHead>
-                    <TableHead>Username</TableHead>
-                    <TableHead>Phone Number</TableHead>
-                    <TableHead className="text-right">Due Amount (₹)</TableHead>
-                  </TableRow>
+                  <TableRow><TableHead>Full Name</TableHead><TableHead>Username</TableHead><TableHead>Phone Number</TableHead><TableHead className="text-right">Due Amount (₹)</TableHead></TableRow>
                 </TableHeader>
                 <TableBody>
                   {membersDetails.map((member) => (
                     <TableRow key={member.id} className="hover:bg-muted/50 transition-colors">
-                      <TableCell className="font-medium">{member.fullname}</TableCell>
-                      <TableCell>{member.username}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center">
-                          <Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(member.dueAmount)}
-                      </TableCell>
+                      <TableCell className="font-medium">{member.fullname}</TableCell><TableCell>{member.username}</TableCell><TableCell><div className="flex items-center"><Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}</div></TableCell><TableCell className="text-right">{formatCurrency(member.dueAmount)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -683,7 +750,7 @@ export default function AdminGroupDetailPage() {
                   <Card className="bg-secondary/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
                     <CardHeader className="pb-3 pt-4">
                       <CardTitle className="text-md font-semibold text-primary">
-                         Auction #{auction.auctionNumber ? auction.auctionNumber : index + 1}
+                         Auction #{auction.auctionNumber ? auction.auctionNumber : (index + 1)}
                       </CardTitle>
                       <CardDescription>Group: {auction.groupName}</CardDescription>
                     </CardHeader>
@@ -716,7 +783,7 @@ export default function AdminGroupDetailPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 <p className="ml-3 text-muted-foreground">Loading payment history...</p>
              </div>
-          ) : collectionHistory.length === 0 ? (
+          ) : combinedPaymentHistory.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">
               No payment history found for this group.
             </p>
@@ -725,40 +792,34 @@ export default function AdminGroupDetailPage() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>User</TableHead>
-                            <TableHead>Date & Time</TableHead>
-                            <TableHead className="text-right">Amount (₹)</TableHead>
+                            <TableHead>S.No</TableHead>
                             <TableHead>Type</TableHead>
+                            <TableHead>Date & Time</TableHead>
+                            <TableHead>From</TableHead>
+                            <TableHead>To</TableHead>
+                            <TableHead className="text-right">Amount (₹)</TableHead>
                             <TableHead>Mode</TableHead>
-                            <TableHead>Auction #</TableHead>
-                             <TableHead>Location</TableHead>
                             <TableHead>Remarks</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {collectionHistory.map((payment) => (
-                            <TableRow key={payment.id}>
+                        {combinedPaymentHistory.map((payment, index) => (
+                            <TableRow key={payment.id + payment.originalSource}>
+                                <TableCell>{index + 1}</TableCell>
                                 <TableCell>
-                                    {payment.userFullname}<br/>
-                                    <span className="text-xs text-muted-foreground">({payment.userUsername})</span>
+                                  <span className={cn(
+                                    "font-semibold px-2 py-1 rounded-full text-xs",
+                                    payment.type === "Sent" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" 
+                                                          : "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                                  )}>
+                                    {payment.type}
+                                  </span>
                                 </TableCell>
-                                <TableCell>
-                                    {formatDateSafe(payment.paymentDate, "dd MMM yy")}<br/>
-                                    <span className="text-xs text-muted-foreground">{payment.paymentTime}</span>
-                                </TableCell>
+                                <TableCell>{formatDateSafe(payment.dateTime, "dd MMM yy, hh:mm a")}</TableCell>
+                                <TableCell className="max-w-xs truncate">{payment.fromParty}</TableCell>
+                                <TableCell className="max-w-xs truncate">{payment.toParty}</TableCell>
                                 <TableCell className="text-right font-mono">{formatCurrency(payment.amount)}</TableCell>
-                                <TableCell>{payment.paymentType}</TableCell>
-                                <TableCell>{payment.paymentMode}</TableCell>
-                                <TableCell className="text-center">{payment.auctionNumber || "N/A"}</TableCell>
-                                <TableCell className="max-w-[150px] truncate">
-                                  {payment.collectionLocation && payment.collectionLocation.startsWith('http') ? (
-                                    <a href={payment.collectionLocation} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                                      View on Map
-                                    </a>
-                                  ) : (
-                                    payment.collectionLocation || "N/A"
-                                  )}
-                                </TableCell>
+                                <TableCell>{payment.mode || "N/A"}</TableCell>
                                 <TableCell className="max-w-xs truncate">{payment.remarks || "N/A"}</TableCell>
                             </TableRow>
                         ))}
@@ -772,3 +833,6 @@ export default function AdminGroupDetailPage() {
     </div>
   );
 }
+
+
+    
