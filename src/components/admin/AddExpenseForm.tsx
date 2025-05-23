@@ -23,36 +23,32 @@ import { useRouter } from "next/navigation";
 import type { ExpenseRecord } from "@/types";
 
 const addExpenseFormSchema = z.object({
-  date: z.date().optional(), // Optional for 'received', required for 'spend'
-  time: z.string().optional(), // Optional for 'received', required for 'spend'
+  date: z.date().optional(), 
+  time: z.string().optional(), 
   amount: z.coerce.number({ required_error: "Amount is required." }).positive("Amount must be a positive number."),
-  reason: z.string().optional(), // For 'spend'
-  fromPerson: z.string().optional(), // For 'received'
-  paymentMode: z.enum(["Cash", "UPI", "Netbanking"]).optional(), // For 'received'
+  reason: z.string().optional(), 
+  fromPerson: z.string().optional(), 
+  paymentMode: z.enum(["Cash", "UPI", "Netbanking"]).optional(), 
   remarks: z.string().optional(),
 });
 
 type AddExpenseFormValues = z.infer<typeof addExpenseFormSchema>;
 
-// Converts "HH:mm" (24h) to "hh:mm AM/PM" (12h)
 const formatTimeTo12Hour = (timeStr?: string): string => {
   if (!timeStr) return "";
-  // Check if it's already in HH:mm format
   if (/^([01]\d|2[0-3]):([0-5]\d)$/.test(timeStr)) {
     const [hoursStr, minutesStr] = timeStr.split(':');
     let hours = parseInt(hoursStr, 10);
     const ampm = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12;
-    hours = hours ? hours : 12; // the hour '0' should be '12'
+    hours = hours ? hours : 12; 
     return `${String(hours).padStart(2, '0')}:${minutesStr} ${ampm}`;
   }
-  return timeStr; // Return as is if not in expected format
+  return timeStr; 
 };
 
-// Converts "hh:mm AM/PM" (and other variants) to "HH:mm" (24h) for time input
 const formatTimeTo24HourInput = (timeStr?: string): string => {
     if (!timeStr) return "";
-    // Check if already in 24-hour format
     if (/^([01]\d|2[0-3]):([0-5]\d)$/.test(timeStr)) return timeStr;
 
     const lowerTime = timeStr.toLowerCase();
@@ -61,11 +57,11 @@ const formatTimeTo24HourInput = (timeStr?: string): string => {
         let hours = parseInt(match[1], 10);
         const minutes = parseInt(match[2], 10);
         const period = match[3];
-        if (hours === 12 && period === 'am') hours = 0; // Midnight case
+        if (hours === 12 && period === 'am') hours = 0; 
         else if (period === 'pm' && hours !== 12) hours += 12;
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
     }
-    return ""; // Return empty if format is not recognized
+    return ""; 
 };
 
 
@@ -78,26 +74,26 @@ export function AddExpenseForm() {
   const form = useForm<AddExpenseFormValues>({
     resolver: zodResolver(addExpenseFormSchema),
     defaultValues: {
-      date: new Date(), // Default to today for spend
-      time: format(new Date(), "HH:mm"), // Default to current time for spend
+      date: new Date(), 
+      time: format(new Date(), "HH:mm"), 
       amount: undefined,
       reason: "",
       fromPerson: "",
       paymentMode: undefined,
-      remarks: expenseType === 'spend' ? "Expenses" : "", // Default remark based on type
+      remarks: "Expenses", 
     },
   });
 
   const handleTypeChange = (type: 'spend' | 'received') => {
     setExpenseType(type);
-    form.reset({ // Reset form to defaults appropriate for the type
+    form.reset({ 
       date: type === 'spend' ? new Date() : undefined,
       time: type === 'spend' ? format(new Date(), "HH:mm") : undefined,
       amount: undefined,
       reason: "",
       fromPerson: "",
       paymentMode: undefined,
-      remarks: type === 'spend' ? "Expenses" : "",
+      remarks: type === 'spend' ? "Expenses" : "", 
     });
   };
 
@@ -107,7 +103,7 @@ export function AddExpenseForm() {
         type: expenseType,
         amount: values.amount,
         remarks: values.remarks || null,
-        date: '', // Will be set below
+        date: '', 
         time: null,
         reason: null,
         fromPerson: null,
@@ -130,11 +126,11 @@ export function AddExpenseForm() {
       dataToSave = {
         ...dataToSave,
         date: format(values.date, "yyyy-MM-dd"),
-        time: formatTimeTo12Hour(values.time), // Save in 12hr format
+        time: formatTimeTo12Hour(values.time), 
         reason: values.reason,
-        remarks: values.remarks || "Expenses", // Ensure remarks defaults to "Expenses" if not explicitly changed
+        remarks: values.remarks || "Expenses", 
       };
-    } else { // 'received'
+    } else { 
        if (!values.fromPerson || values.fromPerson.trim().length < 3) {
         toast({ title: "Validation Error", description: "'From' field must be at least 3 characters for received income.", variant: "destructive" });
         setIsSubmitting(false); return;
@@ -145,11 +141,10 @@ export function AddExpenseForm() {
       }
       dataToSave = {
         ...dataToSave,
-        date: format(values.date || new Date(), "yyyy-MM-dd"), // Use selected date or default to today for received
+        date: format(values.date || new Date(), "yyyy-MM-dd"), 
         fromPerson: values.fromPerson,
         paymentMode: values.paymentMode,
         remarks: values.remarks || null,
-        // time is typically not recorded for 'received' unless specified
       };
     }
 
@@ -203,7 +198,7 @@ export function AddExpenseForm() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
              <FormField control={form.control} name="date" render={({ field }) => (
                 <FormItem className="flex flex-col">
-                <FormLabel>{expenseType === 'spend' ? 'Date of Spending' : 'Date of Receipt (Optional)'}</FormLabel>
+                <FormLabel>{expenseType === 'spend' ? 'Date of Spending' : 'Date of Receipt (Optional for Received)'}</FormLabel>
                 <Popover>
                     <PopoverTrigger asChild>
                     <FormControl>
@@ -231,7 +226,7 @@ export function AddExpenseForm() {
                             type="time" 
                             {...field} 
                             value={formatTimeTo24HourInput(field.value)}
-                            onChange={(e) => field.onChange(e.target.value)} // Store as HH:mm
+                            onChange={(e) => field.onChange(e.target.value)} 
                         />
                     </FormControl>
                     <FormMessage />
@@ -286,7 +281,6 @@ export function AddExpenseForm() {
                     <Input 
                         type="number" 
                         placeholder="e.g., 5000" 
-                        {...field} 
                         value={field.value === undefined ? "" : String(field.value)}
                         onChange={e => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                     />
@@ -302,23 +296,23 @@ export function AddExpenseForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Remarks</FormLabel>
-                  {expenseType === 'spend' ? (
-                    <Select onValueChange={field.onChange} value={field.value || "Expenses"}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select remark" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Expenses">Expenses</SelectItem>
-                        {/* Add other predefined remarks for 'spend' if needed in the future */}
-                      </SelectContent>
-                    </Select>
-                  ) : (
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value || (expenseType === 'spend' ? "Expenses" : "")}
+                  >
                     <FormControl>
-                      <Textarea placeholder="Any additional notes for received income..." {...field} />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select remark" />
+                      </SelectTrigger>
                     </FormControl>
-                  )}
+                    <SelectContent>
+                      <SelectItem value="Expenses">Expenses</SelectItem>
+                      {/* You can add more specific options for 'received' type here if needed in the future */}
+                      {expenseType === 'received' && (
+                        <SelectItem value="Other Income">Other Income</SelectItem> 
+                      )}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -334,5 +328,3 @@ export function AddExpenseForm() {
     </Card>
   );
 }
-
-    
