@@ -7,7 +7,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -18,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, orderBy, doc } from "firebase/firestore";
-import type { Group, User, AuctionRecord, CollectionRecord } from "@/types"; // Keep CollectionRecord for structure similarity for now
+import type { Group, User, AuctionRecord, CollectionRecord } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 
@@ -92,7 +91,7 @@ export function RecordPaymentForm() {
       paymentType: undefined,
       paymentMode: undefined,
       amount: undefined,
-      remarks: "",
+      remarks: "Auction Payment", // Default remark
     },
   });
 
@@ -196,7 +195,7 @@ export function RecordPaymentForm() {
 
     try {
       // Using CollectionRecord type here for structure, but saving to 'paymentRecords'
-      const paymentData: Omit<CollectionRecord, "id" | "recordedAt" | "collectionLocation" | "recordedByEmployeeId" | "recordedByEmployeeName"> & { recordedAt?: any } = { 
+      const paymentData: Omit<CollectionRecord, "id" | "recordedAt" | "collectionLocation" | "recordedByEmployeeId" | "recordedByEmployeeName"> & { recordedAt?: any; recordedBy?: string; } = { 
         groupId: selectedGroupObject.id,
         groupName: selectedGroupObject.groupName,
         auctionId: selectedAuction ? selectedAuction.id : null,
@@ -209,17 +208,16 @@ export function RecordPaymentForm() {
         paymentType: values.paymentType,
         paymentMode: values.paymentMode,
         amount: values.amount,
-        remarks: values.remarks || null,
+        remarks: values.remarks || "Auction Payment", // Ensure remarks has a value
+        recordedBy: "Admin", // Example field for admin recorded payments
       };
 
-      await addDoc(collection(db, "paymentRecords"), { // Changed to "paymentRecords"
+      await addDoc(collection(db, "paymentRecords"), { 
         ...paymentData,
         recordedAt: serverTimestamp() as Timestamp,
-        // Admin-specific recording details (if needed) can be added here
-        recordedBy: "Admin", // Example
       });
 
-      toast({ title: "Payment Recorded", description: "Payment details saved successfully to payment records." }); // Updated toast
+      toast({ title: "Payment Recorded", description: "Payment details saved successfully to payment records." });
       form.reset({
         selectedGroupId: values.selectedGroupId,
         selectedAuctionId: undefined,
@@ -229,7 +227,7 @@ export function RecordPaymentForm() {
         paymentType: undefined,
         paymentMode: undefined,
         amount: undefined,
-        remarks: "",
+        remarks: "Auction Payment",
       }); 
     } catch (error) {
       console.error("Error recording payment:", error);
@@ -448,8 +446,18 @@ export function RecordPaymentForm() {
               name="remarks"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Remarks (Optional)</FormLabel>
-                  <FormControl><Textarea placeholder="Any notes about this payment..." {...field} /></FormControl>
+                  <FormLabel>Remarks</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || "Auction Payment"}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select remark type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Auction Payment">Auction Payment</SelectItem>
+                      {/* Add other remark options here if needed in the future */}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -465,5 +473,3 @@ export function RecordPaymentForm() {
     </Card>
   );
 }
-
-    
