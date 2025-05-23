@@ -103,7 +103,7 @@ export function RecordCollectionForm() {
       paymentMode: undefined,
       amount: undefined,
       collectionLocationOption: undefined,
-      remarks: "",
+      remarks: "Auction Collection",
     },
   });
 
@@ -252,7 +252,7 @@ export function RecordCollectionForm() {
                 paymentType: values.paymentType,
                 paymentMode: values.paymentMode,
                 amount: values.amount,
-                remarks: values.remarks || null,
+                remarks: values.remarks || "Auction Collection",
                 collectionLocation: collectionLocationToStore,
                 recordedByEmployeeId: employee.id,
                 recordedByEmployeeName: employee.fullname,
@@ -274,7 +274,7 @@ export function RecordCollectionForm() {
         paymentMode: undefined,
         amount: undefined,
         collectionLocationOption: undefined,
-        remarks: "",
+        remarks: "Auction Collection",
       });
       setCurrentLocationDisplay(null);
       setCurrentLocationValue(null);
@@ -504,8 +504,18 @@ export function RecordCollectionForm() {
               name="remarks"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Remarks (Optional)</FormLabel>
-                  <FormControl><Textarea placeholder="Any notes about this collection..." {...field} /></FormControl>
+                  <FormLabel>Remarks</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || "Auction Collection"}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select remark type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Auction Collection">Auction Collection</SelectItem>
+                      {/* Add other remark options here if needed in the future */}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
