@@ -62,13 +62,14 @@ export interface SalaryRecord {
   paymentDate: string; // YYYY-MM-DD
   remarks?: string;
   recordedAt: import('firebase/firestore').Timestamp; // Firestore Timestamp
+  virtualTransactionId?: string;
 }
 
 export interface AuctionRecord {
   id: string; // Firestore document ID for this auction record
   groupId: string; // Firestore doc ID of the group
   groupName: string;
-  auctionNumber?: number; 
+  auctionNumber?: number;
   auctionMonth: string; // e.g., "August 2024"
   auctionDate: string; // YYYY-MM-DD
   auctionTime: string; // e.g., "03:00 PM"
@@ -81,8 +82,9 @@ export interface AuctionRecord {
   commissionAmount?: number | null;
   netDiscount?: number | null;
   dividendPerMember?: number | null;
-  finalAmountToBePaid?: number | null; 
+  finalAmountToBePaid?: number | null; // This is the installment paid by other members
   recordedAt: import('firebase/firestore').Timestamp;
+  amountPaidToWinner?: number | null; // Explicitly store amount paid to winner
 }
 
 export interface ExpenseRecord {
@@ -96,14 +98,16 @@ export interface ExpenseRecord {
   paymentMode?: 'Cash' | 'UPI' | 'Netbanking' | null; // For received
   remarks?: string | null;
   recordedAt: import('firebase/firestore').Timestamp;
+  virtualTransactionId?: string;
 }
 
+// For payments received from users (recorded by employees or admin via collection forms)
 export interface CollectionRecord {
   id: string; // Firestore document ID
   groupId: string;
   groupName: string;
-  auctionId?: string | null; 
-  auctionNumber?: number | null; 
+  auctionId?: string | null;
+  auctionNumber?: number | null;
   userId: string; // Firestore doc ID of the User making/receiving payment
   userUsername: string;
   userFullname: string;
@@ -114,14 +118,14 @@ export interface CollectionRecord {
   amount: number;
   remarks?: string | null;
   recordedAt: import('firebase/firestore').Timestamp;
-  collectionLocation?: string | null; 
+  collectionLocation?: string | null;
   recordedByEmployeeId?: string | null;
   recordedByEmployeeName?: string | null;
+  virtualTransactionId?: string;
 }
 
-// This type will be used by Admin's "Record Payment" (Payment Portal)
-// For payments made BY THE COMPANY (e.g., to auction winners, other payouts)
-export interface PaymentRecord { // Distinct from CollectionRecord
+// For payments made BY THE COMPANY (e.g., to auction winners, other payouts recorded by admin)
+export interface PaymentRecord {
   id: string; // Firestore document ID
   groupId?: string | null; // Optional, if payment is related to a group
   groupName?: string | null;
@@ -132,10 +136,11 @@ export interface PaymentRecord { // Distinct from CollectionRecord
   userFullname?: string | null;
   paymentDate: string; // YYYY-MM-DD
   paymentTime: string; // HH:MM AM/PM
-  paymentReason: string; // E.g., "Auction Payout", "Refund", "Advance"
+  paymentReason: string; // E.g., "Auction Payout", "Refund", "Advance" -> Changed from `paymentType` in CollectionRecord
   paymentMode: "Cash" | "UPI" | "Netbanking" | "Cheque";
   amount: number;
   remarks?: string | null;
   recordedAt: import('firebase/firestore').Timestamp;
   recordedBy: "Admin" | string; // Could be Admin or specific employee ID if delegated
+  virtualTransactionId?: string;
 }

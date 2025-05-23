@@ -73,6 +73,8 @@ const recordCollectionFormSchema = z.object({
 
 type RecordCollectionFormValues = z.infer<typeof recordCollectionFormSchema>;
 
+const generateVirtualId = () => Math.floor(100000 + Math.random() * 900000).toString();
+
 export function RecordCollectionForm() {
   const { toast } = useToast();
   const router = useRouter();
@@ -256,6 +258,7 @@ export function RecordCollectionForm() {
                 collectionLocation: collectionLocationToStore,
                 recordedByEmployeeId: employee.id,
                 recordedByEmployeeName: employee.fullname,
+                virtualTransactionId: generateVirtualId(),
             };
             const collectionRecordRef = doc(collection(db, "collectionRecords")); 
             transaction.set(collectionRecordRef, {
@@ -499,7 +502,7 @@ export function RecordCollectionForm() {
               )}
             />
 
-            <FormField
+           <FormField
               control={form.control}
               name="remarks"
               render={({ field }) => (
@@ -513,7 +516,6 @@ export function RecordCollectionForm() {
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="Auction Collection">Auction Collection</SelectItem>
-                      {/* Add other remark options here if needed in the future */}
                     </SelectContent>
                   </Select>
                   <FormMessage />

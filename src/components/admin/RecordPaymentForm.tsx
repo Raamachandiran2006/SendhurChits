@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, orderBy, doc } from "firebase/firestore";
-import type { Group, User, AuctionRecord, CollectionRecord } from "@/types";
+import type { Group, User, AuctionRecord, PaymentRecord } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 
@@ -51,21 +51,23 @@ const formatTimeTo24HourInput = (timeStr?: string): string => {
     return "";
 };
 
+const NO_AUCTION_SELECTED_VALUE = "no-auction-selected";
+
 const recordPaymentFormSchema = z.object({
   selectedGroupId: z.string().min(1, "Please select a Group."),
   selectedAuctionId: z.string().optional(),
   selectedUserId: z.string().min(1, "Please select a User."),
   paymentDate: z.date({ required_error: "Payment date is required." }),
   paymentTime: z.string().min(1, "Payment time is required."),
-  paymentType: z.enum(["Full Payment", "Partial Payment"], { required_error: "Payment type is required." }),
-  paymentMode: z.enum(["Cash", "UPI", "Netbanking"], { required_error: "Payment mode is required." }),
+  paymentReason: z.string().min(3, "Payment reason is required."), // Changed from paymentType
+  paymentMode: z.enum(["Cash", "UPI", "Netbanking", "Cheque"], { required_error: "Payment mode is required." }),
   amount: z.coerce.number().int("Amount must be a whole number.").positive("Amount must be a positive number."),
   remarks: z.string().optional(),
 });
 
 type RecordPaymentFormValues = z.infer<typeof recordPaymentFormSchema>;
 
-const NO_AUCTION_SELECTED_VALUE = "no-auction-selected";
+const generateVirtualId = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 export function RecordPaymentForm() {
   const { toast } = useToast();
@@ -88,10 +90,10 @@ export function RecordPaymentForm() {
       selectedUserId: "",
       paymentDate: new Date(),
       paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
-      paymentType: undefined,
+      paymentReason: "",
       paymentMode: undefined,
       amount: undefined,
-      remarks: "Auction Payment", // Default remark
+      remarks: "Auction Payment",
     },
   });
 
@@ -194,8 +196,7 @@ export function RecordPaymentForm() {
       : null;
 
     try {
-      // Using CollectionRecord type here for structure, but saving to 'paymentRecords'
-      const paymentData: Omit<CollectionRecord, "id" | "recordedAt" | "collectionLocation" | "recordedByEmployeeId" | "recordedByEmployeeName"> & { recordedAt?: any; recordedBy?: string; } = { 
+      const paymentData: Omit<PaymentRecord, "id" | "recordedAt"> & { recordedAt?: any } = { 
         groupId: selectedGroupObject.id,
         groupName: selectedGroupObject.groupName,
         auctionId: selectedAuction ? selectedAuction.id : null,
@@ -205,11 +206,12 @@ export function RecordPaymentForm() {
         userFullname: selectedUser.fullname,
         paymentDate: format(values.paymentDate, "yyyy-MM-dd"),
         paymentTime: values.paymentTime, 
-        paymentType: values.paymentType,
+        paymentReason: values.paymentReason,
         paymentMode: values.paymentMode,
         amount: values.amount,
-        remarks: values.remarks || "Auction Payment", // Ensure remarks has a value
-        recordedBy: "Admin", // Example field for admin recorded payments
+        remarks: values.remarks || "Auction Payment",
+        recordedBy: "Admin",
+        virtualTransactionId: generateVirtualId(),
       };
 
       await addDoc(collection(db, "paymentRecords"), { 
@@ -219,16 +221,17 @@ export function RecordPaymentForm() {
 
       toast({ title: "Payment Recorded", description: "Payment details saved successfully to payment records." });
       form.reset({
-        selectedGroupId: values.selectedGroupId,
+        selectedGroupId: values.selectedGroupId, // Keep group selected
         selectedAuctionId: undefined,
         selectedUserId: "",
         paymentDate: new Date(),
         paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
-        paymentType: undefined,
+        paymentReason: "",
         paymentMode: undefined,
         amount: undefined,
         remarks: "Auction Payment",
       }); 
+      // Optionally redirect or refresh data if this form is on a page that displays these records
     } catch (error) {
       console.error("Error recording payment:", error);
       toast({ title: "Error", description: "Could not record payment. " + (error as Error).message, variant: "destructive" });
@@ -240,6 +243,7 @@ export function RecordPaymentForm() {
   return (
     <Card className="shadow-xl w-full max-w-2xl mx-auto">
       <CardHeader>
+        {/* Title usually comes from the page itself */}
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -368,48 +372,42 @@ export function RecordPaymentForm() {
                 )}
               />
             </div>
+            
+            <FormField
+              control={form.control}
+              name="paymentReason"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Payment Reason</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Auction Payout, Refund" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                control={form.control}
-                name="paymentType"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Payment Type</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Select payment type" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                        <SelectItem value="Full Payment">Full Payment</SelectItem>
-                        <SelectItem value="Partial Payment">Partial Payment</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-                <FormField
-                control={form.control}
-                name="paymentMode"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Payment Mode</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Select payment mode" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                        <SelectItem value="Cash">Cash</SelectItem>
-                        <SelectItem value="UPI">UPI</SelectItem>
-                        <SelectItem value="Netbanking">Netbanking</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-            </div>
+            <FormField
+              control={form.control}
+              name="paymentMode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Payment Mode</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="Select payment mode" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="UPI">UPI</SelectItem>
+                      <SelectItem value="Netbanking">Netbanking</SelectItem>
+                      <SelectItem value="Cheque">Cheque</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Loader2, DollarSign, Send } from "lucide-react"; // Removed UserSearch, FilePenLine
+import { CalendarIcon, Loader2, DollarSign, Send } from "lucide-react"; 
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,8 @@ const addSalaryRecordFormSchema = z.object({
 
 type AddSalaryRecordFormValues = z.infer<typeof addSalaryRecordFormSchema>;
 
+const generateVirtualId = () => Math.floor(100000 + Math.random() * 900000).toString();
+
 export function AddSalaryRecordForm() {
   const { toast } = useToast();
   const router = useRouter();
@@ -43,7 +45,7 @@ export function AddSalaryRecordForm() {
       employeeDocId: "",
       amount: undefined, 
       paymentDate: new Date(),
-      remarks: "",
+      remarks: "Salary", // Default remark
     },
   });
 
@@ -82,8 +84,9 @@ export function AddSalaryRecordForm() {
         employeeName: selectedEmployee.fullname,
         amount: values.amount,
         paymentDate: format(values.paymentDate, "yyyy-MM-dd"),
-        remarks: values.remarks || "",
+        remarks: values.remarks || "Salary",
         recordedAt: serverTimestamp(),
+        virtualTransactionId: generateVirtualId(),
       });
 
       // Set notification flag for the employee
@@ -200,7 +203,7 @@ export function AddSalaryRecordForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Remarks</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || "Salary"}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select remark type" />
@@ -208,7 +211,6 @@ export function AddSalaryRecordForm() {
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="Salary">Salary</SelectItem>
-                      {/* Add other remark options here if needed in the future */}
                     </SelectContent>
                   </Select>
                   <FormMessage />

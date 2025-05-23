@@ -64,6 +64,7 @@ const formatTimeTo24HourInput = (timeStr?: string): string => {
     return ""; 
 };
 
+const generateVirtualId = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 export function AddExpenseForm() {
   const { toast } = useToast();
@@ -80,7 +81,7 @@ export function AddExpenseForm() {
       reason: "",
       fromPerson: "",
       paymentMode: undefined,
-      remarks: "Expenses", 
+      remarks: "Expenses", // Default for 'spend'
     },
   });
 
@@ -99,7 +100,7 @@ export function AddExpenseForm() {
 
   async function onSubmit(values: AddExpenseFormValues) {
     setIsSubmitting(true);
-    let dataToSave: Omit<ExpenseRecord, "id" | "recordedAt"> & { recordedAt?: any } = {
+    let dataToSave: Omit<ExpenseRecord, "id" | "recordedAt" | "virtualTransactionId"> & { recordedAt?: any; virtualTransactionId: string; } = {
         type: expenseType,
         amount: values.amount,
         remarks: values.remarks || null,
@@ -108,6 +109,7 @@ export function AddExpenseForm() {
         reason: null,
         fromPerson: null,
         paymentMode: null,
+        virtualTransactionId: generateVirtualId(),
     };
 
     if (expenseType === 'spend') {
@@ -296,7 +298,7 @@ export function AddExpenseForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Remarks</FormLabel>
-                  <Select 
+                   <Select 
                     onValueChange={field.onChange} 
                     value={field.value || (expenseType === 'spend' ? "Expenses" : "")}
                   >
@@ -307,7 +309,6 @@ export function AddExpenseForm() {
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="Expenses">Expenses</SelectItem>
-                      {/* You can add more specific options for 'received' type here if needed in the future */}
                       {expenseType === 'received' && (
                         <SelectItem value="Other Income">Other Income</SelectItem> 
                       )}
