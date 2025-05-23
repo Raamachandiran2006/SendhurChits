@@ -84,7 +84,7 @@ export function AddExpenseForm() {
       reason: "",
       fromPerson: "",
       paymentMode: undefined,
-      remarks: "",
+      remarks: expenseType === 'spend' ? "Expenses" : "", // Default remark based on type
     },
   });
 
@@ -97,7 +97,7 @@ export function AddExpenseForm() {
       reason: "",
       fromPerson: "",
       paymentMode: undefined,
-      remarks: "",
+      remarks: type === 'spend' ? "Expenses" : "",
     });
   };
 
@@ -132,6 +132,7 @@ export function AddExpenseForm() {
         date: format(values.date, "yyyy-MM-dd"),
         time: formatTimeTo12Hour(values.time), // Save in 12hr format
         reason: values.reason,
+        remarks: values.remarks || "Expenses", // Ensure remarks defaults to "Expenses" if not explicitly changed
       };
     } else { // 'received'
        if (!values.fromPerson || values.fromPerson.trim().length < 3) {
@@ -147,6 +148,7 @@ export function AddExpenseForm() {
         date: format(values.date || new Date(), "yyyy-MM-dd"), // Use selected date or default to today for received
         fromPerson: values.fromPerson,
         paymentMode: values.paymentMode,
+        remarks: values.remarks || null,
         // time is typically not recorded for 'received' unless specified
       };
     }
@@ -199,7 +201,6 @@ export function AddExpenseForm() {
         </Button>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Common date field for both, but might be auto-filled for 'received' */}
              <FormField control={form.control} name="date" render={({ field }) => (
                 <FormItem className="flex flex-col">
                 <FormLabel>{expenseType === 'spend' ? 'Date of Spending' : 'Date of Receipt (Optional)'}</FormLabel>
@@ -294,14 +295,35 @@ export function AddExpenseForm() {
                 </FormItem>
             )}
             />
-            <FormField control={form.control} name="remarks" render={({ field }) => (
+            
+            <FormField
+              control={form.control}
+              name="remarks"
+              render={({ field }) => (
                 <FormItem>
-                <FormLabel>Remarks (Optional)</FormLabel>
-                <FormControl><Textarea placeholder="Any additional notes..." {...field} /></FormControl>
-                <FormMessage />
+                  <FormLabel>Remarks</FormLabel>
+                  {expenseType === 'spend' ? (
+                    <Select onValueChange={field.onChange} value={field.value || "Expenses"}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select remark" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Expenses">Expenses</SelectItem>
+                        {/* Add other predefined remarks for 'spend' if needed in the future */}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <FormControl>
+                      <Textarea placeholder="Any additional notes for received income..." {...field} />
+                    </FormControl>
+                  )}
+                  <FormMessage />
                 </FormItem>
-            )}
+              )}
             />
+
             <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               <Send className="mr-2 h-4 w-4" /> Record Transaction
@@ -312,3 +334,5 @@ export function AddExpenseForm() {
     </Card>
   );
 }
+
+    
