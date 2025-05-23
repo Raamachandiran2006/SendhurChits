@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, orderBy, doc } from "firebase/firestore";
-import type { Group, User, AuctionRecord, PaymentRecord } from "@/types";
+import type { Group, User, AuctionRecord, CollectionRecord } from "@/types"; // Ensure CollectionRecord is imported
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 
@@ -59,7 +59,7 @@ const recordPaymentFormSchema = z.object({
   selectedUserId: z.string().min(1, "Please select a User."),
   paymentDate: z.date({ required_error: "Payment date is required." }),
   paymentTime: z.string().min(1, "Payment time is required."),
-  paymentReason: z.string().min(3, "Payment reason is required."), // Changed from paymentType
+  // paymentReason: z.string().min(3, "Payment reason is required."), // Removed
   paymentMode: z.enum(["Cash", "UPI", "Netbanking", "Cheque"], { required_error: "Payment mode is required." }),
   amount: z.coerce.number().int("Amount must be a whole number.").positive("Amount must be a positive number."),
   remarks: z.string().optional(),
@@ -90,7 +90,7 @@ export function RecordPaymentForm() {
       selectedUserId: "",
       paymentDate: new Date(),
       paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
-      paymentReason: "",
+      // paymentReason: "", // Removed
       paymentMode: undefined,
       amount: undefined,
       remarks: "Auction Payment",
@@ -196,7 +196,9 @@ export function RecordPaymentForm() {
       : null;
 
     try {
-      const paymentData: Omit<PaymentRecord, "id" | "recordedAt"> & { recordedAt?: any } = { 
+      // Using CollectionRecord type as it shares many fields.
+      // If PaymentRecord becomes distinct, use a separate type.
+      const paymentData: Omit<CollectionRecord, "id" | "recordedAt" | "paymentType" | "collectionLocation" | "recordedByEmployeeId" | "recordedByEmployeeName" > & { recordedAt?: any, paymentReason?: string } = { 
         groupId: selectedGroupObject.id,
         groupName: selectedGroupObject.groupName,
         auctionId: selectedAuction ? selectedAuction.id : null,
@@ -206,12 +208,14 @@ export function RecordPaymentForm() {
         userFullname: selectedUser.fullname,
         paymentDate: format(values.paymentDate, "yyyy-MM-dd"),
         paymentTime: values.paymentTime, 
-        paymentReason: values.paymentReason,
+        // paymentReason: values.paymentReason, // Removed
         paymentMode: values.paymentMode,
         amount: values.amount,
         remarks: values.remarks || "Auction Payment",
-        recordedBy: "Admin",
         virtualTransactionId: generateVirtualId(),
+        // Fields from CollectionRecord not directly applicable here or need specific admin context
+        // paymentType: "Admin Recorded", // Example differentiation
+        // collectionLocation: "N/A" 
       };
 
       await addDoc(collection(db, "paymentRecords"), { 
@@ -221,17 +225,16 @@ export function RecordPaymentForm() {
 
       toast({ title: "Payment Recorded", description: "Payment details saved successfully to payment records." });
       form.reset({
-        selectedGroupId: values.selectedGroupId, // Keep group selected
+        selectedGroupId: values.selectedGroupId, 
         selectedAuctionId: undefined,
         selectedUserId: "",
         paymentDate: new Date(),
         paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
-        paymentReason: "",
+        // paymentReason: "", // Removed
         paymentMode: undefined,
         amount: undefined,
         remarks: "Auction Payment",
       }); 
-      // Optionally redirect or refresh data if this form is on a page that displays these records
     } catch (error) {
       console.error("Error recording payment:", error);
       toast({ title: "Error", description: "Could not record payment. " + (error as Error).message, variant: "destructive" });
@@ -373,19 +376,7 @@ export function RecordPaymentForm() {
               />
             </div>
             
-            <FormField
-              control={form.control}
-              name="paymentReason"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Payment Reason</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Auction Payout, Refund" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Payment Reason Field Removed */}
 
             <FormField
               control={form.control}
@@ -453,7 +444,6 @@ export function RecordPaymentForm() {
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="Auction Payment">Auction Payment</SelectItem>
-                      {/* Add other remark options here if needed in the future */}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -471,3 +461,4 @@ export function RecordPaymentForm() {
     </Card>
   );
 }
+
