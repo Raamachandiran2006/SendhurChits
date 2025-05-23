@@ -3,30 +3,30 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import type { Group, User, AuctionRecord, CollectionRecord, PaymentRecord as AdminPaymentRecordType } from "@/types"; 
+import type { Group, User, AuctionRecord, CollectionRecord, PaymentRecord as AdminPaymentRecordType } from "@/types";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, arrayRemove, updateDoc, orderBy, Timestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import { 
-  Loader2, 
-  ArrowLeft, 
-  Users as UsersIconLucide, 
-  User as UserIcon, 
-  Info, 
-  AlertTriangle, 
-  Phone, 
-  Mail, 
-  CalendarDays, 
-  Landmark, 
-  Clock, 
-  Tag, 
-  LandmarkIcon as GroupLandmarkIcon, 
+import {
+  Loader2,
+  ArrowLeft,
+  Users as UsersIconLucide,
+  User as UserIcon,
+  Info,
+  AlertTriangle,
+  Phone,
+  Mail,
+  CalendarDays,
+  Landmark,
+  Clock,
+  Tag,
+  LandmarkIcon as GroupLandmarkIcon,
   SearchCode,
   Trash2,
-  Megaphone, 
+  Megaphone,
   CalendarClock,
   Edit3,
   Save,
@@ -35,23 +35,25 @@ import {
   History,
   DollarSign,
   ReceiptText,
-  ChevronRight, 
-  ChevronDown
+  ChevronRight,
+  ChevronDown,
+  Filter, // Added Filter icon
+  Download // Added Download icon
 } from "lucide-react";
-import { 
-  AlertDialog, 
-  AlertDialogAction, 
-  AlertDialogCancel, 
-  AlertDialogContent, 
-  AlertDialogDescription, 
-  AlertDialogFooter, 
-  AlertDialogHeader, 
-  AlertDialogTitle, 
-  AlertDialogTrigger 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, subDays, isAfter } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { useForm, Controller } from "react-hook-form";
@@ -61,6 +63,17 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
 
 // Helper function to format date safely
 const formatDateSafe = (dateInput: string | Date | Timestamp | undefined | null, outputFormat: string = "dd MMM yyyy") => {
@@ -83,7 +96,7 @@ const formatDateSafe = (dateInput: string | Date | Timestamp | undefined | null,
     } else {
       return "N/A";
     }
-    
+
     if (isNaN(date.getTime())) return "N/A";
     return format(date, outputFormat);
   } catch (e) {
@@ -94,22 +107,22 @@ const formatDateSafe = (dateInput: string | Date | Timestamp | undefined | null,
 
 const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestamp?: Timestamp): Date => {
   if (recordTimestamp) return recordTimestamp.toDate();
-  
+
   let baseDate: Date;
   if (dateStr) {
-    const d = new Date(dateStr.replace(/-/g, '/')); 
-    if (isNaN(d.getTime())) { 
+    const d = new Date(dateStr.replace(/-/g, '/'));
+    if (isNaN(d.getTime())) {
         const isoD = parseISO(dateStr);
-        if(isNaN(isoD.getTime())) return new Date(0); 
+        if(isNaN(isoD.getTime())) return new Date(0);
         baseDate = isoD;
     } else {
         baseDate = d;
     }
   } else {
-    baseDate = new Date(); 
+    baseDate = new Date();
   }
 
-  if (isNaN(baseDate.getTime())) return new Date(0); 
+  if (isNaN(baseDate.getTime())) return new Date(0);
 
   if (timeStr) {
     const timePartsMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
@@ -132,7 +145,7 @@ const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestam
         return baseDate;
     }
   }
-  baseDate.setHours(0,0,0,0); 
+  baseDate.setHours(0,0,0,0);
   return baseDate;
 };
 
@@ -149,7 +162,7 @@ const getBiddingTypeLabel = (type: string | undefined) => {
     case "auction": return "Auction Based";
     case "random": return "Random Draw";
     case "pre-fixed": return "Pre-fixed";
-    default: return type; 
+    default: return type;
   }
 };
 
@@ -164,13 +177,13 @@ type AuctionDetailsFormValues = z.infer<typeof auctionDetailsFormSchema>;
 
 const convert24hTo12hFormat = (time24?: string): string => {
   if (!time24 || !/^([01]\d|2[0-3]):([0-5]\d)$/.test(time24)) {
-    return time24 || ""; 
+    return time24 || "";
   }
   const [hoursStr, minutesStr] = time24.split(':');
   let hours = parseInt(hoursStr, 10);
   const ampm = hours >= 12 ? 'PM' : 'AM';
   hours = hours % 12;
-  hours = hours ? hours : 12; 
+  hours = hours ? hours : 12;
   const hours12Str = String(hours).padStart(2, '0');
   return `${hours12Str}:${minutesStr} ${ampm}`;
 };
@@ -190,14 +203,14 @@ const convert12hTo24hFormat = (time12?: string): string => {
     const minutes = parseInt(match[2], 10);
     const period = match[3];
 
-    if (hours === 12) { 
+    if (hours === 12) {
       hours = (period === 'am') ? 0 : 12;
     } else if (period === 'pm') {
       hours += 12;
     }
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
   }
-  return ""; 
+  return "";
 };
 
 interface CombinedPaymentHistoryTransaction {
@@ -209,9 +222,11 @@ interface CombinedPaymentHistoryTransaction {
   amount: number;
   mode: string | null;
   remarks: string | null;
-  originalSource: "Collection Record" | "Payment Record";
+  originalSource: "CollectionRecord" | "AdminPaymentRecordType";
   virtualTransactionId?: string;
 }
+
+type PaymentFilterType = "all" | "last7Days" | "last10Days" | "last30Days";
 
 
 export default function AdminGroupDetailPage() {
@@ -223,7 +238,8 @@ export default function AdminGroupDetailPage() {
   const [group, setGroup] = useState<Group | null>(null);
   const [membersDetails, setMembersDetails] = useState<User[]>([]);
   const [auctionHistory, setAuctionHistory] = useState<AuctionRecord[]>([]);
-  const [combinedPaymentHistory, setCombinedPaymentHistory] = useState<CombinedPaymentHistoryTransaction[]>([]);
+  const [rawPaymentHistory, setRawPaymentHistory] = useState<CombinedPaymentHistoryTransaction[]>([]);
+  const [filteredPaymentHistory, setFilteredPaymentHistory] = useState<CombinedPaymentHistoryTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -233,6 +249,7 @@ export default function AdminGroupDetailPage() {
   const [loadingAuctionHistory, setLoadingAuctionHistory] = useState(true);
   const [loadingPaymentHistory, setLoadingPaymentHistory] = useState(true);
   const [expandedPaymentRows, setExpandedPaymentRows] = useState<Record<string, boolean>>({});
+  const [selectedPaymentFilter, setSelectedPaymentFilter] = useState<PaymentFilterType>("all");
 
 
   const auctionForm = useForm<AuctionDetailsFormValues>({
@@ -266,14 +283,14 @@ export default function AdminGroupDetailPage() {
       auctionForm.reset({
         auctionMonth: groupData.auctionMonth || "",
         auctionScheduledDate: groupData.auctionScheduledDate || "",
-        auctionScheduledTime: groupData.auctionScheduledTime || "", 
+        auctionScheduledTime: groupData.auctionScheduledTime || "",
         lastAuctionWinner: groupData.lastAuctionWinner || "",
       });
 
       if (groupData.members && groupData.members.length > 0) {
         const memberUsernames = groupData.members;
         const fetchedMembers: User[] = [];
-        const batchSize = 30; 
+        const batchSize = 30;
         for (let i = 0; i < memberUsernames.length; i += batchSize) {
           const batchUsernames = memberUsernames.slice(i, i + batchSize);
           if (batchUsernames.length > 0) {
@@ -291,15 +308,14 @@ export default function AdminGroupDetailPage() {
       }
 
       const auctionRecordsRef = collection(db, "auctionRecords");
-      const qAuction = query(auctionRecordsRef, where("groupId", "==", groupId), orderBy("auctionDate", "asc")); 
+      const qAuction = query(auctionRecordsRef, where("groupId", "==", groupId), orderBy("auctionDate", "desc"));
       const auctionSnapshot = await getDocs(qAuction);
       const fetchedAuctionHistory = auctionSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as AuctionRecord));
       setAuctionHistory(fetchedAuctionHistory);
       setLoadingAuctionHistory(false);
-      
-      // Fetch Collection Records (Received by Company for this group)
+
       const collectionRecordsRef = collection(db, "collectionRecords");
-      const qCollection = query(collectionRecordsRef, where("groupId", "==", groupId), orderBy("recordedAt", "desc"));
+      const qCollection = query(collectionRecordsRef, where("groupId", "==", groupId));
       const collectionSnapshot = await getDocs(qCollection);
       const fetchedCollections = collectionSnapshot.docs.map(docSnap => {
         const data = docSnap.data() as CollectionRecord;
@@ -312,14 +328,13 @@ export default function AdminGroupDetailPage() {
           amount: data.amount,
           mode: data.paymentMode,
           remarks: data.remarks || "User Collection",
-          originalSource: "Collection Record" as const,
+          originalSource: "CollectionRecord" as const,
           virtualTransactionId: data.virtualTransactionId,
         } as CombinedPaymentHistoryTransaction;
       });
 
-      // Fetch Payment Records (Sent by Company for this group)
       const paymentRecordsRef = collection(db, "paymentRecords");
-      const qPayment = query(paymentRecordsRef, where("groupId", "==", groupId), orderBy("recordedAt", "desc"));
+      const qPayment = query(paymentRecordsRef, where("groupId", "==", groupId));
       const paymentSnapshot = await getDocs(qPayment);
       const fetchedPayments = paymentSnapshot.docs.map(docSnap => {
         const data = docSnap.data() as AdminPaymentRecordType;
@@ -332,13 +347,14 @@ export default function AdminGroupDetailPage() {
           amount: data.amount,
           mode: data.paymentMode,
           remarks: data.remarks || "Company Payment",
-          originalSource: "Payment Record" as const,
+          originalSource: "AdminPaymentRecordType" as const,
           virtualTransactionId: data.virtualTransactionId,
         } as CombinedPaymentHistoryTransaction;
       });
 
       const combined = [...fetchedCollections, ...fetchedPayments].sort((a,b) => b.dateTime.getTime() - a.dateTime.getTime());
-      setCombinedPaymentHistory(combined);
+      setRawPaymentHistory(combined);
+      setFilteredPaymentHistory(combined); // Initially show all
       setLoadingPaymentHistory(false);
 
     } catch (err) {
@@ -353,25 +369,96 @@ export default function AdminGroupDetailPage() {
     fetchGroupData();
   }, [fetchGroupData]);
 
+  useEffect(() => {
+    const applyFilter = () => {
+      if (selectedPaymentFilter === "all") {
+        setFilteredPaymentHistory(rawPaymentHistory);
+        return;
+      }
+      const now = new Date();
+      let startDate: Date;
+      if (selectedPaymentFilter === "last7Days") {
+        startDate = subDays(now, 7);
+      } else if (selectedPaymentFilter === "last10Days") {
+        startDate = subDays(now, 10);
+      } else if (selectedPaymentFilter === "last30Days") {
+        startDate = subDays(now, 30);
+      } else {
+        setFilteredPaymentHistory(rawPaymentHistory);
+        return;
+      }
+      startDate.setHours(0, 0, 0, 0); // Start of the day for comparison
+      const filtered = rawPaymentHistory.filter(tx => isAfter(tx.dateTime, startDate));
+      setFilteredPaymentHistory(filtered);
+    };
+    applyFilter();
+  }, [selectedPaymentFilter, rawPaymentHistory]);
+
+  const handleDownloadPdf = () => {
+    if (!group) return;
+    const doc = new jsPDF();
+    const tableColumn = ["S.No", "Type", "Date & Time", "From", "To", "Amount (₹)", "Mode", "Remarks"];
+    const tableRows: any[][] = [];
+
+    filteredPaymentHistory.forEach((payment, index) => {
+      const paymentData = [
+        index + 1,
+        payment.type,
+        formatDateSafe(payment.dateTime, "dd MMM yy, hh:mm a"),
+        payment.fromParty,
+        payment.toParty,
+        formatCurrency(payment.amount),
+        payment.mode || "N/A",
+        payment.remarks || "N/A",
+      ];
+      tableRows.push(paymentData);
+    });
+
+    const filterLabel = {
+      all: "All Time",
+      last7Days: "Last 7 Days",
+      last10Days: "Last 10 Days",
+      last30Days: "Last 30 Days",
+    };
+
+    doc.setFontSize(18);
+    doc.text(`Payment History - ${group.groupName}`, 14, 15);
+    doc.setFontSize(12);
+    doc.text(`Filter: ${filterLabel[selectedPaymentFilter]}`, 14, 22);
+    doc.text(`Generated on: ${format(new Date(), "dd MMM yyyy, hh:mm a")}`, 14, 29);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 35,
+      theme: 'grid',
+      headStyles: { fillColor: [30, 144, 255] }, // Dodger blue
+      styles: { fontSize: 8 },
+      columnStyles: { 0: { cellWidth: 10 } } // Adjust S.No column width
+    });
+    doc.save(`payment_history_${group.groupName.replace(/\s+/g, '_')}_${selectedPaymentFilter}.pdf`);
+  };
+
+
   const handleDeleteGroup = async () => {
     if (!group || deleteConfirmationText !== "delete") return;
 
     setIsDeleting(true);
     try {
       const groupDocRef = doc(db, "groups", groupId);
-      
+
       const batchDB = writeBatch(db);
       const usersToUpdateQuery = query(collection(db, "users"), where("groups", "array-contains", groupId));
       const usersToUpdateSnapshot = await getDocs(usersToUpdateQuery);
-      
+
       usersToUpdateSnapshot.forEach(userDoc => {
         batchDB.update(userDoc.ref, {
           groups: arrayRemove(groupId)
         });
       });
-      
+
       await batchDB.commit();
-      
+
       await deleteDoc(groupDocRef);
 
       toast({
@@ -400,17 +487,17 @@ export default function AdminGroupDetailPage() {
       await updateDoc(groupDocRef, {
         auctionMonth: values.auctionMonth || "",
         auctionScheduledDate: values.auctionScheduledDate || "",
-        auctionScheduledTime: values.auctionScheduledTime || "", 
+        auctionScheduledTime: values.auctionScheduledTime || "",
         lastAuctionWinner: values.lastAuctionWinner || "",
       });
-      
-      setGroup(prevGroup => prevGroup ? { 
-        ...prevGroup, 
+
+      setGroup(prevGroup => prevGroup ? {
+        ...prevGroup,
         auctionMonth: values.auctionMonth || "",
         auctionScheduledDate: values.auctionScheduledDate || "",
         auctionScheduledTime: values.auctionScheduledTime || "",
         lastAuctionWinner: values.lastAuctionWinner || ""
-      } : null); 
+      } : null);
       toast({ title: "Auction Details Updated", description: "Successfully saved auction details." });
       setIsEditingAuctionDetails(false);
     } catch (error) {
@@ -502,11 +589,11 @@ export default function AdminGroupDetailPage() {
               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
               <AlertDialogDescription>
                 This action cannot be undone. This will permanently delete the group
-                <strong className="text-foreground"> {group.groupName} </strong> 
+                <strong className="text-foreground"> {group.groupName} </strong>
                 and remove it from all associated users. Type "delete" to confirm.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <Input 
+            <Input
               type="text"
               placeholder='Type "delete" to confirm'
               value={deleteConfirmationText}
@@ -620,7 +707,7 @@ export default function AdminGroupDetailPage() {
           )}
         </CardContent>
       </Card>
-      
+
       <Separator />
 
       <Card className="shadow-xl">
@@ -651,7 +738,7 @@ export default function AdminGroupDetailPage() {
             <Form {...auctionForm}>
               <form onSubmit={auctionForm.handleSubmit(onSaveAuctionDetails)} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <AuctionDetailItem icon={CalendarClock} label="Auction Month" value={group.auctionMonth} isEditing fieldName="auctionMonth" register={auctionForm.register} />
-                
+
                 <FormField control={auctionForm.control} name="auctionScheduledDate" render={({ field }) => (
                   <FormItem className="flex flex-col p-3 bg-secondary/50 rounded-md">
                     <div className="flex items-center">
@@ -685,9 +772,9 @@ export default function AdminGroupDetailPage() {
                   </FormItem>
                 )} />
 
-                <FormField
+                <Controller
                   control={auctionForm.control}
-                  name="auctionScheduledTime" 
+                  name="auctionScheduledTime"
                   render={({ field }) => (
                     <FormItem className="flex flex-col p-3 bg-secondary/50 rounded-md">
                       <div className="flex items-center">
@@ -696,9 +783,9 @@ export default function AdminGroupDetailPage() {
                           <FormLabel className="font-semibold text-foreground">Scheduled Time</FormLabel>
                           <Input
                             type="time"
-                            value={convert12hTo24hFormat(field.value)} 
+                            value={convert12hTo24hFormat(field.value)}
                             onChange={(e) => {
-                              field.onChange(convert24hTo12hFormat(e.target.value) || ""); 
+                              field.onChange(convert24hTo12hFormat(e.target.value) || "");
                             }}
                             className="text-sm h-8 mt-1 w-full"
                           />
@@ -734,7 +821,7 @@ export default function AdminGroupDetailPage() {
       <Card className="shadow-xl">
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-3">
-            <History className="h-6 w-6 text-primary" /> 
+            <History className="h-6 w-6 text-primary" />
             <CardTitle className="text-xl font-bold text-foreground">Auction History</CardTitle>
           </div>
           <Button asChild variant="outline" size="sm">
@@ -783,8 +870,28 @@ export default function AdminGroupDetailPage() {
       <Card className="shadow-xl">
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-3">
-            <ReceiptText className="h-6 w-6 text-primary" /> 
+            <ReceiptText className="h-6 w-6 text-primary" />
             <CardTitle className="text-xl font-bold text-foreground">Payment History</CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Filter className="mr-2 h-4 w-4" /> Filter
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Filter by Date</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setSelectedPaymentFilter("all")}>All Time</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedPaymentFilter("last7Days")}>Last 7 Days</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedPaymentFilter("last10Days")}>Last 10 Days</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedPaymentFilter("last30Days")}>Last 30 Days</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
+              <Download className="mr-2 h-4 w-4" /> Download PDF
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -793,9 +900,9 @@ export default function AdminGroupDetailPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 <p className="ml-3 text-muted-foreground">Loading payment history...</p>
              </div>
-          ) : combinedPaymentHistory.length === 0 ? (
+          ) : filteredPaymentHistory.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">
-              No payment history found for this group.
+              No payment history found for this group {selectedPaymentFilter !== 'all' ? `in the selected period` : ''}.
             </p>
           ) : (
             <div className="overflow-x-auto rounded-md border">
@@ -813,7 +920,7 @@ export default function AdminGroupDetailPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {combinedPaymentHistory.map((payment, index) => {
+                        {filteredPaymentHistory.map((payment, index) => {
                           const transactionKey = payment.id + payment.originalSource;
                           const isExpanded = expandedPaymentRows[transactionKey];
                           return (
@@ -840,7 +947,7 @@ export default function AdminGroupDetailPage() {
                                 <TableCell>
                                   <span className={cn(
                                     "font-semibold px-2 py-1 rounded-full text-xs",
-                                    payment.type === "Sent" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" 
+                                    payment.type === "Sent" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
                                                           : "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
                                   )}>
                                     {payment.type}
@@ -866,4 +973,5 @@ export default function AdminGroupDetailPage() {
     </div>
   );
 }
+
 
