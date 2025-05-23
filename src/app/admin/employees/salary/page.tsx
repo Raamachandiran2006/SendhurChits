@@ -1,14 +1,14 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react"; // Added React import
 import type { SalaryRecord } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query as firestoreQuery } from "firebase/firestore"; // aliased query
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Loader2, DollarSign, PlusCircle, ArrowLeft, ListChecks } from "lucide-react";
+import { Loader2, DollarSign, PlusCircle, ArrowLeft, ListChecks, ChevronRight, ChevronDown } from "lucide-react"; // Added Chevron icons
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, parseISO } from "date-fns";
 import { useSearchParams } from "next/navigation"; // Import useSearchParams
@@ -17,8 +17,13 @@ export default function SalaryManagementPage() {
   const [salaryHistory, setSalaryHistory] = useState<SalaryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams(); // Get search params
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   const refreshId = searchParams.get('refreshId'); // Get the refreshId
+
+  const toggleRowExpansion = (recordId: string) => {
+    setExpandedRows(prev => ({ ...prev, [recordId]: !prev[recordId] }));
+  };
 
   useEffect(() => {
     const fetchSalaryHistory = async () => {
@@ -97,6 +102,7 @@ export default function SalaryManagementPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>S.No</TableHead>
                     <TableHead>Employee Name</TableHead>
                     <TableHead>Employee ID</TableHead>
                     <TableHead className="text-right">Amount (₹)</TableHead>
@@ -105,15 +111,37 @@ export default function SalaryManagementPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {salaryHistory.map((record) => (
-                    <TableRow key={record.id}>
-                      <TableCell className="font-medium">{record.employeeName}</TableCell>
-                      <TableCell>{record.employeeReadableId}</TableCell>
-                      <TableCell className="text-right font-mono">₹{record.amount.toLocaleString()}</TableCell>
-                      <TableCell>{formatDateSafe(record.paymentDate)}</TableCell>
-                      <TableCell className="max-w-xs truncate">{record.remarks || "N/A"}</TableCell>
-                    </TableRow>
-                  ))}
+                  {salaryHistory.map((record, index) => {
+                    const isExpanded = expandedRows[record.id];
+                    return (
+                    <React.Fragment key={record.id}>
+                      <TableRow>
+                        <TableCell>
+                          <div className="flex items-center">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleRowExpansion(record.id)}
+                                className="mr-1 p-1 h-auto"
+                            >
+                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </Button>
+                            {index + 1}
+                          </div>
+                          {isExpanded && (
+                            <div className="pl-7 mt-1 text-xs text-muted-foreground">
+                                Virtual ID: {record.virtualTransactionId || "N/A"}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium">{record.employeeName}</TableCell>
+                        <TableCell>{record.employeeReadableId}</TableCell>
+                        <TableCell className="text-right font-mono">₹{record.amount.toLocaleString()}</TableCell>
+                        <TableCell>{formatDateSafe(record.paymentDate)}</TableCell>
+                        <TableCell className="max-w-xs truncate">{record.remarks || "N/A"}</TableCell>
+                      </TableRow>
+                    </React.Fragment>
+                  )})}
                 </TableBody>
               </Table>
             </div>
