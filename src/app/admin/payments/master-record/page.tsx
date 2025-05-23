@@ -8,10 +8,20 @@ import { collection, getDocs, orderBy, query as firestoreQuery, Timestamp } from
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ArrowLeft, BookOpenCheck, Loader2, AlertTriangle, ChevronRight, ChevronDown } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, Loader2, AlertTriangle, ChevronRight, ChevronDown, Filter, Download } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, subDays, isAfter } from "date-fns";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface MasterTransaction {
   id: string; // Original document ID
@@ -26,6 +36,8 @@ interface MasterTransaction {
   originalSource: string; // e.g., "Collection", "Salary", "Expense", "Payment"
   virtualTransactionId?: string; // The 6-digit random ID
 }
+
+type PaymentFilterType = "all" | "last7Days" | "last10Days" | "last30Days";
 
 const formatDateSafe = (dateInput: string | Date | Timestamp | undefined | null, outputFormat: string = "dd MMM yyyy, hh:mm a") => {
   if (!dateInput) return "N/A";
@@ -61,21 +73,19 @@ const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestam
   
   let baseDate: Date;
   if (dateStr) {
-    // Attempt to parse YYYY-MM-DD or other common date strings
-    const d = new Date(dateStr.replace(/-/g, '/')); // Replace hyphens for better cross-browser compatibility
+    const d = new Date(dateStr.replace(/-/g, '/')); 
     if (isNaN(d.getTime())) { 
-        // If direct parsing fails, try parseISO for ISO 8601 strings
         const isoD = parseISO(dateStr);
-        if(isNaN(isoD.getTime())) return new Date(0); // Return an early date if unparseable
+        if(isNaN(isoD.getTime())) return new Date(0); 
         baseDate = isoD;
     } else {
         baseDate = d;
     }
   } else {
-    baseDate = new Date(); // Default to now if no date string, though this should be rare
+    baseDate = new Date(); 
   }
 
-  if (isNaN(baseDate.getTime())) return new Date(0); // Safety check
+  if (isNaN(baseDate.getTime())) return new Date(0); 
 
   if (timeStr) {
     const timePartsMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
@@ -85,12 +95,11 @@ const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestam
       const period = timePartsMatch[3]?.toUpperCase();
 
       if (period === "PM" && hours < 12) hours += 12;
-      if (period === "AM" && hours === 12) hours = 0; // Midnight case
+      if (period === "AM" && hours === 12) hours = 0;
 
       baseDate.setHours(hours, minutes, 0, 0);
       return baseDate;
     }
-    // Check for 24-hour format HH:MM
     const time24hMatch = timeStr.match(/^(\d{2}):(\d{2})$/);
     if (time24hMatch) {
         const hours = parseInt(time24hMatch[1], 10);
@@ -99,8 +108,6 @@ const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestam
         return baseDate;
     }
   }
-  // If no time provided, or invalid format, default to start of the day (or current time if baseDate was set to new Date())
-  // For sorting consistency, setting to 00:00:00 for dates without time is better
   baseDate.setHours(0,0,0,0); 
   return baseDate;
 };
@@ -112,10 +119,13 @@ const formatCurrency = (amount: number | null | undefined) => {
 };
 
 export default function MasterRecordPage() {
-  const [allTransactions, setAllTransactions] = useState<MasterTransaction[]>([]);
+  const [rawAllTransactions, setRawAllTransactions] = useState<MasterTransaction[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<MasterTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [selectedFilter, setSelectedFilter] = useState<PaymentFilterType>("all");
+
 
   const toggleRowExpansion = (transactionKey: string) => {
     setExpandedRows(prev => ({ ...prev, [transactionKey]: !prev[transactionKey] }));
@@ -143,8 +153,7 @@ export default function MasterRecordPage() {
         console.log("Master Record: Fetch results from Promise.allSettled:", results);
 
         let combinedTransactions: MasterTransaction[] = [];
-        let fetchErrorOccurred = false;
-
+        
         results.forEach((result, index) => {
           const sourceType = collectionsToFetch[index].type;
           if (result.status === "fulfilled") {
@@ -180,7 +189,7 @@ export default function MasterRecordPage() {
                   toParty: `User: ${record.userFullname} (${record.userUsername})`,
                   amount: record.amount,
                   mode: record.paymentMode,
-                  remarksOrSource: record.remarks || `Payment for Group: ${record.groupName}`,
+                  remarksOrSource: record.remarks || `Payment for Group: ${record.groupName || 'N/A'}`,
                   originalSource: "Payment",
                   virtualTransactionId: record.virtualTransactionId,
                 };
@@ -223,14 +232,14 @@ export default function MasterRecordPage() {
                 const newError = `Failed to load ${collectionsToFetch[index].name}.`;
                 return prev ? `${prev}\n${newError}` : newError;
             });
-            fetchErrorOccurred = true;
           }
         });
         
         console.log("Master Record: Combined transactions before sort:", combinedTransactions.length, "items");
         combinedTransactions.sort((a, b) => b.dateTime.getTime() - a.dateTime.getTime());
         console.log("Master Record: Transactions after sort:", combinedTransactions.length, "items. First item date:", combinedTransactions[0]?.dateTime);
-        setAllTransactions(combinedTransactions);
+        setRawAllTransactions(combinedTransactions);
+        setFilteredTransactions(combinedTransactions); // Initially show all
 
       } catch (err) {
         console.error("Master Record: Main fetch error:", err);
@@ -244,6 +253,85 @@ export default function MasterRecordPage() {
     fetchTransactions();
   }, []);
 
+  useEffect(() => {
+    const applyFilter = () => {
+      if (selectedFilter === "all") {
+        setFilteredTransactions(rawAllTransactions);
+        return;
+      }
+      const now = new Date();
+      let startDate: Date;
+      if (selectedFilter === "last7Days") {
+        startDate = subDays(now, 7);
+      } else if (selectedFilter === "last10Days") {
+        startDate = subDays(now, 10);
+      } else if (selectedFilter === "last30Days") {
+        startDate = subDays(now, 30);
+      } else {
+        setFilteredTransactions(rawAllTransactions);
+        return;
+      }
+      startDate.setHours(0, 0, 0, 0); 
+      const filtered = rawAllTransactions.filter(tx => isAfter(tx.dateTime, startDate));
+      setFilteredTransactions(filtered);
+    };
+    applyFilter();
+  }, [selectedFilter, rawAllTransactions]);
+
+  const handleDownloadPdf = () => {
+    const doc = new jsPDF();
+    const tableColumn = ["S.No", "Direction", "Date & Time", "From", "To", "Amount (₹)", "Mode", "Remarks/Source", "Type"];
+    const tableRows: any[][] = [];
+
+    filteredTransactions.forEach((tx, index) => {
+      const txData = [
+        index + 1,
+        tx.direction,
+        formatDateSafe(tx.dateTime),
+        tx.fromParty,
+        tx.toParty,
+        formatCurrency(tx.amount),
+        tx.mode || "N/A",
+        tx.remarksOrSource,
+        tx.originalSource,
+      ];
+      tableRows.push(txData);
+    });
+
+    const filterLabel = {
+      all: "All Time",
+      last7Days: "Last 7 Days",
+      last10Days: "Last 10 Days",
+      last30Days: "Last 30 Days",
+    };
+
+    doc.setFontSize(18);
+    doc.text(`Master Financial Record`, 14, 15);
+    doc.setFontSize(12);
+    doc.text(`Filter: ${filterLabel[selectedFilter]}`, 14, 22);
+    doc.text(`Generated on: ${format(new Date(), "dd MMM yyyy, hh:mm a")}`, 14, 29);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 35,
+      theme: 'grid',
+      headStyles: { fillColor: [30, 144, 255] }, // Dodger blue
+      styles: { fontSize: 7 }, // Adjusted font size for more columns
+      columnStyles: { 
+        0: { cellWidth: 8 }, // S.No
+        2: { cellWidth: 25 }, // Date & Time
+        3: { cellWidth: 35 }, // From
+        4: { cellWidth: 35 }, // To
+        6: { cellWidth: 15 }, // Mode
+        7: { cellWidth: 30 }, // Remarks
+        8: { cellWidth: 15 }, // Type
+      },
+    });
+    doc.save(`master_financial_record_${selectedFilter}.pdf`);
+  };
+
+
   if (loading) {
     return (
       <div className="container mx-auto py-8 text-center">
@@ -253,7 +341,7 @@ export default function MasterRecordPage() {
     );
   }
 
-  if (error && allTransactions.length === 0) { 
+  if (error && filteredTransactions.length === 0) { 
     return (
       <div className="container mx-auto py-8 text-center">
         <Card className="max-w-md mx-auto shadow-lg">
@@ -275,7 +363,7 @@ export default function MasterRecordPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
         <div className="flex items-center gap-3">
           <BookOpenCheck className="h-8 w-8 text-primary" />
           <div>
@@ -283,12 +371,32 @@ export default function MasterRecordPage() {
             <p className="text-muted-foreground">A comprehensive overview of all transactions.</p>
           </div>
         </div>
-        <Button variant="outline" asChild>
-          <Link href="/admin/payments">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Payments
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2 mt-4 sm:mt-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Filter className="mr-2 h-4 w-4" /> Filter
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Filter by Date</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setSelectedFilter("all")}>All Time</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setSelectedFilter("last7Days")}>Last 7 Days</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setSelectedFilter("last10Days")}>Last 10 Days</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setSelectedFilter("last30Days")}>Last 30 Days</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={filteredTransactions.length === 0}>
+            <Download className="mr-2 h-4 w-4" /> Download PDF
+          </Button>
+          <Button variant="outline" asChild size="sm">
+            <Link href="/admin/payments">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Link>
+          </Button>
+        </div>
       </div>
       <Card className="shadow-lg">
         <CardHeader>
@@ -296,9 +404,9 @@ export default function MasterRecordPage() {
           <CardDescription>Sorted by most recent first. {error && <span className="text-destructive text-xs block mt-1">Note: Some data may have failed to load.</span>}</CardDescription>
         </CardHeader>
         <CardContent>
-          {allTransactions.length === 0 ? (
+          {filteredTransactions.length === 0 && !error ? (
             <p className="text-muted-foreground text-center py-10">
-              No transactions found across all records.
+              No transactions found {selectedFilter !== 'all' ? `in the selected period` : ''}.
             </p>
           ) : (
             <div className="overflow-x-auto rounded-md border">
@@ -317,8 +425,8 @@ export default function MasterRecordPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {allTransactions.map((tx, index) => {
-                    const transactionKey = tx.id + tx.originalSource; // Unique key for expansion state
+                  {filteredTransactions.map((tx, index) => {
+                    const transactionKey = tx.id + tx.originalSource; 
                     const isExpanded = expandedRows[transactionKey];
                     return (
                       <React.Fragment key={transactionKey}>
@@ -351,11 +459,11 @@ export default function MasterRecordPage() {
                             </span>
                           </TableCell>
                           <TableCell>{formatDateSafe(tx.dateTime)}</TableCell>
-                          <TableCell className="max-w-xs truncate">{tx.fromParty}</TableCell>
-                          <TableCell className="max-w-xs truncate">{tx.toParty}</TableCell>
+                          <TableCell className="max-w-[150px] truncate">{tx.fromParty}</TableCell>
+                          <TableCell className="max-w-[150px] truncate">{tx.toParty}</TableCell>
                           <TableCell className="text-right font-mono">{formatCurrency(tx.amount)}</TableCell>
                           <TableCell>{tx.mode || "N/A"}</TableCell>
-                          <TableCell className="max-w-xs truncate">{tx.remarksOrSource}</TableCell>
+                          <TableCell className="max-w-[200px] truncate">{tx.remarksOrSource}</TableCell>
                           <TableCell>
                             <span className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground">
                               {tx.originalSource}
