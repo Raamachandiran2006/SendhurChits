@@ -117,7 +117,7 @@ export default function EmployeeSalaryPage() {
                     const isExpanded = expandedRows[record.id];
                     return (
                     <React.Fragment key={record.id}>
-                      <TableRow>
+                      <TableRow>{/* Compacted JSX below */}
                         <TableCell>
                           <div className="flex items-center">
                             <Button
@@ -135,10 +135,7 @@ export default function EmployeeSalaryPage() {
                                 Virtual ID: {record.virtualTransactionId || "N/A"}
                             </div>
                           )}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">₹{record.amount.toLocaleString()}</TableCell>
-                        <TableCell>{formatDateSafe(record.paymentDate)}</TableCell>
-                        <TableCell className="max-w-xs truncate">{record.remarks || "N/A"}</TableCell>
+                        </TableCell><TableCell className="text-right font-mono">₹{record.amount.toLocaleString()}</TableCell><TableCell>{formatDateSafe(record.paymentDate)}</TableCell><TableCell className="max-w-xs truncate">{record.remarks || "N/A"}</TableCell>
                       </TableRow>
                     </React.Fragment>
                   )})}
@@ -151,3 +148,4 @@ export default function EmployeeSalaryPage() {
     </div>
   );
 }
+
