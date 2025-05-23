@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowLeft, BookOpenCheck, Loader2, AlertTriangle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
+import { cn } from "@/lib/utils"; // Ensure cn is imported
 
 interface MasterTransaction {
   id: string;
@@ -32,10 +33,8 @@ const formatDateSafe = (dateInput: string | Date | Timestamp | undefined | null,
     if (dateInput instanceof Timestamp) {
       date = dateInput.toDate();
     } else if (typeof dateInput === 'string') {
-      // Attempt to parse various common formats if it's a string
-      const parsedDate = new Date(dateInput.replace(/-/g, '/')); // Replace to help Safari
+      const parsedDate = new Date(dateInput.replace(/-/g, '/'));
       if (isNaN(parsedDate.getTime())) {
-         // Try ISO parsing if direct new Date fails
         const isoParsed = parseISO(dateInput);
         if(isNaN(isoParsed.getTime())) return "N/A";
         date = isoParsed;
@@ -56,15 +55,26 @@ const formatDateSafe = (dateInput: string | Date | Timestamp | undefined | null,
   }
 };
 
-// Helper to parse date and time for sorting, ensuring a valid Date object
 const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestamp?: Timestamp): Date => {
   if (recordTimestamp) return recordTimestamp.toDate();
   
-  const baseDate = dateStr ? new Date(dateStr.replace(/-/g, '/')) : new Date(); // Default to now if no date string
-  if (isNaN(baseDate.getTime())) return new Date(0); // Invalid date, sort to epoch
+  let baseDate: Date;
+  if (dateStr) {
+    const d = new Date(dateStr.replace(/-/g, '/')); // Handle YYYY-MM-DD
+    if (isNaN(d.getTime())) { // try ISO if direct fails
+        const isoD = parseISO(dateStr);
+        if(isNaN(isoD.getTime())) return new Date(0); // Invalid date, sort to epoch
+        baseDate = isoD;
+    } else {
+        baseDate = d;
+    }
+  } else {
+    baseDate = new Date(); // Default to now if no date string
+  }
+
+  if (isNaN(baseDate.getTime())) return new Date(0); 
 
   if (timeStr) {
-    // Assuming timeStr is "HH:mm AM/PM" or "HH:mm"
     const timePartsMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
     if (timePartsMatch) {
       let hours = parseInt(timePartsMatch[1], 10);
@@ -72,14 +82,21 @@ const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestam
       const period = timePartsMatch[3]?.toUpperCase();
 
       if (period === "PM" && hours < 12) hours += 12;
-      if (period === "AM" && hours === 12) hours = 0; // Midnight
+      if (period === "AM" && hours === 12) hours = 0;
 
       baseDate.setHours(hours, minutes, 0, 0);
       return baseDate;
     }
+    // Handle HH:mm (24-hour format)
+    const time24hMatch = timeStr.match(/^(\d{2}):(\d{2})$/);
+    if (time24hMatch) {
+        const hours = parseInt(time24hMatch[1], 10);
+        const minutes = parseInt(time24hMatch[2], 10);
+        baseDate.setHours(hours, minutes, 0, 0);
+        return baseDate;
+    }
   }
-  // If only date is present, use start of that day for consistent sorting
-  baseDate.setHours(0,0,0,0);
+  baseDate.setHours(0,0,0,0); // Default to start of the day if no time
   return baseDate;
 };
 
@@ -103,7 +120,7 @@ export default function MasterRecordPage() {
       try {
         const collectionsToFetch = [
           { name: "collectionRecords", type: "Collection" as const, dateField: "recordedAt" },
-          { name: "paymentRecords", type: "Admin Payment" as const, dateField: "recordedAt" },
+          { name: "paymentRecords", type: "Payment" as const, dateField: "recordedAt" }, // Changed type for clarity
           { name: "salaryRecords", type: "Salary" as const, dateField: "recordedAt" },
           { name: "expenses", type: "Expense" as const, dateField: "recordedAt" },
         ];
@@ -140,21 +157,19 @@ export default function MasterRecordPage() {
                   remarksOrSource: record.remarks || `Collection from ${record.userFullname}`,
                   originalSource: "Collection",
                 };
-              } else if (sourceType === "Admin Payment" && data) {
-                // Assuming AdminPaymentRecord has a similar structure to CollectionRecord for now
-                // You might need a distinct AdminPaymentRecord type if fields differ significantly
-                const record = data as AdminPaymentRecord; // Or a more specific type if defined
+              } else if (sourceType === "Payment" && data) {
+                const record = data as AdminPaymentRecord; 
                 transformed = {
                   id,
                   transactionDisplayId: `PAY-${id.substring(0,6)}`,
-                  direction: "Sent",
+                  direction: "Sent", // Admin recorded payments are typically 'Sent' by company
                   dateTime: parseDateTimeForSort(record.paymentDate, record.paymentTime, record.recordedAt),
                   fromParty: "ChitConnect (Company)",
-                  toParty: `User: ${record.userFullname} (${record.userUsername})`, // Assuming similar user fields
+                  toParty: `User: ${record.userFullname} (${record.userUsername})`,
                   amount: record.amount,
                   mode: record.paymentMode,
                   remarksOrSource: record.remarks || `Payment to ${record.userFullname}`,
-                  originalSource: "Admin Payment",
+                  originalSource: "Payment",
                 };
               } else if (sourceType === "Salary" && data) {
                 const record = data as SalaryRecord;
@@ -162,11 +177,11 @@ export default function MasterRecordPage() {
                   id,
                   transactionDisplayId: `SAL-${id.substring(0,6)}`,
                   direction: "Sent",
-                  dateTime: parseDateTimeForSort(record.paymentDate, undefined, record.recordedAt), // Salary might not have specific time
+                  dateTime: parseDateTimeForSort(record.paymentDate, undefined, record.recordedAt),
                   fromParty: "ChitConnect (Company)",
                   toParty: `Employee: ${record.employeeName} (${record.employeeReadableId})`,
                   amount: record.amount,
-                  mode: "Bank Transfer", // Assuming salary is bank transfer
+                  mode: "Bank Transfer", 
                   remarksOrSource: record.remarks || `Salary for ${record.employeeName}`,
                   originalSource: "Salary",
                 };
@@ -189,7 +204,7 @@ export default function MasterRecordPage() {
             });
           } else {
             console.error(`Master Record: Error fetching from ${collectionsToFetch[index].name}:`, result.reason);
-            // Optionally set a partial error state or continue
+            setError(prev => prev ? `${prev}\nFailed to load ${collectionsToFetch[index].name}.` : `Failed to load ${collectionsToFetch[index].name}.`);
           }
         });
         
@@ -219,17 +234,17 @@ export default function MasterRecordPage() {
     );
   }
 
-  if (error) {
+  if (error && allTransactions.length === 0) { // Show error only if no transactions loaded
     return (
       <div className="container mx-auto py-8 text-center">
         <Card className="max-w-md mx-auto shadow-lg">
           <CardHeader>
             <CardTitle className="text-destructive flex items-center justify-center">
-              <AlertTriangle className="mr-2 h-6 w-6" /> Error
+              <AlertTriangle className="mr-2 h-6 w-6" /> Error Loading Data
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">{error}</p>
+            <p className="text-muted-foreground whitespace-pre-line">{error}</p>
             <Button onClick={() => window.location.reload()} className="mt-6">
               Try Again
             </Button>
@@ -259,7 +274,7 @@ export default function MasterRecordPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>All Transactions</CardTitle>
-          <CardDescription>Sorted by most recent first.</CardDescription>
+          <CardDescription>Sorted by most recent first. {error && <span className="text-destructive text-xs block mt-1">Note: Some data may have failed to load.</span>}</CardDescription>
         </CardHeader>
         <CardContent>
           {allTransactions.length === 0 ? (
@@ -313,5 +328,3 @@ export default function MasterRecordPage() {
     </div>
   );
 }
-
-    
