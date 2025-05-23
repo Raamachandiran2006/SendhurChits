@@ -1,9 +1,9 @@
 
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import type { Group, User, AuctionRecord, CollectionRecord, PaymentRecord as AdminPaymentRecordType } from "@/types"; // Assuming PaymentRecord is for admin payments
+import type { Group, User, AuctionRecord, CollectionRecord, PaymentRecord as AdminPaymentRecordType } from "@/types"; 
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, arrayRemove, updateDoc, orderBy, Timestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -34,7 +34,9 @@ import {
   PlayCircle,
   History,
   DollarSign,
-  ReceiptText
+  ReceiptText,
+  ChevronRight, 
+  ChevronDown
 } from "lucide-react";
 import { 
   AlertDialog, 
@@ -208,6 +210,7 @@ interface CombinedPaymentHistoryTransaction {
   mode: string | null;
   remarks: string | null;
   originalSource: "Collection Record" | "Payment Record";
+  virtualTransactionId?: string;
 }
 
 
@@ -229,6 +232,7 @@ export default function AdminGroupDetailPage() {
   const [isSavingAuctionDetails, setIsSavingAuctionDetails] = useState(false);
   const [loadingAuctionHistory, setLoadingAuctionHistory] = useState(true);
   const [loadingPaymentHistory, setLoadingPaymentHistory] = useState(true);
+  const [expandedPaymentRows, setExpandedPaymentRows] = useState<Record<string, boolean>>({});
 
 
   const auctionForm = useForm<AuctionDetailsFormValues>({
@@ -287,7 +291,7 @@ export default function AdminGroupDetailPage() {
       }
 
       const auctionRecordsRef = collection(db, "auctionRecords");
-      const qAuction = query(auctionRecordsRef, where("groupId", "==", groupId), orderBy("auctionDate", "desc")); 
+      const qAuction = query(auctionRecordsRef, where("groupId", "==", groupId), orderBy("auctionDate", "asc")); 
       const auctionSnapshot = await getDocs(qAuction);
       const fetchedAuctionHistory = auctionSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as AuctionRecord));
       setAuctionHistory(fetchedAuctionHistory);
@@ -309,6 +313,7 @@ export default function AdminGroupDetailPage() {
           mode: data.paymentMode,
           remarks: data.remarks || "User Collection",
           originalSource: "Collection Record" as const,
+          virtualTransactionId: data.virtualTransactionId,
         } as CombinedPaymentHistoryTransaction;
       });
 
@@ -317,7 +322,7 @@ export default function AdminGroupDetailPage() {
       const qPayment = query(paymentRecordsRef, where("groupId", "==", groupId), orderBy("recordedAt", "desc"));
       const paymentSnapshot = await getDocs(qPayment);
       const fetchedPayments = paymentSnapshot.docs.map(docSnap => {
-        const data = docSnap.data() as AdminPaymentRecordType; // Assuming CollectionRecord structure for now
+        const data = docSnap.data() as AdminPaymentRecordType;
         return {
           id: docSnap.id,
           type: "Sent" as const,
@@ -328,6 +333,7 @@ export default function AdminGroupDetailPage() {
           mode: data.paymentMode,
           remarks: data.remarks || "Company Payment",
           originalSource: "Payment Record" as const,
+          virtualTransactionId: data.virtualTransactionId,
         } as CombinedPaymentHistoryTransaction;
       });
 
@@ -425,6 +431,10 @@ export default function AdminGroupDetailPage() {
       });
     }
     setIsEditingAuctionDetails(false);
+  };
+
+  const togglePaymentRowExpansion = (transactionKey: string) => {
+    setExpandedPaymentRows(prev => ({ ...prev, [transactionKey]: !prev[transactionKey] }));
   };
 
   if (loading) {
@@ -803,9 +813,30 @@ export default function AdminGroupDetailPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {combinedPaymentHistory.map((payment, index) => (
-                            <TableRow key={payment.id + payment.originalSource}>
-                                <TableCell>{index + 1}</TableCell>
+                        {combinedPaymentHistory.map((payment, index) => {
+                          const transactionKey = payment.id + payment.originalSource;
+                          const isExpanded = expandedPaymentRows[transactionKey];
+                          return (
+                            <React.Fragment key={transactionKey}>
+                              <TableRow>
+                                <TableCell>
+                                  <div className="flex items-center">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => togglePaymentRowExpansion(transactionKey)}
+                                      className="mr-1 p-1 h-auto"
+                                    >
+                                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                    </Button>
+                                    {index + 1}
+                                  </div>
+                                  {isExpanded && (
+                                    <div className="pl-7 mt-1 text-xs text-muted-foreground">
+                                      Virtual ID: {payment.virtualTransactionId || "N/A"}
+                                    </div>
+                                  )}
+                                </TableCell>
                                 <TableCell>
                                   <span className={cn(
                                     "font-semibold px-2 py-1 rounded-full text-xs",
@@ -821,8 +852,10 @@ export default function AdminGroupDetailPage() {
                                 <TableCell className="text-right font-mono">{formatCurrency(payment.amount)}</TableCell>
                                 <TableCell>{payment.mode || "N/A"}</TableCell>
                                 <TableCell className="max-w-xs truncate">{payment.remarks || "N/A"}</TableCell>
-                            </TableRow>
-                        ))}
+                              </TableRow>
+                            </React.Fragment>
+                          )
+                        })}
                     </TableBody>
                 </Table>
             </div>
@@ -834,5 +867,3 @@ export default function AdminGroupDetailPage() {
   );
 }
 
-
-    
