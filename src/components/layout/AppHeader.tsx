@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, UserCircle, Shield, Briefcase, Landmark, CreditCard, Wallet } from "lucide-react";
+import { LogOut, UserCircle, Shield, Briefcase, Landmark } from "lucide-react"; // Removed CreditCard, Wallet
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { User, Employee } from "@/types";
-import { cn } from "@/lib/utils"; // Added this import
+import { cn } from "@/lib/utils";
 
 const formatCurrency = (amount: number | null | undefined) => {
   if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
@@ -51,7 +51,17 @@ export function AppHeader() {
         </Link>
         
         <div className="flex items-center gap-4">
-          <span className="text-sm text-muted-foreground hidden sm:inline">Welcome, {entityFullname}</span>
+          <div className="hidden sm:flex flex-col items-end text-right">
+            <span className="text-sm text-muted-foreground">Welcome, {entityFullname}</span>
+            {userType === 'user' && userDueAmount !== undefined && (
+              <span className={cn(
+                "text-xs font-semibold",
+                (userDueAmount ?? 0) > 0 ? "text-destructive" : "text-green-600"
+              )}>
+                Due: {formatCurrency(userDueAmount)}
+              </span>
+            )}
+          </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
@@ -68,14 +78,17 @@ export function AppHeader() {
                   <p className="text-xs leading-none text-muted-foreground">
                     {userType === 'employee' ? `Employee ID: ${entityUsername}` : (userType === 'admin' ? `@${entityUsername}` : `@${entityUsername}`)}
                   </p>
-                  {userType === 'user' && (
-                    <div className="mt-2 flex items-center">
-                        <Wallet className="mr-2 h-4 w-4 text-muted-foreground" />
-                        <p className="text-xs leading-none">
-                            Due: <span className={cn("font-semibold", (userDueAmount ?? 0) > 0 ? "text-destructive" : "text-green-600")}>{formatCurrency(userDueAmount)}</span>
-                        </p>
-                    </div>
-                  )}
+                  {/* Due Amount display removed from here for regular users, already shown outside */}
+                  <div className="sm:hidden mt-1"> {/* Show due amount here for small screens */}
+                    {userType === 'user' && userDueAmount !== undefined && (
+                        <span className={cn(
+                            "text-xs font-semibold",
+                            (userDueAmount ?? 0) > 0 ? "text-destructive" : "text-green-600"
+                        )}>
+                            Due: {formatCurrency(userDueAmount)}
+                        </span>
+                    )}
+                  </div>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
