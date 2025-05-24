@@ -195,7 +195,7 @@ export function AdminRecordCollectionForm() {
   };
 
   useEffect(() => {
-    if (watchedCollectionLocationOption === "User Location") { // Changed from "Your Location" to "User Location" to match dropdown
+    if (watchedCollectionLocationOption === "User Location") { 
       handleFetchLocation();
     } else {
       setCurrentLocationDisplay(null);
@@ -280,7 +280,7 @@ export function AdminRecordCollectionForm() {
       setCurrentLocationDisplay(null);
       setCurrentLocationValue(null);
       setLocationError(null);
-      router.push(`/admin/collection?refreshId=${Date.now()}`);
+      router.push(`/admin/users/${selectedUser.id}`); // Navigate to the user's detail page
     } catch (error) {
       console.error("Error recording collection:", error);
       toast({ title: "Error", description: "Could not record collection. " + (error as Error).message, variant: "destructive" });
