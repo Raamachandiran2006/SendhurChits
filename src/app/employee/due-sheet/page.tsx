@@ -1,15 +1,16 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import type { User } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Loader2, ArrowLeft, Sheet as SheetIcon, UserCircle, Phone } from "lucide-react";
+import { Loader2, ArrowLeft, Sheet as SheetIcon, UserCircle, Phone, Search } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input"; // Import Input component
 
 const formatCurrency = (amount: number | null | undefined) => {
   if (amount === null || amount === undefined || isNaN(amount)) return "₹0.00"; // Or "N/A"
@@ -17,8 +18,9 @@ const formatCurrency = (amount: number | null | undefined) => {
 };
 
 export default function EmployeeDueSheetPage() {
-  const [users, setUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -29,12 +31,11 @@ export default function EmployeeDueSheetPage() {
         const querySnapshot = await getDocs(q);
         const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
         
-        // Filter out admin users and users with no positive due amount
         const relevantUsers = fetchedUsers.filter(user => 
           !(user.isAdmin || user.username === 'admin') &&
           (user.dueAmount && user.dueAmount > 0)
         );
-        setUsers(relevantUsers);
+        setAllUsers(relevantUsers);
 
       } catch (error) {
         console.error("Error fetching users for due sheet:", error);
@@ -44,6 +45,18 @@ export default function EmployeeDueSheetPage() {
     };
     fetchUsers();
   }, []);
+
+  const filteredUsers = useMemo(() => {
+    if (!searchTerm) {
+      return allUsers;
+    }
+    const lowercasedSearchTerm = searchTerm.toLowerCase();
+    return allUsers.filter(user => 
+      user.username.toLowerCase().includes(lowercasedSearchTerm) ||
+      user.fullname.toLowerCase().includes(lowercasedSearchTerm) ||
+      user.phone.includes(searchTerm) // Phone number might not need lowercasing if it's just digits
+    );
+  }, [allUsers, searchTerm]);
 
   return (
     <div className="container mx-auto py-8">
@@ -63,10 +76,26 @@ export default function EmployeeDueSheetPage() {
         </Button>
       </div>
 
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search by User ID, Name, or Phone..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 w-full max-w-md shadow-sm"
+          />
+        </div>
+      </div>
+
       <Card className="shadow-xl">
         <CardHeader>
           <CardTitle>Outstanding Due Amounts</CardTitle>
-          <CardDescription>List of customers with positive due amounts (excluding admins).</CardDescription>
+          <CardDescription>
+            List of customers with positive due amounts (excluding admins).
+            {searchTerm && ` Showing results for "${searchTerm}".`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -74,9 +103,11 @@ export default function EmployeeDueSheetPage() {
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
               <p className="ml-4 text-lg text-foreground">Loading due sheet...</p>
             </div>
-          ) : users.length === 0 ? (
+          ) : filteredUsers.length === 0 ? (
             <div className="text-center py-10">
-              <p className="text-muted-foreground">No customers with outstanding dues found.</p>
+              <p className="text-muted-foreground">
+                {searchTerm ? `No customers found matching "${searchTerm}" with outstanding dues.` : "No customers with outstanding dues found."}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-md border">
@@ -91,7 +122,7 @@ export default function EmployeeDueSheetPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user, index) => (
+                  {filteredUsers.map((user, index) => (
                     <TableRow key={user.id}>
                       <TableCell>{index + 1}</TableCell>
                       <TableCell>
