@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -114,30 +113,17 @@ export default function AdminUsersPage() {
                     <TableHead>Date of Birth</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead className="text-right">Groups Joined</TableHead>
-                    <TableHead className="text-center">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium cursor-pointer hover:underline" onClick={() => handleUserRowClick(user.id)}>{user.fullname}</TableCell>
-                      <TableCell className="cursor-pointer hover:underline" onClick={() => handleUserRowClick(user.id)}>{user.username}</TableCell>
-                      <TableCell className="cursor-pointer hover:underline" onClick={() => handleUserRowClick(user.id)}>{user.phone}</TableCell>
-                      <TableCell className="cursor-pointer hover:underline" onClick={() => handleUserRowClick(user.id)}>{formatDateSafe(user.dob)}</TableCell>
-                      <TableCell className="cursor-pointer hover:underline" onClick={() => handleUserRowClick(user.id)}>{user.isAdmin || user.username === 'admin' ? (<Badge variant="destructive">Admin</Badge>) : (<Badge variant="secondary">User</Badge>)}</TableCell>
-                      <TableCell className="text-right cursor-pointer hover:underline" onClick={() => handleUserRowClick(user.id)}>{user.groups?.length || 0}</TableCell>
-                      <TableCell className="text-center">
-                        <Button 
-                          asChild 
-                          variant="destructive" 
-                          size="sm" 
-                          className="bg-red-600 hover:bg-red-700 text-white"
-                        >
-                          <Link href={`/admin/collection/record?userId=${user.id}&fullname=${encodeURIComponent(user.fullname)}&username=${encodeURIComponent(user.username)}`}>
-                            Collection
-                          </Link>
-                        </Button>
-                      </TableCell>
+                    <TableRow key={user.id} onClick={() => handleUserRowClick(user.id)} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                      <TableCell className="font-medium">{user.fullname}</TableCell>
+                      <TableCell>{user.username}</TableCell>
+                      <TableCell>{user.phone}</TableCell>
+                      <TableCell>{formatDateSafe(user.dob)}</TableCell>
+                      <TableCell>{user.isAdmin || user.username === 'admin' ? (<Badge variant="destructive">Admin</Badge>) : (<Badge variant="secondary">User</Badge>)}</TableCell>
+                      <TableCell className="text-right">{user.groups?.length || 0}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

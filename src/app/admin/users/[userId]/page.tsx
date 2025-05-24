@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
@@ -41,6 +40,7 @@ import {
   ClockIcon,
   Sheet,
   Contact,
+  ArchiveRestore // Added for collection button
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, subYears, parseISO, subDays, isAfter, addDays } from "date-fns";
@@ -389,18 +389,16 @@ export default function AdminUserDetailPage() {
               where("userId", "==", userId),
               where("groupId", "==", group.id),
               where("auctionNumber", "==", auctionRecord.auctionNumber)
-              // No order by needed here as we just sum, but for latestPaidDate you might order by recordedAt desc, limit 1
             );
             const collectionsForAuctionSnapshot = await getDocs(collectionForAuctionQuery);
             
-            // Sort collections by recordedAt to get the latest payment date if fully paid
             const sortedCollections = collectionsForAuctionSnapshot.docs
               .map(doc => ({ ...doc.data(), id: doc.id } as CollectionRecord))
               .sort((a, b) => (b.recordedAt?.toDate()?.getTime() || 0) - (a.recordedAt?.toDate()?.getTime() || 0));
 
             sortedCollections.forEach(colData => {
               totalCollectedForThisDue += colData.amount;
-              if (!latestPaidDate && totalCollectedForThisDue >= amountDueForInstallment) { // or more complex logic for latest payment
+              if (!latestPaidDate && totalCollectedForThisDue >= amountDueForInstallment) { 
                 const paymentDateTime = parseDateTimeForSort(colData.paymentDate, colData.paymentTime, colData.recordedAt);
                 if (paymentDateTime) latestPaidDate = paymentDateTime;
               }
@@ -419,7 +417,7 @@ export default function AdminUserDetailPage() {
             const balanceOnPrincipal = amountDueForInstallment - paidTowardsPrincipal;
             
             let status: DueSheetItem['status'] = 'Not Paid';
-            if (balanceOnPrincipal <= 0 && amountDueForInstallment > 0) { // Check amountDue > 0 to avoid "Paid" for 0 dues
+            if (balanceOnPrincipal <= 0 && amountDueForInstallment > 0) { 
               status = 'Paid';
             } else if (paidTowardsPrincipal > 0 && balanceOnPrincipal > 0) {
               status = 'Partially Paid';
@@ -465,7 +463,7 @@ export default function AdminUserDetailPage() {
     if (window.location.hash === "#due-sheet" && dueSheetRef.current && !loadingDueSheet) {
       dueSheetRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [loadingDueSheet]); // Rerun when loadingDueSheet changes
+  }, [loadingDueSheet]); 
 
   useEffect(() => {
     const applyFilter = () => {
@@ -749,9 +747,20 @@ export default function AdminUserDetailPage() {
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
         <Button variant="outline" onClick={() => isEditing ? setIsEditing(false) : router.push("/admin/users")} className="mb-6"><ArrowLeft className="mr-2 h-4 w-4" /> {isEditing ? "Cancel Edit" : "Back to All Users"}</Button>
-        {!isEditing && (
-          <Button onClick={() => setIsEditing(true)} className="mb-6"><Edit3 className="mr-2 h-4 w-4" /> Edit User</Button>
-        )}
+        <div className="flex gap-2 mb-6">
+          <Button 
+            asChild 
+            variant="destructive" 
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            <Link href={`/admin/collection/record?userId=${user.id}&fullname=${encodeURIComponent(user.fullname)}&username=${encodeURIComponent(user.username)}`}>
+              <ArchiveRestore className="mr-2 h-4 w-4" /> Record Collection
+            </Link>
+          </Button>
+          {!isEditing && (
+            <Button onClick={() => setIsEditing(true)}><Edit3 className="mr-2 h-4 w-4" /> Edit User</Button>
+          )}
+        </div>
       </div>
 
       {isEditing ? (
@@ -961,7 +970,7 @@ export default function AdminUserDetailPage() {
             </section>
             <Separator />
              <section>
-              <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><Contact className="mr-2 h-5 w-5" />Referral Source Information</h3>
+              <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><Contact className="mr-2 h-5 w-5 text-primary"/>Referral Source Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
                 <div className="flex items-start"><UserIconLucide className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Name:</strong> {user.referralSourceName || "N/A"}</div></div>
                 <div className="flex items-start"><Phone className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Phone:</strong> {user.referralSourcePhone || "N/A"}</div></div>
@@ -1163,6 +1172,3 @@ export default function AdminUserDetailPage() {
     </div>
   );
 }
-
-
-    
