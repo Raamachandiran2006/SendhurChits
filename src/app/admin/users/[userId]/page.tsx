@@ -37,7 +37,8 @@ import {
   Download,
   ChevronRight,
   ChevronDown,
-  Landmark
+  Landmark,
+  ClockIcon // Added ClockIcon for Due Type
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, subYears, parseISO, subDays, isAfter } from "date-fns";
@@ -51,6 +52,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Alert, AlertTitle, AlertDescription as AlertDescriptionUI } from "@/components/ui/alert";
@@ -136,6 +138,9 @@ const editUserFormSchema = z.object({
   recentPhotographWebcamDataUrl: z.string().optional().nullable(),
   isAdmin: z.boolean().default(false).optional(),
   dueAmount: z.coerce.number().optional().nullable(),
+  dueType: z.enum(["Day", "Week", "Month"], {
+    errorMap: () => ({ message: "Please select a valid due type." }),
+  }).optional().nullable(),
 });
 
 type EditUserFormValues = z.infer<typeof editUserFormSchema>;
@@ -270,6 +275,7 @@ export default function AdminUserDetailPage() {
         recentPhotographFile: null,
         recentPhotographWebcamDataUrl: null,
         dueAmount: userData.dueAmount ?? null,
+        dueType: userData.dueType ?? undefined,
       });
       setCapturedImage(userData.photoUrl || null);
 
@@ -287,7 +293,6 @@ export default function AdminUserDetailPage() {
             let latestAuctionRecord: AuctionRecord | null = null;
             let currentInstallment: number | null = null;
 
-            // Fetch latest auction record for this group
             const auctionQuery = query(collection(db, "auctionRecords"), where("groupId", "==", groupData.id), orderBy("auctionDate", "desc"), limit(1));
             const auctionSnapshot = await getDocs(auctionQuery);
             if (!auctionSnapshot.empty) {
@@ -298,7 +303,7 @@ export default function AdminUserDetailPage() {
                 currentInstallment = groupData.rate;
               }
             } else if (typeof groupData.rate === 'number') {
-                 currentInstallment = groupData.rate; // If no auctions, installment is just the rate
+                 currentInstallment = groupData.rate;
             }
 
 
@@ -314,7 +319,6 @@ export default function AdminUserDetailPage() {
         setUserGroupsWithFinancials([]);
       }
 
-      // Fetch transactions
       let combinedTransactions: AdminUserTransaction[] = [];
       const collectionsRef = collection(db, "collectionRecords");
       const collectionsQuery = query(collectionsRef, where("userId", "==", userId), orderBy("recordedAt", "desc"));
@@ -335,11 +339,11 @@ export default function AdminUserDetailPage() {
         });
       });
 
-      const paymentsRef = collection(db, "paymentRecords"); // This should be the 'paymentRecords' collection
+      const paymentsRef = collection(db, "paymentRecords"); 
       const paymentsQuery = query(paymentsRef, where("userId", "==", userId), orderBy("recordedAt", "desc"));
       const paymentsSnapshot = await getDocs(paymentsQuery);
       paymentsSnapshot.forEach(docSnap => {
-        const data = docSnap.data() as AdminPaymentRecordType; // Assuming AdminPaymentRecordType is correct for 'paymentRecords'
+        const data = docSnap.data() as AdminPaymentRecordType; 
         combinedTransactions.push({
           id: docSnap.id,
           type: "Received by User",
@@ -502,6 +506,7 @@ export default function AdminUserDetailPage() {
         referralPerson: values.referralPerson || "",
         isAdmin: values.isAdmin,
         dueAmount: values.dueAmount ?? undefined,
+        dueType: values.dueType ?? undefined,
       };
       if (values.password && values.password.length >= 6) {
         updatedUserData.password = values.password;
@@ -683,16 +688,37 @@ export default function AdminUserDetailPage() {
                 </div>
                 <FormField control={form.control} name="password" render={({ field }) => (<FormItem><FormLabel>New Password (optional)</FormLabel><FormControl><Input type="password" placeholder="Leave blank to keep current password" {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="address" render={({ field }) => (<FormItem><FormLabel>Address</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="referralPerson" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Referral Person (Optional)</FormLabel>
-                      <FormControl>
-                        <Input {...field} value={field.value ?? ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                
+                <div className="grid md:grid-cols-2 gap-6">
+                    <FormField control={form.control} name="referralPerson" render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Referral Person (Optional)</FormLabel>
+                        <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                     <FormField control={form.control} name="dueType" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Due Type (Optional)</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                                <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select due type" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem value="Day">Day</SelectItem>
+                                    <SelectItem value="Week">Week</SelectItem>
+                                    <SelectItem value="Month">Month</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                </div>
+
                  <FormField control={form.control} name="dueAmount" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Due Amount (₹)</FormLabel>
@@ -713,15 +739,15 @@ export default function AdminUserDetailPage() {
                 <Card>
                   <CardHeader><CardTitle className="text-lg">Update Documents (Optional)</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
-                    <FormField control={form.control} name="aadhaarCard" render={({ field: { onChange, onBlur, name, ref }}) => (
+                    <FormField control={form.control} name="aadhaarCard" render={({ field: { onChange, onBlur, name, refValue, ...rest }}) => (
                       <FormItem><FormLabel>Aadhaar Card (Upload new to replace)</FormLabel>
-                        {user.aadhaarCardUrl && <p className="text-xs text-muted-foreground">Current: View Aadhaar: <a href={user.aadhaarCardUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Document</a></p>}
-                        <FormControl><Input type="file" onChange={(e) => {const file = e.target.files?.[0]; onChange(file ?? null)}} onBlur={onBlur} name={name} ref={ref} accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
+                        {user.aadhaarCardUrl && <p className="text-xs text-muted-foreground">Current: <a href={user.aadhaarCardUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Document</a></p>}
+                        <FormControl><Input type="file" onChange={(e) => {const file = e.target.files?.[0]; onChange(file ?? null)}} onBlur={onBlur} name={name} ref={refValue} accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
                       </FormItem>)} />
-                    <FormField control={form.control} name="panCard" render={({ field: { onChange, onBlur, name, ref }}) => (
+                    <FormField control={form.control} name="panCard" render={({ field: { onChange, onBlur, name, refValue, ...rest }}) => (
                       <FormItem><FormLabel>PAN Card (Upload new to replace)</FormLabel>
-                         {user.panCardUrl && <p className="text-xs text-muted-foreground">Current: View PAN: <a href={user.panCardUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Document</a></p>}
-                        <FormControl><Input type="file" onChange={(e) => {const file = e.target.files?.[0]; onChange(file ?? null)}} onBlur={onBlur} name={name} ref={ref} accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
+                         {user.panCardUrl && <p className="text-xs text-muted-foreground">Current: <a href={user.panCardUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Document</a></p>}
+                        <FormControl><Input type="file" onChange={(e) => {const file = e.target.files?.[0]; onChange(file ?? null)}} onBlur={onBlur} name={name} ref={refValue} accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
                       </FormItem>)} />
                   </CardContent>
                 </Card>
@@ -737,7 +763,7 @@ export default function AdminUserDetailPage() {
                       )}
                     {!showCamera && (
                       <>
-                        <FormField control={form.control} name="recentPhotographFile" render={({ field: { onChange, onBlur, name, ref }}) => (<FormItem><FormLabel>Upload New Photo</FormLabel>
+                        <FormField control={form.control} name="recentPhotographFile" render={({ field: { onChange, onBlur, name, refValue, ...rest }}) => (<FormItem><FormLabel>Upload New Photo</FormLabel>
                             <FormControl><Input type="file"
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
@@ -749,7 +775,7 @@ export default function AdminUserDetailPage() {
                                   setCapturedImage(user.photoUrl || null);
                                 }
                               }}
-                              onBlur={onBlur} name={name} ref={ref}
+                              onBlur={onBlur} name={name} ref={refValue}
                               accept="image/jpeg,image/png" /></FormControl><FormMessage />
                           </FormItem>)} />
                         <div className="text-center my-2 text-sm text-muted-foreground">OR</div>
@@ -816,6 +842,7 @@ export default function AdminUserDetailPage() {
                 <div className="flex items-start"><CalendarDays className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Date of Birth:</strong> {formatDateSafe(user.dob, "dd MMMM yyyy")}</div></div>
                 <div className="flex items-start col-span-1 md:col-span-2"><Home className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Address:</strong> {user.address || "N/A"}</div></div>
                 <div className="flex items-start"><Briefcase className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Referred By:</strong> {user.referralPerson || "N/A"}</div></div>
+                <div className="flex items-start"><ClockIcon className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Due Type:</strong> {user.dueType || "N/A"}</div></div>
               </div>
             </section>
             <Separator />
@@ -871,7 +898,7 @@ export default function AdminUserDetailPage() {
               <Card className="shadow-md">
                 <CardHeader className="flex flex-row items-center justify-between pb-4">
                     <div className="flex items-center gap-3">
-                        <ReceiptText className="h-6 w-6 text-primary" />
+                        <ReceiptText className="mr-2 h-6 w-6 text-primary" />
                         <CardTitle className="text-xl font-bold text-foreground">Payment History</CardTitle>
                     </div>
                     <div className="flex items-center gap-2">

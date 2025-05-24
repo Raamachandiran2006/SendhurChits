@@ -14,6 +14,7 @@ export interface User {
   groups: string[]; // Array of group IDs
   isAdmin?: boolean;
   dueAmount?: number; // Optional: due amount for the user
+  dueType?: "Day" | "Week" | "Month"; // Added dueType
 }
 
 export interface Group {
@@ -84,7 +85,6 @@ export interface AuctionRecord {
   dividendPerMember?: number | null;
   finalAmountToBePaid?: number | null; // This is the installment paid by other members
   recordedAt: import('firebase/firestore').Timestamp;
-  amountPaidToWinner?: number | null; // Explicitly store amount paid to winner
 }
 
 export interface ExpenseRecord {
@@ -136,11 +136,10 @@ export interface PaymentRecord {
   userFullname?: string | null;
   paymentDate: string; // YYYY-MM-DD
   paymentTime: string; // HH:MM AM/PM
-  paymentReason: string; // E.g., "Auction Payout", "Refund", "Advance" -> Changed from `paymentType` in CollectionRecord
   paymentMode: "Cash" | "UPI" | "Netbanking" | "Cheque";
   amount: number;
   remarks?: string | null;
   recordedAt: import('firebase/firestore').Timestamp;
-  recordedBy: "Admin" | string; // Could be Admin or specific employee ID if delegated
+  recordedBy?: "Admin" | string; // Could be Admin or specific employee ID if delegated
   virtualTransactionId?: string;
 }
