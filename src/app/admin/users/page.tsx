@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Users, PlusCircle, Edit } from "lucide-react"; // Added Edit for actions
+import { Loader2, Users, PlusCircle } from "lucide-react"; // Removed Edit, not used in this version
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
 
@@ -42,8 +42,20 @@ export default function AdminUsersPage() {
       return "N/A";
     }
     try {
-      const date = parseISO(dateString);
+      // Attempt to parse ISO strings first, then general date strings
+      const date = dateString.includes('T') ? parseISO(dateString) : new Date(dateString.replace(/-/g, '/'));
       if (isNaN(date.getTime())) {
+        // If still NaN, try parsing as YYYY-MM-DD directly
+        const parts = dateString.split('-');
+        if (parts.length === 3) {
+          const year = parseInt(parts[0]);
+          const month = parseInt(parts[1]) - 1; // Month is 0-indexed
+          const day = parseInt(parts[2]);
+          const directDate = new Date(year, month, day);
+          if (!isNaN(directDate.getTime())) {
+            return format(directDate, "dd MMM yyyy");
+          }
+        }
         return "N/A";
       }
       return format(date, "dd MMM yyyy");
