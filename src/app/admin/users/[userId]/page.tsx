@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
@@ -40,7 +41,7 @@ import {
   ClockIcon,
   Sheet,
   Contact,
-  ArchiveRestore // Added for collection button
+  ArchiveRestore
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, subYears, parseISO, subDays, isAfter, addDays } from "date-fns";
@@ -304,7 +305,7 @@ export default function AdminUserDetailPage() {
       const fetchedGroups: Group[] = [];
       if (userData.groups && userData.groups.length > 0) {
         const groupsRef = collection(db, "groups");
-        const groupIds = userData.groups.slice(0, 30); // Firestore 'in' query limit
+        const groupIds = userData.groups.slice(0, 30); 
         if (groupIds.length > 0) {
           const groupQuery = query(groupsRef, where(documentId(), "in", groupIds));
           const groupSnapshots = await getDocs(groupQuery);
@@ -378,8 +379,7 @@ export default function AdminUserDetailPage() {
             }
             
             const amountDueForInstallment = auctionRecord.finalAmountToBePaid;
-            // Placeholder for penalty - needs a data source if you want to implement actual penalties
-            const penaltyChargedForInstallment = 0; 
+            const penaltyChargedForInstallment = 0; // Placeholder: implement actual penalty fetching if needed
 
             let totalCollectedForThisDue = 0;
             let latestPaidDate: Date | null = null;
@@ -394,14 +394,12 @@ export default function AdminUserDetailPage() {
             
             const sortedCollections = collectionsForAuctionSnapshot.docs
               .map(doc => ({ ...doc.data(), id: doc.id } as CollectionRecord))
-              .sort((a, b) => (b.recordedAt?.toDate()?.getTime() || 0) - (a.recordedAt?.toDate()?.getTime() || 0));
+              .sort((a, b) => (a.recordedAt?.toDate()?.getTime() || 0) - (b.recordedAt?.toDate()?.getTime() || 0)); // Oldest first
 
             sortedCollections.forEach(colData => {
               totalCollectedForThisDue += colData.amount;
-              if (!latestPaidDate && totalCollectedForThisDue >= amountDueForInstallment) { 
-                const paymentDateTime = parseDateTimeForSort(colData.paymentDate, colData.paymentTime, colData.recordedAt);
-                if (paymentDateTime) latestPaidDate = paymentDateTime;
-              }
+               const paymentDateTime = parseDateTimeForSort(colData.paymentDate, colData.paymentTime, colData.recordedAt);
+               if (paymentDateTime) latestPaidDate = paymentDateTime; // Keep updating to get the latest payment date for this due
             });
             
             let paidTowardsPenalty = 0;
@@ -439,7 +437,14 @@ export default function AdminUserDetailPage() {
           }
         }
       }
-      processedDueSheetItems.sort((a,b) => a.dueNo - b.dueNo); 
+      processedDueSheetItems.sort((a,b) => {
+        const dateA = parseISO(a.dueDate.replace(/(\d{2}) (\w{3}) (\d{4})/, '$2 $1 $3')); // Reformat for parseISO if needed
+        const dateB = parseISO(b.dueDate.replace(/(\d{2}) (\w{3}) (\d{4})/, '$2 $1 $3'));
+        if (dateA.getTime() !== dateB.getTime()) {
+            return dateA.getTime() - dateB.getTime();
+        }
+        return a.dueNo - b.dueNo;
+      }); 
       setDueSheetItems(processedDueSheetItems);
       setLoadingDueSheet(false);
 
@@ -866,12 +871,24 @@ export default function AdminUserDetailPage() {
                     <FormField control={form.control} name="aadhaarCard" render={({ field: { onChange, onBlur, name, ref }}) => (
                       <FormItem><FormLabel>Aadhaar Card (Upload new to replace)</FormLabel>
                         {user.aadhaarCardUrl && <p className="text-xs text-muted-foreground">Current: <a href={user.aadhaarCardUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Document</a></p>}
-                        <FormControl><Input type="file" onChange={(e) => {const file = e.target.files?.[0]; onChange(file ?? null)}} onBlur={onBlur} name={name} ref={ref} accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
+                        <FormControl><Input type="file" 
+                            onChange={(e) => { 
+                                const file = e.target.files?.[0]; 
+                                onChange(file ?? null); 
+                            }} 
+                            onBlur={onBlur} name={name} ref={ref}
+                            accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
                       </FormItem>)} />
                     <FormField control={form.control} name="panCard" render={({ field: { onChange, onBlur, name, ref }}) => (
                       <FormItem><FormLabel>PAN Card (Upload new to replace)</FormLabel>
                          {user.panCardUrl && <p className="text-xs text-muted-foreground">Current: <a href={user.panCardUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Document</a></p>}
-                        <FormControl><Input type="file" onChange={(e) => {const file = e.target.files?.[0]; onChange(file ?? null)}} onBlur={onBlur} name={name} ref={ref} accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
+                        <FormControl><Input type="file" 
+                            onChange={(e) => { 
+                                const file = e.target.files?.[0]; 
+                                onChange(file ?? null); 
+                            }} 
+                            onBlur={onBlur} name={name} ref={ref}
+                            accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
                       </FormItem>)} />
                   </CardContent>
                 </Card>
@@ -949,7 +966,7 @@ export default function AdminUserDetailPage() {
         <Card className="shadow-xl overflow-hidden">
           <CardHeader className="bg-secondary/50 p-6 border-b">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              {(user.photoUrl) && (<Image src={user.photoUrl} alt={`${user.fullname}'s photo`} width={100} height={100} className="rounded-full border-4 border-card object-cover" data-ai-hint="user profile"/>)}
+              {(user?.photoUrl) && (<Image src={user.photoUrl} alt={`${user.fullname}'s photo`} width={100} height={100} className="rounded-full border-4 border-card object-cover" data-ai-hint="user profile"/>)}
               <div className="flex-grow">
                 <CardTitle className="text-3xl font-bold text-foreground flex items-center">
                   {user.fullname} {isAdminUser && <Badge variant="destructive" className="ml-3"><Shield className="mr-1 h-4 w-4"/>Admin</Badge>}
@@ -1172,3 +1189,5 @@ export default function AdminUserDetailPage() {
     </div>
   );
 }
+
+    
