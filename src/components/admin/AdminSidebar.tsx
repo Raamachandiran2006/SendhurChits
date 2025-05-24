@@ -3,11 +3,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Layers, PlusCircle, LogOut, Briefcase, CreditCard } from "lucide-react";
+import { Home, Users, Layers, PlusCircle, LogOut, Briefcase, CreditCard, ArchiveRestore } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-// Removed: import { useLanguage } from "@/contexts/LanguageContext"; 
 import {
   Sidebar,
   SidebarContent,
@@ -23,7 +22,6 @@ import Image from "next/image";
 export function AdminSidebar() {
   const pathname = usePathname();
   const { logout } = useAuth();
-  // Removed: const { t } = useLanguage(); 
 
   const navItems = [
     { href: "/admin", label: "Overview", icon: Home },
@@ -32,6 +30,7 @@ export function AdminSidebar() {
     { href: "/admin/groups/create", label: "Create Group", icon: PlusCircle },
     { href: "/admin/employees", label: "Manage Employees", icon: Briefcase },
     { href: "/admin/payments", label: "Payments", icon: CreditCard },
+    { href: "/admin/collection", label: "Collection Mgmt", icon: ArchiveRestore },
   ];
 
   return (
@@ -54,12 +53,12 @@ export function AdminSidebar() {
                 <SidebarMenuButton
                   asChild
                   isActive={pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))}
-                  tooltip={item.label} // Reverted from t(item.labelKey)
+                  tooltip={item.label} 
                   className="justify-start"
                 >
                   <Link href={item.href}>
                     <item.icon className="h-5 w-5 mr-3" />
-                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span> {/* Reverted from t(item.labelKey) */}
+                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span> 
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -69,7 +68,7 @@ export function AdminSidebar() {
         <SidebarFooter className="p-4 border-t">
             <SidebarMenuButton onClick={logout} tooltip="Logout" className="justify-start w-full text-destructive hover:bg-destructive hover:text-destructive-foreground">
                 <LogOut className="h-5 w-5 mr-3" />
-                <span className="group-data-[collapsible=icon]:hidden">Logout</span> {/* Reverted from t('sidebarLogout') */}
+                <span className="group-data-[collapsible=icon]:hidden">Logout</span>
             </SidebarMenuButton>
         </SidebarFooter>
       </Sidebar>
