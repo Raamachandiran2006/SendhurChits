@@ -149,11 +149,6 @@ const editUserFormSchema = z.object({
 
 type EditUserFormValues = z.infer<typeof editUserFormSchema>;
 
-interface UserGroupWithFinancials extends Group {
-  latestAuctionRecord?: AuctionRecord | null;
-  currentInstallment?: number | null;
-}
-
 interface AdminUserTransaction {
   id: string;
   type: "Sent by User" | "Received by User";
@@ -235,7 +230,7 @@ export default function AdminUserDetailPage() {
   const userId = params.userId as string;
 
   const [user, setUser] = useState<User | null>(null);
-  const [userGroupsWithFinancials, setUserGroupsWithFinancials] = useState<UserGroupWithFinancials[]>([]);
+  const [userGroups, setUserGroups] = useState<Group[]>([]); // Changed from UserGroupWithFinancials to Group
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -250,7 +245,7 @@ export default function AdminUserDetailPage() {
   
   const [dueSheetItems, setDueSheetItems] = useState<DueSheetItem[]>([]);
   const [loadingDueSheet, setLoadingDueSheet] = useState(true);
-  const dueSheetRef = useRef<HTMLDivElement>(null); // Ref for scrolling
+  const dueSheetRef = useRef<HTMLDivElement>(null);
 
 
   const [showCamera, setShowCamera] = useState(false);
@@ -305,8 +300,8 @@ export default function AdminUserDetailPage() {
       });
       setCapturedImage(userData.photoUrl || null);
 
-      // Fetch User Groups and Financials
-      const fetchedGroupsWithFinancials: UserGroupWithFinancials[] = [];
+      // Fetch User Groups
+      const fetchedGroups: Group[] = [];
       if (userData.groups && userData.groups.length > 0) {
         const groupsRef = collection(db, "groups");
         const groupIds = userData.groups.slice(0, 30);
@@ -314,26 +309,11 @@ export default function AdminUserDetailPage() {
           const groupQuery = query(groupsRef, where(documentId(), "in", groupIds));
           const groupSnapshots = await getDocs(groupQuery);
           for (const groupDoc of groupSnapshots.docs) {
-            const groupData = { id: groupDoc.id, ...groupDoc.data() } as Group;
-            let latestAuctionRecord: AuctionRecord | null = null;
-            let currentInstallment: number | null = null;
-            const auctionQuery = query(collection(db, "auctionRecords"), where("groupId", "==", groupData.id), orderBy("auctionDate", "desc"), limit(1));
-            const auctionSnapshot = await getDocs(auctionQuery);
-            if (!auctionSnapshot.empty) {
-              latestAuctionRecord = { id: auctionSnapshot.docs[0].id, ...auctionSnapshot.docs[0].data() } as AuctionRecord;
-              if (typeof groupData.rate === 'number' && latestAuctionRecord.finalAmountToBePaid !== null && latestAuctionRecord.finalAmountToBePaid !== undefined) {
-                currentInstallment = latestAuctionRecord.finalAmountToBePaid;
-              } else if (typeof groupData.rate === 'number') {
-                currentInstallment = groupData.rate;
-              }
-            } else if (typeof groupData.rate === 'number') {
-                 currentInstallment = groupData.rate;
-            }
-            fetchedGroupsWithFinancials.push({ ...groupData, latestAuctionRecord, currentInstallment });
+            fetchedGroups.push({ id: groupDoc.id, ...groupDoc.data() } as Group);
           }
         }
       }
-      setUserGroupsWithFinancials(fetchedGroupsWithFinancials);
+      setUserGroups(fetchedGroups);
 
       // Fetch Payment Transactions
       let combinedTransactions: AdminUserTransaction[] = [];
@@ -381,8 +361,8 @@ export default function AdminUserDetailPage() {
 
       // Fetch and Process Due Sheet Items
       const processedDueSheetItems: DueSheetItem[] = [];
-      if (fetchedGroupsWithFinancials.length > 0) {
-        for (const group of fetchedGroupsWithFinancials) {
+      if (fetchedGroups.length > 0) { // Use fetchedGroups directly
+        for (const group of fetchedGroups) {
           const groupAuctionRecordsQuery = query(
             collection(db, "auctionRecords"),
             where("groupId", "==", group.id),
@@ -462,7 +442,7 @@ export default function AdminUserDetailPage() {
     if (window.location.hash === "#due-sheet" && dueSheetRef.current) {
       dueSheetRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [loadingDueSheet]); // Trigger scroll after due sheet data is loaded
+  }, [loadingDueSheet]); 
 
   useEffect(() => {
     const applyFilter = () => {
@@ -983,29 +963,20 @@ export default function AdminUserDetailPage() {
             </section>
             <Separator />
              <section>
-              <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><GroupIcon className="mr-2 h-5 w-5" />Joined Groups ({userGroupsWithFinancials.length})</h3>
-              {userGroupsWithFinancials.length > 0 ? (
+              <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><GroupIcon className="mr-2 h-5 w-5" />Joined Groups ({userGroups.length})</h3>
+              {userGroups.length > 0 ? (
                 <div className="space-y-4">
-                  {userGroupsWithFinancials.map(groupWithFinancials => (
-                    <Card key={groupWithFinancials.id} className="bg-secondary/30 shadow-sm">
+                  {userGroups.map(group => (
+                    <Card key={group.id} className="bg-secondary/30 shadow-sm">
                       <CardHeader className="pb-2 pt-3">
                         <CardTitle className="text-md font-semibold">
-                          <Link href={`/admin/groups/${groupWithFinancials.id}`} className="text-primary hover:underline">
-                            {groupWithFinancials.groupName}
+                          <Link href={`/admin/groups/${group.id}`} className="text-primary hover:underline">
+                            {group.groupName}
                           </Link>
                         </CardTitle>
-                        <CardDescription>Group ID: {groupWithFinancials.id}</CardDescription>
+                        <CardDescription>Group ID: {group.id}</CardDescription>
                       </CardHeader>
-                      <CardContent className="text-sm space-y-1 pb-3">
-                        <div className="flex items-center">
-                            <Landmark className="mr-2 h-4 w-4 text-muted-foreground flex-shrink-0" />
-                            <div><strong className="text-foreground">Group Total:</strong> {formatCurrency(groupWithFinancials.totalAmount)}</div>
-                        </div>
-                        <div className="flex items-center">
-                             <DollarSign className="mr-2 h-4 w-4 text-muted-foreground flex-shrink-0" />
-                             <div><strong className="text-foreground">Current Installment:</strong> {formatCurrency(groupWithFinancials.currentInstallment)}</div>
-                        </div>
-                      </CardContent>
+                       {/* Financial details for the group removed from here */}
                     </Card>
                   ))}
                 </div>
