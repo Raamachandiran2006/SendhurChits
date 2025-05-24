@@ -17,10 +17,10 @@ import {
   User as UserIconLucide,
   Info,
   AlertTriangle,
-  Phone,
+  Phone, // Corrected: Removed PhoneIcon, ensured Phone is here
   Mail,
   CalendarDays,
-  Home,
+  Home as HomeIcon, // Changed from Home to HomeIcon to match usage for address
   Users as GroupIcon,
   Briefcase,
   FileText,
@@ -40,8 +40,7 @@ import {
   Landmark,
   ClockIcon,
   Sheet,
-  Contact, // Added Contact icon
-  HomeIcon // Added HomeIcon for address
+  Contact,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, subYears, parseISO, subDays, isAfter } from "date-fns";
@@ -870,7 +869,7 @@ export default function AdminUserDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
                 <div className="flex items-start"><Phone className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Phone:</strong> {user.phone}</div></div>
                 <div className="flex items-start"><CalendarDays className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Date of Birth:</strong> {formatDateSafe(user.dob, "dd MMMM yyyy")}</div></div>
-                <div className="flex items-start col-span-1 md:col-span-2"><Home className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Address:</strong> {user.address || "N/A"}</div></div>
+                <div className="flex items-start col-span-1 md:col-span-2"><HomeIcon className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Address:</strong> {user.address || "N/A"}</div></div>
                 <div className="flex items-start"><ClockIcon className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Due Type:</strong> {user.dueType || "N/A"}</div></div>
               </div>
             </section>
@@ -879,7 +878,7 @@ export default function AdminUserDetailPage() {
               <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><Contact className="mr-2 h-5 w-5" />Referral Source Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
                 <div className="flex items-start"><UserIconLucide className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Name:</strong> {user.referralSourceName || "N/A"}</div></div>
-                <div className="flex items-start"><PhoneIcon className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Phone:</strong> {user.referralSourcePhone || "N/A"}</div></div>
+                <div className="flex items-start"><Phone className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Phone:</strong> {user.referralSourcePhone || "N/A"}</div></div>
                 <div className="flex items-start col-span-1 md:col-span-2"><HomeIcon className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Address:</strong> {user.referralSourceAddress || "N/A"}</div></div>
               </div>
             </section>
