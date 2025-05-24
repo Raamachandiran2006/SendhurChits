@@ -1,11 +1,11 @@
 
 "use client";
 
-import Link from "link-next"; // Corrected import
+import Link from "next/link"; // Corrected import
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, UserCircle, Shield, Briefcase, Landmark, Globe } from "lucide-react"; // Added Globe
+import { LogOut, UserCircle, Shield, Briefcase, Landmark, Globe, Wallet } from "lucide-react"; // Added Globe and Wallet
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,23 +18,25 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { User, Employee } from "@/types";
 import { cn } from "@/lib/utils";
-import { useLanguage } from "@/contexts/LanguageContext"; // Import useLanguage
-import React from "react"; // Import React for DropdownMenuRadioGroup
+import { useLanguage } from "@/contexts/LanguageContext";
+import React from "react";
 
 const formatCurrency = (amount: number | null | undefined) => {
   if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
-  return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // Ensure it's a number before calling toLocaleString
+  const numericAmount = Number(amount);
+  if (isNaN(numericAmount)) return "N/A";
+  return `₹${numericAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 export function AppHeader() {
   const { loggedInEntity, userType, logout } = useAuth();
-  // Conditionally use useLanguage only if userType is admin, or handle gracefully if context is not available
+  
   const isAdmin = userType === 'admin';
   const languageHook = isAdmin ? useLanguage() : null;
   const language = languageHook?.language;
   const setLanguage = languageHook?.setLanguage;
   const t = languageHook?.t;
-
 
   if (!loggedInEntity) return null;
 
@@ -47,6 +49,8 @@ export function AppHeader() {
   const entityFullname = loggedInEntity.fullname;
   const entityUsername = 'username' in loggedInEntity ? loggedInEntity.username : loggedInEntity.employeeId;
   const userDueAmount = (userType === 'user' && loggedInEntity && 'dueAmount' in loggedInEntity) ? (loggedInEntity as User).dueAmount : undefined;
+  const userPhotoUrl = (loggedInEntity as User | Employee)?.photoUrl;
+
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-card shadow-sm">
@@ -63,16 +67,19 @@ export function AppHeader() {
         
         <div className="flex items-center gap-4">
           <div className="hidden sm:flex flex-col items-end text-right">
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-foreground">
               {isAdmin && t ? t('welcomeAdmin').replace('{name}', entityFullname) : `Welcome, ${entityFullname}`}
             </span>
             {userType === 'user' && userDueAmount !== undefined && (
-              <span className={cn(
-                "text-xs font-semibold",
-                (userDueAmount ?? 0) > 0 ? "text-destructive" : "text-green-600"
-              )}>
-                Due: {formatCurrency(userDueAmount)}
-              </span>
+              <div className="flex items-center text-xs">
+                <Wallet className="mr-1 h-3 w-3 text-muted-foreground" />
+                <span className={cn(
+                    "font-semibold",
+                    (userDueAmount ?? 0) > 0 ? "text-destructive" : "text-green-600"
+                )}>
+                    Due: {formatCurrency(userDueAmount)}
+                </span>
+              </div>
             )}
           </div>
 
@@ -99,7 +106,7 @@ export function AppHeader() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar className="h-9 w-9">
-                  <AvatarImage src={(loggedInEntity as User)?.photoUrl || `https://placehold.co/100x100.png?text=${getInitials(entityFullname)}`} alt={entityFullname} data-ai-hint="profile avatar"/>
+                  <AvatarImage src={userPhotoUrl || `https://placehold.co/100x100.png?text=${getInitials(entityFullname)}`} alt={entityFullname} data-ai-hint="profile avatar"/>
                   <AvatarFallback>{getInitials(entityFullname)}</AvatarFallback>
                 </Avatar>
               </Button>
@@ -111,16 +118,14 @@ export function AppHeader() {
                   <p className="text-xs leading-none text-muted-foreground">
                     {userType === 'employee' ? `Employee ID: ${entityUsername}` : (userType === 'admin' ? `@${entityUsername}` : `@${entityUsername}`)}
                   </p>
-                  <div className="sm:hidden mt-1">
-                    {userType === 'user' && userDueAmount !== undefined && (
-                        <span className={cn(
-                            "text-xs font-semibold",
-                            (userDueAmount ?? 0) > 0 ? "text-destructive" : "text-green-600"
-                        )}>
-                            Due: {formatCurrency(userDueAmount)}
-                        </span>
-                    )}
-                  </div>
+                  {userType === 'user' && userDueAmount !== undefined && (
+                    <div className="flex items-center sm:hidden mt-1 text-xs">
+                         <Wallet className="mr-1 h-3 w-3 text-muted-foreground" />
+                        <p className="leading-none">
+                            Due: <span className={cn("font-semibold", (userDueAmount ?? 0) > 0 ? "text-destructive" : "text-green-600")}>{formatCurrency(userDueAmount)}</span>
+                        </p>
+                    </div>
+                  )}
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
