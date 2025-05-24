@@ -245,12 +245,13 @@ export default function AdminUserDetailPage() {
 
       if (!userDocSnap.exists()) {
         setError("User not found.");
+        setUser(null); 
         setLoading(false); setLoadingTransactions(false);
         return;
       }
       const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
       setUser(userData);
-      form.reset({ /* Form reset logic from previous version */
+      form.reset({ 
         fullname: userData.fullname,
         phone: userData.phone,
         dob: userData.dob ? parseISO(userData.dob) : new Date(),
@@ -282,7 +283,6 @@ export default function AdminUserDetailPage() {
 
       // Fetch transactions
       let combinedTransactions: AdminUserTransaction[] = [];
-      // Collections (Sent by User)
       const collectionsRef = collection(db, "collectionRecords");
       const collectionsQuery = query(collectionsRef, where("userId", "==", userId), orderBy("recordedAt", "desc"));
       const collectionsSnapshot = await getDocs(collectionsQuery);
@@ -302,7 +302,6 @@ export default function AdminUserDetailPage() {
         });
       });
 
-      // Payments (Received by User)
       const paymentsRef = collection(db, "paymentRecords");
       const paymentsQuery = query(paymentsRef, where("userId", "==", userId), orderBy("recordedAt", "desc"));
       const paymentsSnapshot = await getDocs(paymentsQuery);
@@ -329,6 +328,7 @@ export default function AdminUserDetailPage() {
     } catch (err) {
       console.error("Error fetching user details/transactions:", err);
       setError("Failed to fetch user details. Please try again.");
+      setUser(null);
       setTransactionError("Failed to fetch payment history.");
     } finally {
       setLoading(false);
@@ -394,14 +394,14 @@ export default function AdminUserDetailPage() {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
-      if (showCamera && videoRef.current && videoRef.current.srcObject) { // ensure camera is released
+      if (showCamera && videoRef.current && videoRef.current.srcObject) { 
         (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
         videoRef.current.srcObject = null;
       }
     };
   }, [showCamera, requestCameraPermission, hasCameraPermission]);
 
-  const handleCapturePhoto = () => { /* ... same as before ... */
+  const handleCapturePhoto = () => { 
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current; const canvas = canvasRef.current;
       canvas.width = video.videoWidth; canvas.height = video.videoHeight;
@@ -422,14 +422,14 @@ export default function AdminUserDetailPage() {
     }
   };
   
-  const handleRetake = () => { /* ... same as before ... */
+  const handleRetake = () => { 
     setCapturedImage(user?.photoUrl || null);
     form.setValue("recentPhotographWebcamDataUrl", null);
     setShowCamera(true); 
     setHasCameraPermission(null);
   };
 
-  const dataURLtoFile = (dataurl: string, filename: string): File => { /* ... same as before ... */
+  const dataURLtoFile = (dataurl: string, filename: string): File => { 
     const arr = dataurl.split(',');
     const mimeMatch = arr[0].match(/:(.*?);/);
     if (!mimeMatch) throw new Error('Invalid data URL');
@@ -439,13 +439,13 @@ export default function AdminUserDetailPage() {
     return new File([u8arr], filename, { type: mime });
   };
 
-  const uploadFile = async (file: File, path: string): Promise<string> => { /* ... same as before ... */
+  const uploadFile = async (file: File, path: string): Promise<string> => { 
     const fileRef = storageRef(storage, path);
     await uploadBytes(fileRef, file);
     return getDownloadURL(fileRef);
   };
 
-  async function onSubmit(values: EditUserFormValues) { /* ... same as before, ensure fetchUserDetailsAndTransactions is called on success ... */
+  async function onSubmit(values: EditUserFormValues) { 
     if (!user) return;
     setIsSubmitting(true);
     try {
@@ -498,7 +498,7 @@ export default function AdminUserDetailPage() {
       await updateDoc(userDocRef, updatedUserData);
       toast({ title: "User Updated", description: `${values.fullname}'s details updated successfully.` });
       setIsEditing(false);
-      fetchUserDetailsAndTransactions(); // Re-fetch all data
+      fetchUserDetailsAndTransactions(); 
     } catch (error) {
       console.error("User update error:", error);
       toast({ title: "Error", description: "Could not update user. " + (error as Error).message, variant: "destructive" });
@@ -568,11 +568,44 @@ export default function AdminUserDetailPage() {
   const today = new Date();
   const hundredYearsAgo = subYears(today, 100);
 
-  if (loading) { /* ... */ }
-  if (error) { /* ... */ }
-  if (!user) { /* ... */ }
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-foreground">Loading user details...</p>
+      </div>
+    );
+  }
 
-  const isAdminUser = user.isAdmin || user.username === 'admin';
+  if (error) {
+    return (
+      <div className="container mx-auto py-8 text-center">
+        <Card className="max-w-md mx-auto shadow-lg">
+          <CardHeader><CardTitle className="text-destructive flex items-center justify-center"><AlertTriangle className="mr-2 h-6 w-6" /> Error</CardTitle></CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">{error}</p>
+            <Button onClick={() => router.push("/admin/users")} className="mt-6"><ArrowLeft className="mr-2 h-4 w-4" /> Back to All Users</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+        <div className="container mx-auto py-8 text-center">
+            <Card className="max-w-md mx-auto shadow-lg">
+            <CardHeader><CardTitle className="text-amber-600 flex items-center justify-center"><AlertTriangle className="mr-2 h-6 w-6" /> Data Issue</CardTitle></CardHeader>
+            <CardContent>
+                <p className="text-muted-foreground">User data could not be loaded or is unavailable. Please try again later.</p>
+                <Button onClick={() => router.push("/admin/users")} className="mt-6"><ArrowLeft className="mr-2 h-4 w-4" /> Back to All Users</Button>
+            </CardContent>
+            </Card>
+        </div>
+    );
+  }
+
+  const isAdminUser = user?.isAdmin || user?.username === 'admin';
 
   return (
     <div className="container mx-auto py-8 space-y-8">
