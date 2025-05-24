@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -19,7 +19,7 @@ import { format } from "date-fns";
 import { db, storage } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, orderBy, doc } from "firebase/firestore";
-import type { Group, User, AuctionRecord, PaymentRecord } from "@/types";
+import type { Group, User, AuctionRecord, CollectionRecord as PaymentRecord } from "@/types"; // Renamed CollectionRecord to PaymentRecord for this form's context
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
@@ -53,7 +53,6 @@ const formatTimeTo24HourInput = (timeStr?: string): string => {
     return "";
 };
 
-const NO_AUCTION_SELECTED_VALUE = "no-auction-selected";
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const ACCEPTED_DOCUMENT_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
@@ -66,7 +65,7 @@ const optionalFileSchema = z.custom<File>((val) => val instanceof File, "File is
 
 const recordPaymentFormSchema = z.object({
   selectedGroupId: z.string().min(1, "Please select a Group."),
-  selectedAuctionId: z.string().optional(),
+  selectedAuctionId: z.string().min(1, "Auction number is required."), // Made compulsory
   selectedUserId: z.string().min(1, "Please select a User."),
   paymentDate: z.date({ required_error: "Payment date is required." }),
   paymentTime: z.string().min(1, "Payment time is required."),
@@ -112,7 +111,7 @@ export function RecordPaymentForm() {
     resolver: zodResolver(recordPaymentFormSchema),
     defaultValues: {
       selectedGroupId: "",
-      selectedAuctionId: undefined,
+      selectedAuctionId: "", // Changed from undefined to empty string for required validation
       selectedUserId: "",
       paymentDate: new Date(),
       paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
@@ -156,7 +155,7 @@ export function RecordPaymentForm() {
       setSelectedGroupObject(null);
       setGroupAuctions([]);
       setGroupMembers([]);
-      setValue("selectedAuctionId", undefined); 
+      setValue("selectedAuctionId", ""); 
       setValue("selectedUserId", "");
       return;
     }
@@ -225,9 +224,13 @@ export function RecordPaymentForm() {
       return;
     }
     
-    const selectedAuction = values.selectedAuctionId && values.selectedAuctionId !== NO_AUCTION_SELECTED_VALUE 
-      ? groupAuctions.find(a => a.id === values.selectedAuctionId) 
-      : null;
+    const selectedAuction = groupAuctions.find(a => a.id === values.selectedAuctionId);
+    if (!selectedAuction) {
+        toast({ title: "Error", description: "Selected auction details not found.", variant: "destructive" });
+        setIsSubmitting(false);
+        return;
+    }
+
 
     try {
       let guarantorAuthDocUrl = "";
@@ -241,8 +244,8 @@ export function RecordPaymentForm() {
       const paymentData: Omit<PaymentRecord, "id" | "recordedAt"> & { recordedAt?: any } = { 
         groupId: selectedGroupObject.id,
         groupName: selectedGroupObject.groupName,
-        auctionId: selectedAuction ? selectedAuction.id : null,
-        auctionNumber: selectedAuction ? selectedAuction.auctionNumber : null,
+        auctionId: selectedAuction.id,
+        auctionNumber: selectedAuction.auctionNumber,
         userId: selectedUser.id,
         userUsername: selectedUser.username,
         userFullname: selectedUser.fullname,
@@ -253,6 +256,10 @@ export function RecordPaymentForm() {
         remarks: values.remarks || "Auction Payment",
         virtualTransactionId: generateVirtualId(),
         recordedBy: "Admin",
+        collectionLocation: null, // Not applicable for admin payment portal
+        paymentType: null, // Not applicable for this form's payment record type
+        recordedByEmployeeId: null, // Admin is recording
+        recordedByEmployeeName: "Admin", // Admin is recording
         // Guarantor fields
         guarantorFullName: values.guarantorFullName || undefined,
         guarantorRelationship: values.guarantorRelationship || undefined,
@@ -271,7 +278,7 @@ export function RecordPaymentForm() {
       toast({ title: "Payment Recorded", description: "Payment details saved successfully to payment records." });
       form.reset({
         selectedGroupId: values.selectedGroupId, 
-        selectedAuctionId: undefined,
+        selectedAuctionId: "",
         selectedUserId: "",
         paymentDate: new Date(),
         paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
@@ -307,7 +314,7 @@ export function RecordPaymentForm() {
               <FormField control={form.control} name="selectedGroupId" render={({ field }) => (<FormItem><FormLabel>Group Name</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={loadingGroups}><FormControl><SelectTrigger><SelectValue placeholder={loadingGroups ? "Loading groups..." : "Select a group"} /></SelectTrigger></FormControl><SelectContent>{groups.map((group) => (<SelectItem key={group.id} value={group.id}>{group.groupName}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)} />
               <FormItem><FormLabel>Group ID</FormLabel><Input readOnly value={selectedGroupObject?.id || ""} placeholder="Auto-filled" /></FormItem>
             </div>
-            <FormField control={form.control} name="selectedAuctionId" render={({ field }) => (<FormItem><FormLabel>Auction No (Optional)</FormLabel><Select onValueChange={field.onChange} value={field.value || NO_AUCTION_SELECTED_VALUE} disabled={!watchedGroupId || loadingAuctions}><FormControl><SelectTrigger><SelectValue placeholder={!watchedGroupId ? "Select group first" : (loadingAuctions ? "Loading auctions..." : "Select auction (if applicable)")} /></SelectTrigger></FormControl><SelectContent><SelectItem value={NO_AUCTION_SELECTED_VALUE}>None</SelectItem> {groupAuctions.map((auction) => (<SelectItem key={auction.id} value={auction.id}>Auction #{auction.auctionNumber} - {auction.auctionMonth}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="selectedAuctionId" render={({ field }) => (<FormItem><FormLabel>Auction No</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!watchedGroupId || loadingAuctions}><FormControl><SelectTrigger><SelectValue placeholder={!watchedGroupId ? "Select group first" : (loadingAuctions ? "Loading auctions..." : "Select an auction")} /></SelectTrigger></FormControl><SelectContent>{groupAuctions.map((auction) => (<SelectItem key={auction.id} value={auction.id}>Auction #{auction.auctionNumber} - {auction.auctionMonth}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)} />
             <FormField control={form.control} name="selectedUserId" render={({ field }) => (<FormItem><FormLabel>User</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!watchedGroupId || loadingMembers}><FormControl><SelectTrigger><SelectValue placeholder={!watchedGroupId ? "Select group first" : (loadingMembers ? "Loading members..." : "Select a user")} /></SelectTrigger></FormControl><SelectContent>{groupMembers.map((member) => (<SelectItem key={member.id} value={member.id}>{member.fullname} (@{member.username})</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)} />
             
             {/* Payment Details */}
@@ -316,8 +323,56 @@ export function RecordPaymentForm() {
               <FormField control={form.control} name="paymentTime" render={({ field }) => (<FormItem><FormLabel>Payment Time</FormLabel><FormControl><Input type="time" value={formatTimeTo24HourInput(field.value)} onChange={(e) => field.onChange(e.target.value ? formatTimeTo12Hour(e.target.value) : "")} /></FormControl><FormMessage /></FormItem>)} />
             </div>
             <FormField control={form.control} name="paymentMode" render={({ field }) => (<FormItem><FormLabel>Payment Mode</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payment mode" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Cash">Cash</SelectItem><SelectItem value="UPI">UPI</SelectItem><SelectItem value="Netbanking">Netbanking</SelectItem><SelectItem value="Cheque">Cheque</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (₹)</FormLabel><FormControl><div className="flex items-center gap-2"><DollarSign className="h-5 w-5 text-muted-foreground" /><Input type="text" placeholder="e.g., 10000" value={field.value === undefined ? "" : String(field.value)} onChange={e => { const val = e.target.value; if (val === "") { field.onChange(undefined); } else { const num = parseInt(val, 10); field.onChange(isNaN(num) ? undefined : num); } }}/></div></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="remarks" render={({ field }) => (<FormItem><FormLabel>Remarks</FormLabel><Select onValueChange={field.onChange} value={field.value || "Auction Payment"}><FormControl><SelectTrigger><SelectValue placeholder="Select remark type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Auction Payment">Auction Payment</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+            <FormField
+              control={form.control}
+              name="amount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Amount (₹)</FormLabel>
+                  <FormControl>
+                    <div className="flex items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-muted-foreground" />
+                        <Input
+                        type="text" 
+                        placeholder="e.g., 10000"
+                        value={field.value === undefined ? "" : String(field.value)}
+                        onChange={e => {
+                            const val = e.target.value;
+                            if (val === "") {
+                                field.onChange(undefined);
+                            } else {
+                                const num = parseInt(val, 10);
+                                field.onChange(isNaN(num) ? undefined : num);
+                            }
+                        }}
+                        />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="remarks"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Remarks</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || "Auction Payment"}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select remark type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Auction Payment">Auction Payment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
 
             {/* Guarantor Details */}
             <Separator className="my-8" />
