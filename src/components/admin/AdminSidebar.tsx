@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Layers, PlusCircle, LogOut, Briefcase, CreditCard, ArchiveRestore } from "lucide-react";
+import { Home, Users, Layers, PlusCircle, LogOut, Briefcase, CreditCard, ArchiveRestore, Sheet as SheetIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +31,7 @@ export function AdminSidebar() {
     { href: "/admin/employees", label: "Manage Employees", icon: Briefcase },
     { href: "/admin/payments", label: "Payments", icon: CreditCard },
     { href: "/admin/collection", label: "Collection Mgmt", icon: ArchiveRestore },
+    { href: "/admin/due-sheet", label: "Due Sheet", icon: SheetIcon },
   ];
 
   return (
