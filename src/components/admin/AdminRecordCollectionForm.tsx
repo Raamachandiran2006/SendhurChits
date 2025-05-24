@@ -306,8 +306,8 @@ export function AdminRecordCollectionForm() {
                 amount: values.amount,
                 remarks: values.remarks || "Auction Collection",
                 collectionLocation: collectionLocationToStore,
-                recordedByEmployeeId: loggedInEntity.id, 
-                recordedByEmployeeName: `Admin: ${loggedInEntity.fullname}`, 
+                recordedByEmployeeId: (loggedInEntity as Admin).id, 
+                recordedByEmployeeName: `Admin: ${(loggedInEntity as Admin).fullname}`, 
                 virtualTransactionId: generateVirtualId(),
             };
             const collectionRecordRef = doc(collection(db, "collectionRecords")); 
@@ -318,7 +318,6 @@ export function AdminRecordCollectionForm() {
         });
 
       toast({ title: "Collection Recorded", description: `Payment of ${formatCurrency(values.amount)} from ${selectedUser.fullname} recorded by admin.` });
-      // Reset form but keep preselected user if navigating from user page
       reset({
         selectedGroupId: preselectedUserId ? values.selectedGroupId : "", 
         selectedAuctionId: undefined,
@@ -334,7 +333,7 @@ export function AdminRecordCollectionForm() {
       setCurrentLocationDisplay(null);
       setCurrentLocationValue(null);
       setLocationError(null);
-      router.push(`/admin/users/${selectedUser.id}`); 
+      router.push(`/admin/users/${selectedUser.id}#due-sheet`); 
     } catch (error) {
       console.error("Error recording collection:", error);
       toast({ title: "Error", description: "Could not record collection. " + (error as Error).message, variant: "destructive" });
