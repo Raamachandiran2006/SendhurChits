@@ -1,17 +1,27 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react"; // Added React import
-import type { CollectionRecord, PaymentRecord as AdminPaymentRecordType } from "@/types"; // Using AdminPaymentRecordType alias for clarity
+import React, { useEffect, useState } from "react"; 
+import type { CollectionRecord, PaymentRecord as AdminPaymentRecordType } from "@/types"; 
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query as firestoreQuery, Timestamp } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ArrowLeft, Landmark, Loader2, AlertTriangle, ReceiptText, ChevronRight, ChevronDown } from "lucide-react";
+import { ArrowLeft, Landmark, Loader2, AlertTriangle, ReceiptText, ChevronRight, ChevronDown, Filter, Download } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, subDays, isAfter } from "date-fns";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface UnifiedAuctionTransaction {
   id: string;
@@ -22,9 +32,11 @@ interface UnifiedAuctionTransaction {
   amount: number;
   mode: string | null;
   remarks: string | null;
-  originalSource: "Payment Record" | "Collection Record"; // To distinguish origin if needed
+  originalSource: "Payment Record" | "Collection Record"; 
   virtualTransactionId?: string;
 }
+
+type PaymentFilterType = "all" | "last7Days" | "last10Days" | "last30Days";
 
 const formatDateSafe = (dateInput: string | Date | Timestamp | undefined | null, outputFormat: string = "dd MMM yyyy, hh:mm a") => {
   if (!dateInput) return "N/A";
@@ -105,10 +117,12 @@ const formatCurrency = (amount: number | null | undefined) => {
 };
 
 export default function AuctionPaymentRecordPage() {
-  const [allAuctionTransactions, setAllAuctionTransactions] = useState<UnifiedAuctionTransaction[]>([]);
+  const [rawAllAuctionTransactions, setRawAllAuctionTransactions] = useState<UnifiedAuctionTransaction[]>([]);
+  const [filteredAuctionTransactions, setFilteredAuctionTransactions] = useState<UnifiedAuctionTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [selectedFilter, setSelectedFilter] = useState<PaymentFilterType>("all");
 
   const toggleRowExpansion = (transactionKey: string) => {
     setExpandedRows(prev => ({ ...prev, [transactionKey]: !prev[transactionKey] }));
@@ -118,12 +132,10 @@ export default function AuctionPaymentRecordPage() {
     const fetchAuctionRelatedTransactions = async () => {
       setLoading(true);
       setError(null);
-      console.log("AuctionPaymentRecordPage: Starting to fetch transactions...");
-
       try {
         const collectionsToFetch = [
-          { name: "paymentRecords", type: "Sent" as const, source: "Payment Record" as const }, // Payments by company
-          { name: "collectionRecords", type: "Received" as const, source: "Collection Record" as const }, // Collections from users
+          { name: "paymentRecords", type: "Sent" as const, source: "Payment Record" as const }, 
+          { name: "collectionRecords", type: "Received" as const, source: "Collection Record" as const }, 
         ];
 
         const promises = collectionsToFetch.map(c => 
@@ -131,8 +143,6 @@ export default function AuctionPaymentRecordPage() {
         );
 
         const results = await Promise.allSettled(promises);
-        console.log("AuctionPaymentRecordPage: Fetch results:", results);
-
         let combinedTransactions: UnifiedAuctionTransaction[] = [];
 
         results.forEach((result, index) => {
@@ -140,7 +150,6 @@ export default function AuctionPaymentRecordPage() {
           const sourceName = collectionsToFetch[index].source;
 
           if (result.status === "fulfilled") {
-            console.log(`AuctionPaymentRecordPage: Fetched from ${collectionsToFetch[index].name}, ${result.value.docs.length} docs`);
             result.value.docs.forEach(doc => {
               const data = doc.data() as CollectionRecord | AdminPaymentRecordType; 
               const id = doc.id;
@@ -150,7 +159,7 @@ export default function AuctionPaymentRecordPage() {
                 ? `${data.userFullname} (${data.userUsername})` 
                 : "Unknown User";
 
-              if (sourceType === "Sent") { // From paymentRecords
+              if (sourceType === "Sent") { 
                 transformed = {
                   id,
                   type: "Sent",
@@ -163,7 +172,7 @@ export default function AuctionPaymentRecordPage() {
                   originalSource: sourceName,
                   virtualTransactionId: data.virtualTransactionId,
                 };
-              } else if (sourceType === "Received") { // From collectionRecords
+              } else if (sourceType === "Received") { 
                 transformed = {
                   id,
                   type: "Received",
@@ -180,27 +189,111 @@ export default function AuctionPaymentRecordPage() {
               if (transformed) combinedTransactions.push(transformed);
             });
           } else {
-            console.error(`AuctionPaymentRecordPage: Error fetching from ${collectionsToFetch[index].name}:`, result.reason);
+            console.error(`Error fetching from ${collectionsToFetch[index].name}:`, result.reason);
             setError(prev => prev ? `${prev}\nFailed to load ${collectionsToFetch[index].name}.` : `Failed to load ${collectionsToFetch[index].name}.`);
           }
         });
         
-        console.log("AuctionPaymentRecordPage: Combined transactions before sort:", combinedTransactions.length);
         combinedTransactions.sort((a, b) => b.dateTime.getTime() - a.dateTime.getTime());
-        console.log("AuctionPaymentRecordPage: Transactions after sort:", combinedTransactions.length, "First item date:", combinedTransactions[0]?.dateTime);
-        setAllAuctionTransactions(combinedTransactions);
+        setRawAllAuctionTransactions(combinedTransactions);
+        setFilteredAuctionTransactions(combinedTransactions); // Initially show all
 
       } catch (err) {
-        console.error("AuctionPaymentRecordPage: Main fetch error:", err);
+        console.error("Main fetch error:", err);
         setError("Failed to load auction payment records. Please try again.");
       } finally {
         setLoading(false);
-        console.log("AuctionPaymentRecordPage: Fetching completed.");
       }
     };
 
     fetchAuctionRelatedTransactions();
   }, []);
+
+  useEffect(() => {
+    const applyFilter = () => {
+      if (selectedFilter === "all") {
+        setFilteredAuctionTransactions(rawAllAuctionTransactions);
+        return;
+      }
+      const now = new Date();
+      let startDate: Date;
+      if (selectedFilter === "last7Days") {
+        startDate = subDays(now, 7);
+      } else if (selectedFilter === "last10Days") {
+        startDate = subDays(now, 10);
+      } else if (selectedFilter === "last30Days") {
+        startDate = subDays(now, 30);
+      } else {
+        setFilteredAuctionTransactions(rawAllAuctionTransactions);
+        return;
+      }
+      startDate.setHours(0, 0, 0, 0); 
+      const filtered = rawAllAuctionTransactions.filter(tx => isAfter(tx.dateTime, startDate));
+      setFilteredAuctionTransactions(filtered);
+    };
+    applyFilter();
+  }, [selectedFilter, rawAllAuctionTransactions]);
+
+  const handleDownloadPdf = () => {
+    const doc = new jsPDF();
+    
+    const formatCurrencyPdf = (amount: number | null | undefined) => {
+      if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
+      return `Rs. ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+    const tableColumn = ["S.No", "Type", "Date & Time", "From", "To", "Amount", "Mode", "Remarks", "Virtual ID"];
+    const tableRows: any[][] = [];
+
+    filteredAuctionTransactions.forEach((tx, index) => {
+      const txData = [
+        index + 1,
+        tx.type,
+        formatDateSafe(tx.dateTime),
+        tx.fromParty,
+        tx.toParty,
+        formatCurrencyPdf(tx.amount),
+        tx.mode || "N/A",
+        tx.remarks || "N/A",
+        tx.virtualTransactionId || "N/A",
+      ];
+      tableRows.push(txData);
+    });
+
+    const filterLabel = {
+      all: "All Time",
+      last7Days: "Last 7 Days",
+      last10Days: "Last 10 Days",
+      last30Days: "Last 30 Days",
+    };
+
+    doc.setFontSize(18);
+    doc.text(`Auction Payment Records`, 14, 15);
+    doc.setFontSize(12);
+    doc.text(`Filter: ${filterLabel[selectedFilter]}`, 14, 22);
+    doc.text(`Generated on: ${format(new Date(), "dd MMM yyyy, hh:mm a")}`, 14, 29);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 35,
+      theme: 'grid',
+      headStyles: { fillColor: [30, 144, 255] }, 
+      styles: { fontSize: 7, cellPadding: 1.5 },
+      columnStyles: { 
+        0: { cellWidth: 8 },  
+        1: { cellWidth: 15 }, 
+        2: { cellWidth: 25 }, 
+        3: { cellWidth: 'auto' }, 
+        4: { cellWidth: 'auto' }, 
+        5: { cellWidth: 20, halign: 'right' }, 
+        6: { cellWidth: 15 }, 
+        7: { cellWidth: 'auto' }, 
+        8: { cellWidth: 18 }  
+      },
+    });
+    doc.save(`auction_payment_records_${selectedFilter}.pdf`);
+  };
 
   if (loading) {
     return (
@@ -211,7 +304,7 @@ export default function AuctionPaymentRecordPage() {
     );
   }
 
-  if (error && allAuctionTransactions.length === 0) {
+  if (error && filteredAuctionTransactions.length === 0) {
     return (
       <div className="container mx-auto py-8 text-center">
         <Card className="max-w-md mx-auto shadow-lg">
@@ -233,7 +326,7 @@ export default function AuctionPaymentRecordPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
         <div className="flex items-center gap-3">
             <Landmark className="h-8 w-8 text-primary"/>
             <div>
@@ -241,12 +334,32 @@ export default function AuctionPaymentRecordPage() {
                 <p className="text-muted-foreground">Combined view of payments sent and received related to auctions/collections.</p>
             </div>
         </div>
-        <Button variant="outline" asChild>
+        <div className="flex items-center gap-2 mt-4 sm:mt-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Filter className="mr-2 h-4 w-4" /> Filter
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Filter by Date</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setSelectedFilter("all")}>All Time</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setSelectedFilter("last7Days")}>Last 7 Days</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setSelectedFilter("last10Days")}>Last 10 Days</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setSelectedFilter("last30Days")}>Last 30 Days</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={filteredAuctionTransactions.length === 0}>
+            <Download className="mr-2 h-4 w-4" /> Download PDF
+          </Button>
+          <Button variant="outline" asChild size="sm">
             <Link href="/admin/payments">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Payments
+                Back
             </Link>
-        </Button>
+          </Button>
+        </div>
       </div>
       <Card className="shadow-lg">
         <CardHeader>
@@ -259,9 +372,9 @@ export default function AuctionPaymentRecordPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {allAuctionTransactions.length === 0 && !error ? (
+          {filteredAuctionTransactions.length === 0 && !error ? (
             <p className="text-muted-foreground text-center py-10">
-              No auction-related payment records found.
+              No auction-related payment records found {selectedFilter !== 'all' ? `for the selected period` : ''}.
             </p>
           ) : (
             <div className="overflow-x-auto rounded-md border">
@@ -279,7 +392,7 @@ export default function AuctionPaymentRecordPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {allAuctionTransactions.map((tx, index) => {
+                  {filteredAuctionTransactions.map((tx, index) => {
                     const transactionKey = tx.id + tx.originalSource;
                     const isExpanded = expandedRows[transactionKey];
                     return (
@@ -330,3 +443,4 @@ export default function AuctionPaymentRecordPage() {
     </div>
   );
 }
+
