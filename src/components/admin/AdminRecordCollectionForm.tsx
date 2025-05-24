@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -7,18 +6,17 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, Users as UsersIcon, Layers as LayersIcon, MapPin, LocateFixed } from "lucide-react";
+import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, Users as UsersIcon, Layers as LayersIcon, MapPin, LocateFixed, ListNumbers } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc } from "firebase/firestore";
-import type { Group, User, CollectionRecord } from "@/types";
+import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc, orderBy } from "firebase/firestore";
+import type { Group, User, CollectionRecord, Admin, AuctionRecord } from "@/types"; // Assuming Admin type exists or is User
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
@@ -58,8 +56,11 @@ const formatCurrency = (amount: number | null | undefined) => {
   return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 };
 
+const NO_AUCTION_SELECTED_VALUE = "no-auction-specific-collection";
+
 const recordCollectionFormSchema = z.object({
   selectedGroupId: z.string().min(1, "Please select a Group."),
+  selectedAuctionId: z.string().optional(), // Optional: ID of the auction this collection is for
   selectedUserId: z.string().min(1, "Please select a User."),
   paymentDate: z.date({ required_error: "Payment date is required." }),
   paymentTime: z.string().min(1, "Payment time is required."),
@@ -77,13 +78,15 @@ const generateVirtualId = () => Math.floor(100000 + Math.random() * 900000).toSt
 export function AdminRecordCollectionForm() {
   const { toast } = useToast();
   const router = useRouter();
-  const { loggedInEntity, userType } = useAuth(); // Admin details from AuthContext
+  const { loggedInEntity, userType } = useAuth(); 
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
   
   const [selectedGroupObject, setSelectedGroupObject] = useState<Group | null>(null);
+  const [groupAuctions, setGroupAuctions] = useState<AuctionRecord[]>([]);
+  const [loadingAuctions, setLoadingAuctions] = useState(false);
   const [groupMembers, setGroupMembers] = useState<User[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
 
@@ -96,6 +99,7 @@ export function AdminRecordCollectionForm() {
     resolver: zodResolver(recordCollectionFormSchema),
     defaultValues: {
       selectedGroupId: "",
+      selectedAuctionId: undefined,
       selectedUserId: "",
       paymentDate: new Date(),
       paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
@@ -132,7 +136,9 @@ export function AdminRecordCollectionForm() {
     if (!watchedGroupId) {
       setSelectedGroupObject(null);
       setGroupMembers([]);
+      setGroupAuctions([]);
       setValue("selectedUserId", "");
+      setValue("selectedAuctionId", undefined);
       return;
     }
 
@@ -167,6 +173,22 @@ export function AdminRecordCollectionForm() {
         }
       };
       fetchMembers();
+
+      const fetchAuctions = async () => {
+        setLoadingAuctions(true);
+        try {
+          const auctionQuery = query(collection(db, "auctionRecords"), where("groupId", "==", group.id), orderBy("auctionNumber", "desc"));
+          const auctionSnapshot = await getDocs(auctionQuery);
+          setGroupAuctions(auctionSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()} as AuctionRecord)));
+        } catch (error) {
+          console.error("Error fetching auctions for group:", error);
+          toast({ title: "Error", description: "Could not load auctions for the selected group.", variant: "destructive" });
+          setGroupAuctions([]);
+        } finally {
+          setLoadingAuctions(false);
+        }
+      };
+      fetchAuctions();
     }
   }, [watchedGroupId, groups, setValue, toast]);
 
@@ -219,6 +241,10 @@ export function AdminRecordCollectionForm() {
     setIsSubmitting(true);
     const selectedGroup = groups.find(g => g.id === values.selectedGroupId);
     const selectedUser = groupMembers.find(m => m.id === values.selectedUserId);
+    const selectedAuction = values.selectedAuctionId && values.selectedAuctionId !== NO_AUCTION_SELECTED_VALUE 
+                            ? groupAuctions.find(a => a.id === values.selectedAuctionId) 
+                            : null;
+
 
     if (!selectedGroup || !selectedUser) {
       toast({ title: "Error", description: "Group or User details not found.", variant: "destructive" });
@@ -242,8 +268,8 @@ export function AdminRecordCollectionForm() {
             const collectionRecordData: Omit<CollectionRecord, "id" | "recordedAt"> & { recordedAt?: any } = {
                 groupId: selectedGroup.id,
                 groupName: selectedGroup.groupName,
-                auctionId: null, 
-                auctionNumber: null, 
+                auctionId: selectedAuction ? selectedAuction.id : null,
+                auctionNumber: selectedAuction ? selectedAuction.auctionNumber : null,
                 userId: selectedUser.id,
                 userUsername: selectedUser.username,
                 userFullname: selectedUser.fullname,
@@ -254,8 +280,8 @@ export function AdminRecordCollectionForm() {
                 amount: values.amount,
                 remarks: values.remarks || "Auction Collection",
                 collectionLocation: collectionLocationToStore,
-                recordedByEmployeeId: loggedInEntity.id, // Admin's user ID
-                recordedByEmployeeName: `Admin: ${loggedInEntity.fullname}`, // Admin's name
+                recordedByEmployeeId: loggedInEntity.id, 
+                recordedByEmployeeName: `Admin: ${loggedInEntity.fullname}`, 
                 virtualTransactionId: generateVirtualId(),
             };
             const collectionRecordRef = doc(collection(db, "collectionRecords")); 
@@ -268,6 +294,7 @@ export function AdminRecordCollectionForm() {
       toast({ title: "Collection Recorded", description: `Payment of ${formatCurrency(values.amount)} from ${selectedUser.fullname} recorded by admin.` });
       form.reset({
         selectedGroupId: "", 
+        selectedAuctionId: undefined,
         selectedUserId: "",
         paymentDate: new Date(),
         paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
@@ -280,7 +307,7 @@ export function AdminRecordCollectionForm() {
       setCurrentLocationDisplay(null);
       setCurrentLocationValue(null);
       setLocationError(null);
-      router.push(`/admin/users/${selectedUser.id}`); // Navigate to the user's detail page
+      router.push(`/admin/users/${selectedUser.id}`); 
     } catch (error) {
       console.error("Error recording collection:", error);
       toast({ title: "Error", description: "Could not record collection. " + (error as Error).message, variant: "destructive" });
@@ -327,6 +354,36 @@ export function AdminRecordCollectionForm() {
                 <Input readOnly value={selectedGroupObject?.id || ""} placeholder="Auto-filled" />
               </FormItem>
             </div>
+
+             <FormField
+              control={form.control}
+              name="selectedAuctionId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>For Auction No. (Optional)</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value === NO_AUCTION_SELECTED_VALUE ? undefined : field.value} 
+                    disabled={!watchedGroupId || loadingAuctions}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={!watchedGroupId ? "Select group first" : (loadingAuctions ? "Loading auctions..." : "Select an auction (or general due)")} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={NO_AUCTION_SELECTED_VALUE}>General Due / Not for Specific Auction</SelectItem>
+                      {groupAuctions.map((auction) => (
+                        <SelectItem key={auction.id} value={auction.id}>
+                          Auction #{auction.auctionNumber} - {auction.auctionMonth}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

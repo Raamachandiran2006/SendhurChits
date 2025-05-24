@@ -43,7 +43,7 @@ import {
   Contact,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { format, subYears, parseISO, subDays, isAfter } from "date-fns";
+import { format, subYears, parseISO, subDays, isAfter, addDays } from "date-fns";
 import { Separator } from "@/components/ui/separator";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -169,6 +169,20 @@ interface AdminUserTransaction {
 
 type TransactionFilterType = "all" | "last7Days" | "last10Days" | "last30Days";
 
+interface DueSheetItem {
+  dueNo: number; // From auctionRecord.auctionNumber
+  groupId: string;
+  groupName: string;
+  auctionId: string;
+  dueDate: string; // auctionDate + 5 days (formatted)
+  amount: number; // From auctionRecord.finalAmountToBePaid
+  penalty: number; // Placeholder for now (0)
+  paidAmount: number; // Sum from collectionRecords
+  balance: number; // amount - paidAmount
+  status: 'Paid' | 'Not Paid' | 'Partially Paid';
+  paidDateTime?: string; // From latest relevant collectionRecord (formatted)
+}
+
 
 const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestamp?: Timestamp): Date => {
   if (recordTimestamp) return recordTimestamp.toDate();
@@ -233,6 +247,10 @@ export default function AdminUserDetailPage() {
   const [transactionError, setTransactionError] = useState<string | null>(null);
   const [selectedTransactionFilter, setSelectedTransactionFilter] = useState<TransactionFilterType>("all");
   const [expandedTransactionRows, setExpandedTransactionRows] = useState<Record<string, boolean>>({});
+  
+  const [dueSheetItems, setDueSheetItems] = useState<DueSheetItem[]>([]);
+  const [loadingDueSheet, setLoadingDueSheet] = useState(true);
+
 
   const [showCamera, setShowCamera] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
@@ -250,9 +268,10 @@ export default function AdminUserDetailPage() {
       setError("Error loading user details.");
       setLoading(false);
       setLoadingTransactions(false);
+      setLoadingDueSheet(false);
       return;
     }
-    setLoading(true); setLoadingTransactions(true);
+    setLoading(true); setLoadingTransactions(true); setLoadingDueSheet(true);
     setError(null); setTransactionError(null);
     try {
       const userDocRef = doc(db, "users", userId);
@@ -261,7 +280,7 @@ export default function AdminUserDetailPage() {
       if (!userDocSnap.exists()) {
         setError("User data not available.");
         setUser(null);
-        setLoading(false); setLoadingTransactions(false);
+        setLoading(false); setLoadingTransactions(false); setLoadingDueSheet(false);
         return;
       }
       const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
@@ -285,26 +304,23 @@ export default function AdminUserDetailPage() {
       });
       setCapturedImage(userData.photoUrl || null);
 
-      // Fetch User Groups
+      // Fetch User Groups and Financials
+      const fetchedGroupsWithFinancials: UserGroupWithFinancials[] = [];
       if (userData.groups && userData.groups.length > 0) {
         const groupsRef = collection(db, "groups");
         const groupIds = userData.groups.slice(0, 30);
-        const fetchedGroupsWithFinancials: UserGroupWithFinancials[] = [];
-
         if (groupIds.length > 0) {
           const groupQuery = query(groupsRef, where(documentId(), "in", groupIds));
           const groupSnapshots = await getDocs(groupQuery);
-
           for (const groupDoc of groupSnapshots.docs) {
             const groupData = { id: groupDoc.id, ...groupDoc.data() } as Group;
             let latestAuctionRecord: AuctionRecord | null = null;
             let currentInstallment: number | null = null;
-
             const auctionQuery = query(collection(db, "auctionRecords"), where("groupId", "==", groupData.id), orderBy("auctionDate", "desc"), limit(1));
             const auctionSnapshot = await getDocs(auctionQuery);
             if (!auctionSnapshot.empty) {
               latestAuctionRecord = { id: auctionSnapshot.docs[0].id, ...auctionSnapshot.docs[0].data() } as AuctionRecord;
-              if (typeof groupData.rate === 'number' && typeof latestAuctionRecord.finalAmountToBePaid === 'number') { 
+              if (typeof groupData.rate === 'number' && latestAuctionRecord.finalAmountToBePaid !== null && latestAuctionRecord.finalAmountToBePaid !== undefined) {
                 currentInstallment = latestAuctionRecord.finalAmountToBePaid;
               } else if (typeof groupData.rate === 'number') {
                 currentInstallment = groupData.rate;
@@ -312,18 +328,11 @@ export default function AdminUserDetailPage() {
             } else if (typeof groupData.rate === 'number') {
                  currentInstallment = groupData.rate;
             }
-
-            fetchedGroupsWithFinancials.push({
-              ...groupData,
-              latestAuctionRecord,
-              currentInstallment,
-            });
+            fetchedGroupsWithFinancials.push({ ...groupData, latestAuctionRecord, currentInstallment });
           }
         }
-        setUserGroupsWithFinancials(fetchedGroupsWithFinancials);
-      } else {
-        setUserGroupsWithFinancials([]);
       }
+      setUserGroupsWithFinancials(fetchedGroupsWithFinancials);
 
       // Fetch Payment Transactions
       let combinedTransactions: AdminUserTransaction[] = [];
@@ -364,17 +373,81 @@ export default function AdminUserDetailPage() {
           virtualTransactionId: data.virtualTransactionId,
         });
       });
-
       combinedTransactions.sort((a,b) => b.dateTime.getTime() - a.dateTime.getTime());
       setRawUserTransactions(combinedTransactions);
       setFilteredUserTransactions(combinedTransactions); 
       setLoadingTransactions(false);
 
+      // Fetch and Process Due Sheet Items
+      const processedDueSheetItems: DueSheetItem[] = [];
+      if (fetchedGroupsWithFinancials.length > 0) {
+        for (const group of fetchedGroupsWithFinancials) {
+          const groupAuctionRecordsQuery = query(
+            collection(db, "auctionRecords"),
+            where("groupId", "==", group.id),
+            orderBy("auctionNumber", "asc")
+          );
+          const groupAuctionRecordsSnapshot = await getDocs(groupAuctionRecordsQuery);
+
+          for (const auctionDoc of groupAuctionRecordsSnapshot.docs) {
+            const auctionRecord = { id: auctionDoc.id, ...auctionDoc.data() } as AuctionRecord;
+            if (auctionRecord.auctionNumber === undefined || auctionRecord.finalAmountToBePaid === null || auctionRecord.finalAmountToBePaid === undefined) continue;
+
+            let paidAmount = 0;
+            let latestPaidDate: Date | null = null;
+
+            const collectionForAuctionQuery = query(
+              collection(db, "collectionRecords"),
+              where("userId", "==", userId),
+              where("groupId", "==", group.id),
+              where("auctionNumber", "==", auctionRecord.auctionNumber)
+            );
+            const collectionsForAuctionSnapshot = await getDocs(collectionForAuctionQuery);
+            collectionsForAuctionSnapshot.forEach(colDoc => {
+              const colData = colDoc.data() as CollectionRecord;
+              paidAmount += colData.amount;
+              const paymentDateTime = parseDateTimeForSort(colData.paymentDate, colData.paymentTime, colData.recordedAt);
+              if (!latestPaidDate || paymentDateTime > latestPaidDate) {
+                latestPaidDate = paymentDateTime;
+              }
+            });
+
+            const amountDue = auctionRecord.finalAmountToBePaid;
+            const balance = amountDue - paidAmount;
+            let status: DueSheetItem['status'] = 'Not Paid';
+            if (balance <= 0) {
+              status = 'Paid';
+            } else if (paidAmount > 0 && balance > 0) {
+              status = 'Partially Paid';
+            }
+            
+            processedDueSheetItems.push({
+              dueNo: auctionRecord.auctionNumber,
+              groupId: group.id,
+              groupName: group.groupName,
+              auctionId: auctionRecord.id,
+              dueDate: formatDateSafe(addDays(parseISO(auctionRecord.auctionDate), 5), "dd MMM yyyy"),
+              amount: amountDue,
+              penalty: 0, // Placeholder
+              paidAmount: paidAmount,
+              balance: balance,
+              status: status,
+              paidDateTime: latestPaidDate ? formatDateTimeSafe(latestPaidDate) : undefined,
+            });
+          }
+        }
+      }
+      processedDueSheetItems.sort((a,b) => a.dueNo - b.dueNo); // Sort by due number
+      setDueSheetItems(processedDueSheetItems);
+      setLoadingDueSheet(false);
+
+
     } catch (err) {
-      console.error("Error fetching user details/transactions:", err);
+      console.error("Error fetching user details/transactions/due sheet:", err);
       setError("Error loading user details.");
       setUser(null);
       setTransactionError("Failed to fetch payment history.");
+      setLoadingDueSheet(false);
     } finally {
       setLoading(false);
     }
@@ -944,11 +1017,20 @@ export default function AdminUserDetailPage() {
                   <CardDescription>Detailed breakdown of dues for this user.</CardDescription>
                 </CardHeader>
                 <CardContent>
+                {loadingDueSheet ? (
+                     <div className="flex items-center justify-center py-4">
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        <span>Loading due sheet...</span>
+                    </div>
+                ) : dueSheetItems.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-4">No due items found for this user.</p>
+                ) : (
                   <div className="overflow-x-auto rounded-md border">
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Due No</TableHead>
+                          <TableHead>Group</TableHead>
                           <TableHead>Due Date</TableHead>
                           <TableHead className="text-right">Amount (₹)</TableHead>
                           <TableHead className="text-right">Penalty (₹)</TableHead>
@@ -958,14 +1040,30 @@ export default function AdminUserDetailPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
-                            Detailed due sheet data not yet available for this user.
-                          </TableCell>
-                        </TableRow>
+                        {dueSheetItems.map((item, index) => (
+                          <TableRow key={`${item.auctionId}-${item.dueNo}-${index}`}>
+                            <TableCell>{item.dueNo}</TableCell>
+                            <TableCell>{item.groupName}</TableCell>
+                            <TableCell>{item.dueDate}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.penalty)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.paidAmount)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.balance)}</TableCell>
+                            <TableCell>
+                              <Badge variant={item.status === 'Paid' ? 'default' : (item.status === 'Partially Paid' ? 'secondary' : 'destructive')}
+                                     className={cn(item.status === 'Paid' ? 'bg-green-600 hover:bg-green-700' : item.status === 'Partially Paid' ? 'bg-yellow-500 hover:bg-yellow-600' : '')}>
+                                {item.status}
+                                {item.status === 'Paid' && item.paidDateTime && (
+                                  <span className="ml-1 text-xs opacity-80">({item.paidDateTime})</span>
+                                )}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
                       </TableBody>
                     </Table>
                   </div>
+                )}
                 </CardContent>
               </Card>
             </section>
@@ -1065,5 +1163,3 @@ export default function AdminUserDetailPage() {
     </div>
   );
 }
-
-    

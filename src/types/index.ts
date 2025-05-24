@@ -30,7 +30,7 @@ export interface Group {
   startDate?: string; // YYYY-MM-DD
   rate?: number; // Monthly installment amount
   commission?: number; // Optional: foreman commission percentage
-  penaltyPercentage?: number; // Optional: penalty percentage for late payments, etc.
+  penaltyPercentage?: number;
   biddingType?: "auction" | "random" | "pre-fixed"; // Optional: type of bidding
   minBid?: number; // Optional: min bid amount
   auctionMonth?: string;
@@ -86,7 +86,8 @@ export interface AuctionRecord {
   commissionAmount?: number | null;
   netDiscount?: number | null;
   dividendPerMember?: number | null;
-  finalAmountToBePaid?: number | null; // This is the installment paid by all members
+  finalAmountToBePaid?: number | null; // This is the installment paid by all members (including winner)
+  amountPaidToWinner?: number | null; // DEPRECATED - To be removed manually from Firestore
   recordedAt: import('firebase/firestore').Timestamp;
   virtualTransactionId?: string;
 }
@@ -109,8 +110,8 @@ export interface CollectionRecord { // For payments RECEIVED FROM CUSTOMERS
   id: string; // Firestore document ID
   groupId: string;
   groupName: string;
-  auctionId?: string | null;
-  auctionNumber?: number | null;
+  auctionId?: string | null;     // New field
+  auctionNumber?: number | null; // New field
   userId: string;
   userUsername: string;
   userFullname: string;
@@ -143,7 +144,7 @@ export interface PaymentRecord {
   amount: number;
   remarks?: string | null;
   recordedAt: import('firebase/firestore').Timestamp;
-  recordedBy?: "Admin" | string;
+  recordedBy?: "Admin" | string; // Can be admin or employee ID
   virtualTransactionId?: string;
   // Guarantor fields
   guarantorFullName?: string;
