@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import type { Group, User, AuctionRecord, CollectionRecord, PaymentRecord as AdminPaymentRecordType } from "@/types";
+import type { Group, User, AuctionRecord, CollectionRecord } from "@/types";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, arrayRemove, updateDoc, orderBy, Timestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -37,8 +37,9 @@ import {
   ReceiptText,
   ChevronRight,
   ChevronDown,
-  Filter, 
-  Download
+  Filter,
+  Download,
+  PercentIcon
 } from "lucide-react";
 import {
   AlertDialog,
@@ -215,14 +216,14 @@ const convert12hTo24hFormat = (time12?: string): string => {
 
 interface CombinedPaymentHistoryTransaction {
   id: string;
-  type: "Sent" | "Received"; 
+  type: "Sent" | "Received";
   dateTime: Date;
   fromParty: string;
   toParty: string;
   amount: number;
   mode: string | null;
   remarks: string | null;
-  originalSource: "CollectionRecord" | "AdminPaymentRecordType";
+  originalSource: "CollectionRecord" | "PaymentRecord";
   virtualTransactionId?: string;
 }
 
@@ -337,7 +338,7 @@ export default function AdminGroupDetailPage() {
       const qPayment = query(paymentRecordsRef, where("groupId", "==", groupId));
       const paymentSnapshot = await getDocs(qPayment);
       const fetchedPayments = paymentSnapshot.docs.map(docSnap => {
-        const data = docSnap.data() as AdminPaymentRecordType;
+        const data = docSnap.data() as PaymentRecord; // Assuming PaymentRecord type for admin payments
         return {
           id: docSnap.id,
           type: "Sent" as const,
@@ -347,14 +348,14 @@ export default function AdminGroupDetailPage() {
           amount: data.amount,
           mode: data.paymentMode,
           remarks: data.remarks || "Company Payment",
-          originalSource: "AdminPaymentRecordType" as const,
+          originalSource: "PaymentRecord" as const,
           virtualTransactionId: data.virtualTransactionId,
         } as CombinedPaymentHistoryTransaction;
       });
 
       const combined = [...fetchedCollections, ...fetchedPayments].sort((a,b) => b.dateTime.getTime() - a.dateTime.getTime());
       setRawPaymentHistory(combined);
-      setFilteredPaymentHistory(combined); 
+      setFilteredPaymentHistory(combined);
       setLoadingPaymentHistory(false);
 
     } catch (err) {
@@ -387,7 +388,7 @@ export default function AdminGroupDetailPage() {
         setFilteredPaymentHistory(rawPaymentHistory);
         return;
       }
-      startDate.setHours(0, 0, 0, 0); 
+      startDate.setHours(0, 0, 0, 0);
       const filtered = rawPaymentHistory.filter(tx => isAfter(tx.dateTime, startDate));
       setFilteredPaymentHistory(filtered);
     };
@@ -397,7 +398,7 @@ export default function AdminGroupDetailPage() {
   const handleDownloadPdf = () => {
     if (!group) return;
     const doc = new jsPDF();
-    
+
     // PDF specific currency formatter
     const formatCurrencyPdf = (amount: number | null | undefined) => {
       if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
@@ -440,9 +441,9 @@ export default function AdminGroupDetailPage() {
       body: tableRows,
       startY: 35,
       theme: 'grid',
-      headStyles: { fillColor: [30, 144, 255] }, 
+      headStyles: { fillColor: [30, 144, 255] },
       styles: { fontSize: 8, cellPadding: 1.5 },
-      columnStyles: { 
+      columnStyles: {
         0: { cellWidth: 8 },  // S.No
         1: { cellWidth: 15 }, // Type
         2: { cellWidth: 23 }, // Date & Time
@@ -658,7 +659,7 @@ export default function AdminGroupDetailPage() {
           </div>
           <div className="flex items-center">
             <Landmark className="mr-2 h-4 w-4 text-muted-foreground" />
-            <span>Total Amount: ₹{group.totalAmount.toLocaleString()}</span>
+            <span>Total Amount: {formatCurrency(group.totalAmount)}</span>
           </div>
           <div className="flex items-center">
             <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -675,13 +676,19 @@ export default function AdminGroupDetailPage() {
           {group.rate !== undefined && (
             <div className="flex items-center">
               <GroupLandmarkIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-              <span>Monthly Installment: ₹{group.rate.toLocaleString()}</span>
+              <span>Monthly Installment: {formatCurrency(group.rate)}</span>
             </div>
           )}
           {group.commission !== undefined && (
             <div className="flex items-center">
               <Tag className="mr-2 h-4 w-4 text-muted-foreground" />
               <span>Commission: {group.commission}%</span>
+            </div>
+          )}
+          {group.penaltyPercentage !== undefined && (
+            <div className="flex items-center">
+              <PercentIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+              <span>Penalty: {group.penaltyPercentage}%</span>
             </div>
           )}
           {group.biddingType && (
@@ -693,7 +700,7 @@ export default function AdminGroupDetailPage() {
           {group.minBid !== undefined && (
             <div className="flex items-center">
               <GroupLandmarkIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-              <span>Min Bid Amount: ₹{group.minBid.toLocaleString()}</span>
+              <span>Min Bid Amount: {formatCurrency(group.minBid)}</span>
             </div>
           )}
         </CardContent>
@@ -716,24 +723,12 @@ export default function AdminGroupDetailPage() {
             <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Full Name</TableHead>
-                    <TableHead>Username</TableHead>
-                    <TableHead>Phone Number</TableHead>
-                    <TableHead className="text-right">Due Amount (₹)</TableHead>
-                  </TableRow>
+                  <TableRow><TableHead>Full Name</TableHead><TableHead>Username</TableHead><TableHead>Phone Number</TableHead><TableHead className="text-right">Due Amount (₹)</TableHead></TableRow>
                 </TableHeader>
                 <TableBody>
                   {membersDetails.map((member) => (
                     <TableRow key={member.id} className="hover:bg-muted/50 transition-colors">
-                      <TableCell className="font-medium">{member.fullname}</TableCell>
-                      <TableCell>{member.username}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center">
-                          <Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{formatCurrency(member.dueAmount)}</TableCell>
+                      <TableCell className="font-medium">{member.fullname}</TableCell><TableCell>{member.username}</TableCell><TableCell><div className="flex items-center"><Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}</div></TableCell><TableCell className="text-right">{formatCurrency(member.dueAmount)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -882,7 +877,7 @@ export default function AdminGroupDetailPage() {
                   <Card className="bg-secondary/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
                     <CardHeader className="pb-3 pt-4">
                       <CardTitle className="text-md font-semibold text-primary">
-                         Auction #{auction.auctionNumber ? auction.auctionNumber : (index + 1)}
+                         Auction #{auction.auctionNumber ? auction.auctionNumber : (auctionHistory.length - index)}
                       </CardTitle>
                       <CardDescription>Group: {auction.groupName}</CardDescription>
                     </CardHeader>
@@ -1008,5 +1003,3 @@ export default function AdminGroupDetailPage() {
     </div>
   );
 }
-
-    

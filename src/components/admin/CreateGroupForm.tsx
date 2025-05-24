@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 import type { User } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, PlusCircle, Users, CalendarIcon, Tag, LandmarkIcon, SearchCode } from "lucide-react";
+import { Loader2, PlusCircle, Users, CalendarIcon, Tag, LandmarkIcon, SearchCode, PercentIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -32,12 +32,13 @@ const groupFormSchema = z.object({
   memberUsernames: z.array(z.string()).min(1, "At least one member must be selected"),
   tenure: z.coerce.number().int().min(1, "Tenure must be at least 1 month"),
   startDate: z.date({ required_error: "Start date is required." }),
-  rate: z.number().int("Monthly Installment must be a whole number.").positive("Monthly Installment must be positive.").optional(),
-  commission: z.number().int("Commission must be a whole number.").positive("Commission must be positive.").optional(),
+  rate: z.number({invalid_type_error: "Monthly Installment must be a number."}).int("Monthly Installment must be a whole number.").positive("Monthly Installment must be positive.").optional(),
+  commission: z.number({invalid_type_error: "Commission must be a number."}).int("Commission must be a whole number.").min(0, "Commission cannot be negative.").max(100, "Commission cannot exceed 100%.").optional(),
+  penaltyPercentage: z.number({invalid_type_error: "Penalty Percentage must be a number."}).int("Penalty Percentage must be a whole number.").min(0, "Penalty Percentage cannot be negative.").max(100, "Penalty Percentage cannot exceed 100%.").optional(),
   biddingType: z.enum(["auction", "random", "pre-fixed"], {
     errorMap: () => ({ message: "Please select a valid bidding type." }),
   }).optional(),
-  minBid: z.number().int("Min Bid Amount must be a whole number.").positive("Min Bid Amount must be positive.").optional(),
+  minBid: z.number({invalid_type_error: "Min Bid Amount must be a number."}).int("Min Bid Amount must be a whole number.").positive("Min Bid Amount must be positive.").optional(),
 });
 
 export function CreateGroupForm() {
@@ -59,6 +60,7 @@ export function CreateGroupForm() {
       startDate: new Date(),
       rate: undefined,
       commission: undefined,
+      penaltyPercentage: undefined,
       biddingType: undefined,
       minBid: undefined,
     },
@@ -69,7 +71,7 @@ export function CreateGroupForm() {
       setLoadingUsers(true);
       try {
         const usersRef = collection(db, "users");
-        const q = query(usersRef, where("isAdmin", "!=", true)); 
+        const q = query(usersRef, where("isAdmin", "!=", true));
         const querySnapshot = await getDocs(q);
         const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
         setUsers(fetchedUsers);
@@ -86,12 +88,12 @@ export function CreateGroupForm() {
   async function onSubmit(values: z.infer<typeof groupFormSchema>) {
     setIsSubmitting(true);
     try {
-      const groupData: any = { 
+      const groupData: any = {
         groupName: values.groupName,
         description: values.description,
         totalPeople: values.totalPeople,
         totalAmount: values.totalAmount,
-        members: values.memberUsernames, 
+        members: values.memberUsernames,
         tenure: values.tenure,
         startDate: format(values.startDate, "yyyy-MM-dd"),
       };
@@ -101,6 +103,9 @@ export function CreateGroupForm() {
       }
       if (values.commission !== undefined) {
         groupData.commission = values.commission;
+      }
+      if (values.penaltyPercentage !== undefined) {
+        groupData.penaltyPercentage = values.penaltyPercentage;
       }
       if (values.biddingType) {
         groupData.biddingType = values.biddingType;
@@ -133,21 +138,26 @@ export function CreateGroupForm() {
       setIsSubmitting(false);
     }
   }
-  
+
   const today = new Date();
-  const fiveYearsFromNow = subYears(today, -5); 
+  const fiveYearsFromNow = subYears(today, -5);
 
 
   const handleNumericInputChange = (event: React.ChangeEvent<HTMLInputElement>, field: any) => {
-    const strVal = event.target.value;
-    if (strVal.trim() === '') {
-      field.onChange(undefined);
-    } else if (/^\d+$/.test(strVal.trim())) {
-      field.onChange(parseInt(strVal.trim(), 10));
+    const valStr = event.target.value.trim();
+    if (valStr === '') {
+      field.onChange(undefined); // Set to undefined if empty
     } else {
-      // Keep current value or set to NaN for Zod to catch as invalid if not purely numeric
-      // Or, pass the string directly if Zod schema handles non-numeric string validation
-      field.onChange(strVal); // Let Zod handle non-numeric strings if schema allows
+      const num = parseInt(valStr, 10);
+      if (!isNaN(num)) {
+        field.onChange(num); // Set to parsed number if valid
+      } else {
+        // If not a valid number (e.g., contains non-digits),
+        // we might want to keep the string to let Zod show an error,
+        // or set to undefined to signal an invalid number.
+        // For this case, let's set to undefined to rely on Zod's number type coercion.
+        field.onChange(undefined);
+      }
     }
   };
 
@@ -231,19 +241,19 @@ export function CreateGroupForm() {
                 )}
               />
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField control={form.control} name="rate" render={({ field }) => ( 
+                <FormField control={form.control} name="rate" render={({ field }) => (
                     <FormItem>
                         <FormLabel>Monthly Installment (₹)</FormLabel>
                         <div className="flex items-center gap-2">
                             <LandmarkIcon className="h-4 w-4 text-muted-foreground" />
                             <FormControl>
-                              <Input 
-                                type="text" 
-                                placeholder="e.g., 5000" 
-                                {...field} 
-                                value={field.value === undefined ? '' : String(field.value)} 
+                              <Input
+                                type="text"
+                                placeholder="e.g., 5000"
+                                {...field}
+                                value={field.value === undefined ? '' : String(field.value)}
                                 onChange={e => handleNumericInputChange(e, field)}
                               />
                             </FormControl>
@@ -256,22 +266,40 @@ export function CreateGroupForm() {
                         <FormLabel>Commission (%)</FormLabel>
                          <div className="flex items-center gap-2">
                             <FormControl>
-                              <Input 
-                                type="text" 
-                                placeholder="e.g., 2" 
-                                {...field} 
-                                value={field.value === undefined ? '' : String(field.value)} 
+                              <Input
+                                type="text"
+                                placeholder="e.g., 2"
+                                {...field}
+                                value={field.value === undefined ? '' : String(field.value)}
                                 onChange={e => handleNumericInputChange(e, field)}
                               />
                             </FormControl>
-                            <Tag className="h-4 w-4 text-muted-foreground" /> 
+                            <Tag className="h-4 w-4 text-muted-foreground" />
                         </div>
                         <FormMessage />
                     </FormItem>
                 )} />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField control={form.control} name="penaltyPercentage" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Penalty Percentage (%)</FormLabel>
+                         <div className="flex items-center gap-2">
+                            <FormControl>
+                              <Input
+                                type="text"
+                                placeholder="e.g., 1"
+                                {...field}
+                                value={field.value === undefined ? '' : String(field.value)}
+                                onChange={e => handleNumericInputChange(e, field)}
+                              />
+                            </FormControl>
+                            <PercentIcon className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <FormMessage />
+                    </FormItem>
+                )} />
                 <FormField control={form.control} name="biddingType" render={({ field }) => (
                     <FormItem>
                         <FormLabel>Bidding Type</FormLabel>
@@ -290,25 +318,26 @@ export function CreateGroupForm() {
                         <FormMessage />
                     </FormItem>
                 )} />
-                <FormField control={form.control} name="minBid" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Min Bid Amount (₹)</FormLabel>
-                        <div className="flex items-center gap-2">
-                          <LandmarkIcon className="h-4 w-4 text-muted-foreground" />
-                          <FormControl>
-                            <Input 
-                              type="text" 
-                              placeholder="e.g., 1000" 
-                              {...field} 
-                              value={field.value === undefined ? '' : String(field.value)} 
-                              onChange={e => handleNumericInputChange(e, field)}
-                            />
-                          </FormControl>
-                        </div>
-                        <FormMessage />
-                    </FormItem>
-                )} />
             </div>
+
+            <FormField control={form.control} name="minBid" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Min Bid Amount (₹)</FormLabel>
+                    <div className="flex items-center gap-2">
+                      <LandmarkIcon className="h-4 w-4 text-muted-foreground" />
+                      <FormControl>
+                        <Input
+                          type="text"
+                          placeholder="e.g., 1000"
+                          {...field}
+                          value={field.value === undefined ? '' : String(field.value)}
+                          onChange={e => handleNumericInputChange(e, field)}
+                        />
+                      </FormControl>
+                    </div>
+                    <FormMessage />
+                </FormItem>
+            )} />
 
 
             <FormField control={form.control} name="memberUsernames" render={() => (

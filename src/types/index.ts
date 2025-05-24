@@ -16,7 +16,7 @@ export interface User {
   groups: string[]; // Array of group IDs
   isAdmin?: boolean;
   dueAmount?: number; // Optional: due amount for the user
-  dueType?: "Day" | "Week" | "Month"; 
+  dueType?: "Day" | "Week" | "Month";
 }
 
 export interface Group {
@@ -30,6 +30,7 @@ export interface Group {
   startDate?: string; // YYYY-MM-DD
   rate?: number; // Monthly installment amount
   commission?: number; // Optional: foreman commission percentage
+  penaltyPercentage?: number; // Optional: penalty percentage for late payments, etc.
   biddingType?: "auction" | "random" | "pre-fixed"; // Optional: type of bidding
   minBid?: number; // Optional: min bid amount
   auctionMonth?: string;
@@ -86,7 +87,6 @@ export interface AuctionRecord {
   netDiscount?: number | null;
   dividendPerMember?: number | null;
   finalAmountToBePaid?: number | null; // This is the installment paid by all members
-  amountPaidToWinner?: number | null; // This field is being deprecated
   recordedAt: import('firebase/firestore').Timestamp;
   virtualTransactionId?: string;
 }
@@ -111,7 +111,7 @@ export interface CollectionRecord { // For payments RECEIVED FROM CUSTOMERS
   groupName: string;
   auctionId?: string | null;
   auctionNumber?: number | null;
-  userId: string; 
+  userId: string;
   userUsername: string;
   userFullname: string;
   paymentDate: string; // YYYY-MM-DD
@@ -130,11 +130,11 @@ export interface CollectionRecord { // For payments RECEIVED FROM CUSTOMERS
 // For payments MADE BY THE COMPANY (e.g., to auction winners, other payouts recorded by admin)
 export interface PaymentRecord {
   id: string; // Firestore document ID
-  groupId?: string | null; 
+  groupId?: string | null;
   groupName?: string | null;
   auctionId?: string | null;
   auctionNumber?: number | null;
-  userId?: string | null; 
+  userId?: string | null;
   userUsername?: string | null;
   userFullname?: string | null;
   paymentDate: string; // YYYY-MM-DD
@@ -143,14 +143,14 @@ export interface PaymentRecord {
   amount: number;
   remarks?: string | null;
   recordedAt: import('firebase/firestore').Timestamp;
-  recordedBy?: "Admin" | string; 
+  recordedBy?: "Admin" | string;
   virtualTransactionId?: string;
   // Guarantor fields
   guarantorFullName?: string;
   guarantorRelationship?: string;
   guarantorPhone?: string;
   guarantorAddress?: string;
-  guarantorAadhaarNumber?: string; // New
-  guarantorPanCardNumber?: string; // New
-  guarantorAuthDocUrl?: string; // This will be for the general authorization document
+  guarantorAadhaarNumber?: string;
+  guarantorPanCardNumber?: string;
+  guarantorAuthDocUrl?: string;
 }
