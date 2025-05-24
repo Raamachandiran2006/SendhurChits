@@ -38,7 +38,8 @@ import {
   ChevronRight,
   ChevronDown,
   Landmark,
-  ClockIcon // Added ClockIcon for Due Type
+  ClockIcon,
+  Sheet // Added Sheet icon for Due Sheet
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, subYears, parseISO, subDays, isAfter } from "date-fns";
@@ -739,15 +740,15 @@ export default function AdminUserDetailPage() {
                 <Card>
                   <CardHeader><CardTitle className="text-lg">Update Documents (Optional)</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
-                    <FormField control={form.control} name="aadhaarCard" render={({ field: { onChange, onBlur, name, refValue, ...rest }}) => (
+                    <FormField control={form.control} name="aadhaarCard" render={({ field: { onChange, onBlur, name, ref, ...rest }}) => (
                       <FormItem><FormLabel>Aadhaar Card (Upload new to replace)</FormLabel>
                         {user.aadhaarCardUrl && <p className="text-xs text-muted-foreground">Current: <a href={user.aadhaarCardUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Document</a></p>}
-                        <FormControl><Input type="file" onChange={(e) => {const file = e.target.files?.[0]; onChange(file ?? null)}} onBlur={onBlur} name={name} ref={refValue} accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
+                        <FormControl><Input type="file" onChange={(e) => {const file = e.target.files?.[0]; onChange(file ?? null)}} onBlur={onBlur} name={name} ref={ref} accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
                       </FormItem>)} />
-                    <FormField control={form.control} name="panCard" render={({ field: { onChange, onBlur, name, refValue, ...rest }}) => (
+                    <FormField control={form.control} name="panCard" render={({ field: { onChange, onBlur, name, ref, ...rest }}) => (
                       <FormItem><FormLabel>PAN Card (Upload new to replace)</FormLabel>
                          {user.panCardUrl && <p className="text-xs text-muted-foreground">Current: <a href={user.panCardUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Document</a></p>}
-                        <FormControl><Input type="file" onChange={(e) => {const file = e.target.files?.[0]; onChange(file ?? null)}} onBlur={onBlur} name={name} ref={refValue} accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
+                        <FormControl><Input type="file" onChange={(e) => {const file = e.target.files?.[0]; onChange(file ?? null)}} onBlur={onBlur} name={name} ref={ref} accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
                       </FormItem>)} />
                   </CardContent>
                 </Card>
@@ -763,7 +764,7 @@ export default function AdminUserDetailPage() {
                       )}
                     {!showCamera && (
                       <>
-                        <FormField control={form.control} name="recentPhotographFile" render={({ field: { onChange, onBlur, name, refValue, ...rest }}) => (<FormItem><FormLabel>Upload New Photo</FormLabel>
+                        <FormField control={form.control} name="recentPhotographFile" render={({ field: { onChange, onBlur, name, ref, ...rest }}) => (<FormItem><FormLabel>Upload New Photo</FormLabel>
                             <FormControl><Input type="file"
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
@@ -775,7 +776,7 @@ export default function AdminUserDetailPage() {
                                   setCapturedImage(user.photoUrl || null);
                                 }
                               }}
-                              onBlur={onBlur} name={name} ref={refValue}
+                              onBlur={onBlur} name={name} ref={ref}
                               accept="image/jpeg,image/png" /></FormControl><FormMessage />
                           </FormItem>)} />
                         <div className="text-center my-2 text-sm text-muted-foreground">OR</div>
@@ -979,6 +980,43 @@ export default function AdminUserDetailPage() {
                         </Table>
                     </div>
                     )}
+                </CardContent>
+              </Card>
+            </section>
+            <Separator />
+            <section>
+              <Card className="shadow-md">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <Sheet className="mr-2 h-6 w-6 text-primary" />
+                    <CardTitle className="text-xl font-bold text-foreground">Due Sheet</CardTitle>
+                  </div>
+                  <CardDescription>Detailed breakdown of dues for this user.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Due No</TableHead>
+                          <TableHead>Due Date</TableHead>
+                          <TableHead className="text-right">Amount (₹)</TableHead>
+                          <TableHead className="text-right">Penalty (₹)</TableHead>
+                          <TableHead className="text-right">Paid (₹)</TableHead>
+                          <TableHead className="text-right">Balance (₹)</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {/* Placeholder for Due Sheet Data - will be empty for now */}
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                            Detailed due sheet data not yet available for this user.
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             </section>
