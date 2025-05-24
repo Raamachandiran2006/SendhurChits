@@ -6,17 +6,15 @@ import type { User } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Users, PlusCircle } from "lucide-react";
+import { Loader2, Users, PlusCircle, Edit } from "lucide-react"; // Added Edit for actions
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
-// Removed: import { useLanguage } from "@/contexts/LanguageContext"; 
 
 export default function AdminUsersPage() {
-  // Removed: const { t } = useLanguage(); 
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -26,7 +24,7 @@ export default function AdminUsersPage() {
       setLoading(true);
       try {
         const usersRef = collection(db, "users");
-        const q = query(usersRef, orderBy("fullname")); 
+        const q = query(usersRef, orderBy("fullname"));
         const querySnapshot = await getDocs(q);
         const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
         setUsers(fetchedUsers);
@@ -41,19 +39,16 @@ export default function AdminUsersPage() {
 
   const formatDateSafe = (dateString: string | undefined | null): string => {
     if (!dateString) {
-      // Reverted: return t('common.notAvailable');
       return "N/A";
     }
     try {
       const date = parseISO(dateString);
       if (isNaN(date.getTime())) {
-        // Reverted: return t('common.notAvailable');
         return "N/A";
       }
       return format(date, "dd MMM yyyy");
     } catch (e) {
       console.warn("Date formatting error for:", dateString, e);
-      // Reverted: return t('common.notAvailable');
       return "N/A";
     }
   };
@@ -66,8 +61,7 @@ export default function AdminUsersPage() {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        {/* Reverted: <p className="mt-4 text-lg">{t('common.loading')}</p> */}
-        <p className="mt-4 text-lg">Loading...</p>
+        <p className="mt-4 text-lg">Loading users...</p>
       </div>
     );
   }
@@ -78,15 +72,12 @@ export default function AdminUsersPage() {
         <div className="flex items-center gap-3">
             <Users className="h-8 w-8 text-primary"/>
             <div>
-                {/* Reverted: <h1 className="text-3xl font-bold text-foreground">{t('adminUsersPageTitle')}</h1> */}
                 <h1 className="text-3xl font-bold text-foreground">User Management</h1>
-                {/* Reverted: <p className="text-muted-foreground">{t('adminUsersPageDescription')}</p> */}
                 <p className="text-muted-foreground">View and manage all registered users.</p>
             </div>
         </div>
         <Button asChild className="mt-4 sm:mt-0 bg-accent text-accent-foreground hover:bg-accent/90">
           <Link href="/admin/users/create">
-            {/* Reverted: <PlusCircle className="mr-2 h-4 w-4" /> {t('adminUsersCreateUserButton')} */}
             <PlusCircle className="mr-2 h-4 w-4" /> Create New User
           </Link>
         </Button>
@@ -98,7 +89,6 @@ export default function AdminUsersPage() {
         <CardContent>
           {users.length === 0 ? (
             <div className="text-center py-10">
-              {/* Reverted: <p className="text-muted-foreground">{t('adminUsersNoUsersFound')}</p> */}
               <p className="text-muted-foreground">No users found. Click "Create New User" to add one.</p>
             </div>
           ) : (
@@ -106,28 +96,36 @@ export default function AdminUsersPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    {/* Reverted: <TableHead>{t('adminUsersTableFullName')}</TableHead> */}
                     <TableHead>Full Name</TableHead>
-                    {/* Reverted: <TableHead>{t('adminUsersTableUsernameId')}</TableHead> */}
                     <TableHead>Username (ID)</TableHead>
-                    {/* Reverted: <TableHead>{t('adminUsersTablePhone')}</TableHead> */}
                     <TableHead>Phone Number</TableHead>
-                    {/* Reverted: <TableHead>{t('adminUsersTableDob')}</TableHead> */}
                     <TableHead>Date of Birth</TableHead>
-                    {/* Reverted: <TableHead>{t('adminUsersTableRole')}</TableHead> */}
                     <TableHead>Role</TableHead>
-                    {/* Reverted: <TableHead className="text-right">{t('adminUsersTableGroupsJoined')}</TableHead> */}
                     <TableHead className="text-right">Groups Joined</TableHead>
+                    <TableHead className="text-center">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {users.map((user) => (
-                    <TableRow 
-                      key={user.id} 
-                      onClick={() => handleUserRowClick(user.id)}
-                      className="cursor-pointer hover:bg-muted/70 transition-colors"
-                    >
-                      <TableCell className="font-medium">{user.fullname}</TableCell><TableCell>{user.username}</TableCell><TableCell>{user.phone}</TableCell><TableCell>{formatDateSafe(user.dob)}</TableCell><TableCell>{user.isAdmin || user.username === 'admin' ? (<Badge variant="destructive">Admin</Badge>) : (<Badge variant="secondary">User</Badge>)}</TableCell><TableCell className="text-right">{user.groups?.length || 0}</TableCell>
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium cursor-pointer hover:underline" onClick={() => handleUserRowClick(user.id)}>{user.fullname}</TableCell>
+                      <TableCell className="cursor-pointer hover:underline" onClick={() => handleUserRowClick(user.id)}>{user.username}</TableCell>
+                      <TableCell className="cursor-pointer hover:underline" onClick={() => handleUserRowClick(user.id)}>{user.phone}</TableCell>
+                      <TableCell className="cursor-pointer hover:underline" onClick={() => handleUserRowClick(user.id)}>{formatDateSafe(user.dob)}</TableCell>
+                      <TableCell className="cursor-pointer hover:underline" onClick={() => handleUserRowClick(user.id)}>{user.isAdmin || user.username === 'admin' ? (<Badge variant="destructive">Admin</Badge>) : (<Badge variant="secondary">User</Badge>)}</TableCell>
+                      <TableCell className="text-right cursor-pointer hover:underline" onClick={() => handleUserRowClick(user.id)}>{user.groups?.length || 0}</TableCell>
+                      <TableCell className="text-center">
+                        <Button 
+                          asChild 
+                          variant="destructive" 
+                          size="sm" 
+                          className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                          <Link href={`/admin/collection/record?userId=${user.id}&fullname=${encodeURIComponent(user.fullname)}&username=${encodeURIComponent(user.username)}`}>
+                            Collection
+                          </Link>
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

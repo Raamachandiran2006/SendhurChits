@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -16,10 +17,10 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc, orderBy } from "firebase/firestore";
-import type { Group, User, CollectionRecord, Admin, AuctionRecord } from "@/types"; // Assuming Admin type exists or is User
+import type { Group, User, CollectionRecord, Admin, AuctionRecord } from "@/types"; 
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const formatTimeTo12Hour = (timeStr?: string): string => {
@@ -60,7 +61,7 @@ const NO_AUCTION_SELECTED_VALUE = "no-auction-specific-collection";
 
 const recordCollectionFormSchema = z.object({
   selectedGroupId: z.string().min(1, "Please select a Group."),
-  selectedAuctionId: z.string().optional(), // Optional: ID of the auction this collection is for
+  selectedAuctionId: z.string().optional(), 
   selectedUserId: z.string().min(1, "Please select a User."),
   paymentDate: z.date({ required_error: "Payment date is required." }),
   paymentTime: z.string().min(1, "Payment time is required."),
@@ -78,7 +79,12 @@ const generateVirtualId = () => Math.floor(100000 + Math.random() * 900000).toSt
 export function AdminRecordCollectionForm() {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { loggedInEntity, userType } = useAuth(); 
+
+  const preselectedUserId = searchParams.get("userId");
+  const preselectedUserFullname = searchParams.get("fullname");
+  const preselectedUserUsername = searchParams.get("username");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -111,7 +117,7 @@ export function AdminRecordCollectionForm() {
     },
   });
 
-  const { watch, setValue } = form;
+  const { watch, setValue, reset } = form;
   const watchedGroupId = watch("selectedGroupId");
   const watchedCollectionLocationOption = watch("collectionLocationOption");
 
@@ -191,6 +197,26 @@ export function AdminRecordCollectionForm() {
       fetchAuctions();
     }
   }, [watchedGroupId, groups, setValue, toast]);
+
+  // Effect to pre-select user if userId is in query params and members are loaded
+  useEffect(() => {
+    if (preselectedUserId && groupMembers.length > 0) {
+      const userExistsInGroup = groupMembers.some(member => member.id === preselectedUserId);
+      if (userExistsInGroup) {
+        setValue("selectedUserId", preselectedUserId, { shouldValidate: true });
+      } else if (preselectedUserFullname) {
+        // If user not in currently selected group, clear selection and maybe show a note
+        setValue("selectedUserId", "");
+        toast({
+          variant: "default",
+          title: "User Not in Selected Group",
+          description: `${preselectedUserFullname} (@${preselectedUserUsername}) is not a member of the currently selected group. Please select a group they belong to, or a different user.`,
+          duration: 7000,
+        });
+      }
+    }
+  }, [preselectedUserId, groupMembers, setValue, preselectedUserFullname, preselectedUserUsername, toast]);
+
 
   const handleFetchLocation = () => {
     if (navigator.geolocation) {
@@ -292,10 +318,11 @@ export function AdminRecordCollectionForm() {
         });
 
       toast({ title: "Collection Recorded", description: `Payment of ${formatCurrency(values.amount)} from ${selectedUser.fullname} recorded by admin.` });
-      form.reset({
-        selectedGroupId: "", 
+      // Reset form but keep preselected user if navigating from user page
+      reset({
+        selectedGroupId: preselectedUserId ? values.selectedGroupId : "", 
         selectedAuctionId: undefined,
-        selectedUserId: "",
+        selectedUserId: preselectedUserId && groupMembers.some(m => m.id === preselectedUserId) ? preselectedUserId : "",
         paymentDate: new Date(),
         paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
         paymentType: undefined,
@@ -394,7 +421,13 @@ export function AdminRecordCollectionForm() {
                   <Select onValueChange={field.onChange} value={field.value} disabled={!watchedGroupId || loadingMembers}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={!watchedGroupId ? "Select group first" : (loadingMembers ? "Loading members..." : "Select a user")} />
+                        <SelectValue 
+                          placeholder={
+                            preselectedUserFullname && preselectedUserUsername ? 
+                            `${preselectedUserFullname} (@${preselectedUserUsername})` :
+                            (!watchedGroupId ? "Select group first" : (loadingMembers ? "Loading members..." : "Select a user"))
+                          } 
+                        />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
