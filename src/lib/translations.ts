@@ -28,31 +28,32 @@ export const translations = {
     tamil: "Tamil",
   },
   ta: {
-    adminOverview: "நிர்வாக கண்ணோட்டம்", // Tamil: Admin Overview
-    totalUsers: "மொத்த பயனர்கள்", // Tamil: Total Users
-    totalGroups: "மொத்த குழுக்கள்", // Tamil: Total Groups
-    totalEmployees: "மொத்த ஊழியர்கள்", // Tamil: Total Employees
-    systemStatus: "கணினி நிலை", // Tamil: System Status
-    operational: "செயல்பாட்டில் உள்ளது", // Tamil: Operational
-    quickActions: "விரைவு நடவடிக்கைகள்", // Tamil: Quick Actions
-    manageUsers: "பயனர்களை நிர்வகி", // Tamil: Manage Users
-    manageGroups: "குழுக்களை நிர்வகி", // Tamil: Manage Groups
-    manageEmployees: "ஊழியர்களை நிர்வகி", // Tamil: Manage Employees
-    createGroup: "புதிய குழுவை உருவாக்கு", // Tamil: Create Group
-    welcomeAdmin: "வரவேற்கிறோம், {name}!", // Tamil: Welcome, {name}!
-    adminTips: "சிட்கனெக்டை நிர்வகிப்பதற்கான சில குறிப்புகள் இங்கே:", // Tamil: Admin Tips
-    sidebarOverview: "கண்ணோட்டம்", // Tamil: Overview
-    sidebarManageUsers: "பயனர்களை நிர்வகி", // Tamil: Manage Users
-    sidebarManageGroups: "குழுக்களை நிர்வகி", // Tamil: Manage Groups
-    sidebarCreateGroup: "குழுவை உருவாக்கு", // Tamil: Create Group
-    sidebarManageEmployees: "ஊழியர்களை நிர்வகி", // Tamil: Manage Employees
-    sidebarPayments: "பணம் செலுத்துதல்", // Tamil: Payments
-    sidebarLogout: "வெளியேறு", // Tamil: Logout
-    language: "மொழி", // Tamil: Language
-    english: "ஆங்கிலம்", // Tamil: English
-    tamil: "தமிழ்", // Tamil: Tamil
+    adminOverview: "அட்மின் ஓவர்வியூ",
+    totalUsers: "டோட்டல் யூசர்ஸ்",
+    totalGroups: "டோட்டல் குரூப்ஸ்",
+    totalEmployees: "டோட்டல் எம்ப்ளாயீஸ்",
+    systemStatus: "சிஸ்டம் ஸ்டேட்டஸ்",
+    operational: "ஆப்பரேஷனல்",
+    quickActions: "குயிக் ஆக்ஷன்ஸ்",
+    manageUsers: "மேனேஜ் யூசர்ஸ்",
+    manageGroups: "மேனேஜ் குரூப்ஸ்",
+    manageEmployees: "மேனேஜ் எம்ப்ளாயீஸ்",
+    createGroup: "கிரியேட் குரூப்",
+    welcomeAdmin: "வெல்கம், {name}!", 
+    adminTips: "சிட்கனெக்டை நிர்வகிப்பதற்கான சில குறிப்புகள்:", // This can stay more traditional Tamil if preferred
+    sidebarOverview: "ஓவர்வியூ",
+    sidebarManageUsers: "மேனேஜ் யூசர்ஸ்",
+    sidebarManageGroups: "மேனேஜ் குரூப்ஸ்",
+    sidebarCreateGroup: "கிரியேட் குரூப்",
+    sidebarManageEmployees: "மேனேஜ் எம்ப்ளாயீஸ்",
+    sidebarPayments: "பேமெண்ட்ஸ்",
+    sidebarLogout: "லாக்அவுட்",
+    language: "லாங்குவேஜ்",
+    english: "இங்கிலீஷ்",
+    tamil: "தமிழ்",
   }
 };
 
 // This helps with type safety and autocompletion for keys
 export type TranslationKeys = keyof typeof translations.en;
+
