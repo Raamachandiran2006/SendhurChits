@@ -1,11 +1,11 @@
 
 "use client";
 
-import Link from "next/link";
+import Link from "link-next"; // Corrected import
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, UserCircle, Shield, Briefcase, Landmark } from "lucide-react"; // Removed CreditCard, Wallet
+import { LogOut, UserCircle, Shield, Briefcase, Landmark, Globe } from "lucide-react"; // Added Globe
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,9 +13,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import type { User, Employee } from "@/types";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext"; // Import useLanguage
+import React from "react"; // Import React for DropdownMenuRadioGroup
 
 const formatCurrency = (amount: number | null | undefined) => {
   if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
@@ -24,6 +28,13 @@ const formatCurrency = (amount: number | null | undefined) => {
 
 export function AppHeader() {
   const { loggedInEntity, userType, logout } = useAuth();
+  // Conditionally use useLanguage only if userType is admin, or handle gracefully if context is not available
+  const isAdmin = userType === 'admin';
+  const languageHook = isAdmin ? useLanguage() : null;
+  const language = languageHook?.language;
+  const setLanguage = languageHook?.setLanguage;
+  const t = languageHook?.t;
+
 
   if (!loggedInEntity) return null;
 
@@ -52,7 +63,9 @@ export function AppHeader() {
         
         <div className="flex items-center gap-4">
           <div className="hidden sm:flex flex-col items-end text-right">
-            <span className="text-sm text-muted-foreground">Welcome, {entityFullname}</span>
+            <span className="text-sm text-muted-foreground">
+              {isAdmin && t ? t('welcomeAdmin').replace('{name}', entityFullname) : `Welcome, ${entityFullname}`}
+            </span>
             {userType === 'user' && userDueAmount !== undefined && (
               <span className={cn(
                 "text-xs font-semibold",
@@ -62,6 +75,26 @@ export function AppHeader() {
               </span>
             )}
           </div>
+
+          {isAdmin && language && setLanguage && t && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Globe className="mr-2 h-4 w-4" />
+                  {language === 'en' ? t('english') : t('tamil')}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>{t('language')}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup value={language} onValueChange={(value) => setLanguage(value as 'en' | 'ta')}>
+                  <DropdownMenuRadioItem value="en">{t('english')}</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="ta">{t('tamil')}</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
@@ -78,8 +111,7 @@ export function AppHeader() {
                   <p className="text-xs leading-none text-muted-foreground">
                     {userType === 'employee' ? `Employee ID: ${entityUsername}` : (userType === 'admin' ? `@${entityUsername}` : `@${entityUsername}`)}
                   </p>
-                  {/* Due Amount display removed from here for regular users, already shown outside */}
-                  <div className="sm:hidden mt-1"> {/* Show due amount here for small screens */}
+                  <div className="sm:hidden mt-1">
                     {userType === 'user' && userDueAmount !== undefined && (
                         <span className={cn(
                             "text-xs font-semibold",
@@ -92,11 +124,11 @@ export function AppHeader() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {userType === 'admin' && (
+              {userType === 'admin' && t && (
                  <DropdownMenuItem asChild>
                    <Link href="/admin" className="flex items-center">
                     <Shield className="mr-2 h-4 w-4" />
-                    Admin Panel
+                    {t('sidebarOverview')}
                    </Link>
                  </DropdownMenuItem>
               )}
@@ -127,7 +159,7 @@ export function AppHeader() {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive-foreground focus:bg-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
-                Log out
+                {isAdmin && t ? t('sidebarLogout') : 'Log out'}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

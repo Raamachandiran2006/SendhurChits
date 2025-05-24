@@ -9,6 +9,7 @@ import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { LanguageProvider } from "@/contexts/LanguageContext"; // Import LanguageProvider
 
 
 export default function AdminLayout({
@@ -43,26 +44,26 @@ export default function AdminLayout({
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen flex-col">
-        <AppHeader />
-        <div className="flex flex-1">
-          <AdminSidebar />
-          <SidebarInset>
-            <div className="md:hidden p-2 border-b">
-              <SidebarTrigger />
-            </div>
-            <main className="flex-1 p-4 md:p-8 bg-secondary/30">
-              {children}
-            </main>
-          </SidebarInset>
+    <LanguageProvider> {/* Wrap with LanguageProvider */}
+      <SidebarProvider>
+        <div className="flex min-h-screen flex-col">
+          <AppHeader />
+          <div className="flex flex-1">
+            <AdminSidebar />
+            <SidebarInset>
+              <div className="md:hidden p-2 border-b">
+                <SidebarTrigger />
+              </div>
+              <main className="flex-1 p-4 md:p-8 bg-secondary/30">
+                {children}
+              </main>
+            </SidebarInset>
+          </div>
+          <footer className="py-4 text-center text-sm text-muted-foreground border-t md:ml-[var(--sidebar-width-icon)] peer-data-[state=expanded]:md:ml-[var(--sidebar-width)] transition-[margin-left] duration-300 ease-in-out">
+            © {new Date().getFullYear()} ChitConnect Admin Panel.
+          </footer>
         </div>
-        <footer className="py-4 text-center text-sm text-muted-foreground border-t md:ml-[var(--sidebar-width-icon)] peer-data-[state=expanded]:md:ml-[var(--sidebar-width)] transition-[margin-left] duration-300 ease-in-out">
-           © {new Date().getFullYear()} ChitConnect Admin Panel.
-        </footer>
-      </div>
-    </SidebarProvider>
+      </SidebarProvider>
+    </LanguageProvider>
   );
 }
-
-    
