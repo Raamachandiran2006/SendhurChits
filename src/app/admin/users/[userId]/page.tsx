@@ -17,10 +17,10 @@ import {
   User as UserIconLucide,
   Info,
   AlertTriangle,
-  Phone, // Corrected: Removed PhoneIcon, ensured Phone is here
+  Phone,
   Mail,
   CalendarDays,
-  Home as HomeIcon, // Changed from Home to HomeIcon to match usage for address
+  Home as HomeIcon,
   Users as GroupIcon,
   Briefcase,
   FileText,
@@ -41,6 +41,7 @@ import {
   ClockIcon,
   Sheet,
   Contact,
+  CreditCard as CreditCardIcon, // Added CreditCardIcon for guarantor documents
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, subYears, parseISO, subDays, isAfter } from "date-fns";
@@ -163,7 +164,7 @@ interface AdminUserTransaction {
   amount: number;
   mode: string | null;
   remarksOrSource: string | null;
-  originalSource: "CollectionRecord" | "PaymentRecord";
+  originalSource: "CollectionRecord" | "PaymentRecord"; // To distinguish the source for keys if needed
   virtualTransactionId?: string;
 }
 
@@ -234,6 +235,9 @@ export default function AdminUserDetailPage() {
   const [selectedTransactionFilter, setSelectedTransactionFilter] = useState<TransactionFilterType>("all");
   const [expandedTransactionRows, setExpandedTransactionRows] = useState<Record<string, boolean>>({});
 
+  const [guarantorDetailsList, setGuarantorDetailsList] = useState<AdminPaymentRecordType[]>([]);
+  const [loadingGuarantorDetails, setLoadingGuarantorDetails] = useState(true);
+
   const [showCamera, setShowCamera] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
@@ -250,9 +254,10 @@ export default function AdminUserDetailPage() {
       setError("Error loading user details.");
       setLoading(false);
       setLoadingTransactions(false);
+      setLoadingGuarantorDetails(false);
       return;
     }
-    setLoading(true); setLoadingTransactions(true);
+    setLoading(true); setLoadingTransactions(true); setLoadingGuarantorDetails(true);
     setError(null); setTransactionError(null);
     try {
       const userDocRef = doc(db, "users", userId);
@@ -261,7 +266,7 @@ export default function AdminUserDetailPage() {
       if (!userDocSnap.exists()) {
         setError("User data not available.");
         setUser(null);
-        setLoading(false); setLoadingTransactions(false);
+        setLoading(false); setLoadingTransactions(false); setLoadingGuarantorDetails(false);
         return;
       }
       const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
@@ -285,6 +290,7 @@ export default function AdminUserDetailPage() {
       });
       setCapturedImage(userData.photoUrl || null);
 
+      // Fetch User Groups
       if (userData.groups && userData.groups.length > 0) {
         const groupsRef = collection(db, "groups");
         const groupIds = userData.groups.slice(0, 30);
@@ -303,15 +309,14 @@ export default function AdminUserDetailPage() {
             const auctionSnapshot = await getDocs(auctionQuery);
             if (!auctionSnapshot.empty) {
               latestAuctionRecord = { id: auctionSnapshot.docs[0].id, ...auctionSnapshot.docs[0].data() } as AuctionRecord;
-              if (typeof groupData.rate === 'number' && typeof latestAuctionRecord.dividendPerMember === 'number') {
-                currentInstallment = groupData.rate - latestAuctionRecord.dividendPerMember;
+              if (typeof groupData.rate === 'number' && typeof latestAuctionRecord.finalAmountToBePaid === 'number') { // Use finalAmountToBePaid from auction record
+                currentInstallment = latestAuctionRecord.finalAmountToBePaid;
               } else if (typeof groupData.rate === 'number') {
                 currentInstallment = groupData.rate;
               }
             } else if (typeof groupData.rate === 'number') {
                  currentInstallment = groupData.rate;
             }
-
 
             fetchedGroupsWithFinancials.push({
               ...groupData,
@@ -325,6 +330,7 @@ export default function AdminUserDetailPage() {
         setUserGroupsWithFinancials([]);
       }
 
+      // Fetch Payment Transactions
       let combinedTransactions: AdminUserTransaction[] = [];
       const collectionsRef = collection(db, "collectionRecords");
       const collectionsQuery = query(collectionsRef, where("userId", "==", userId), orderBy("recordedAt", "desc"));
@@ -366,16 +372,30 @@ export default function AdminUserDetailPage() {
 
       combinedTransactions.sort((a,b) => b.dateTime.getTime() - a.dateTime.getTime());
       setRawUserTransactions(combinedTransactions);
-      setFilteredUserTransactions(combinedTransactions);
+      setFilteredUserTransactions(combinedTransactions); // Initially show all transactions
+      setLoadingTransactions(false);
+
+      // Fetch Guarantor Details from paymentRecords
+      const guarantorQuery = query(
+        collection(db, "paymentRecords"), 
+        where("userId", "==", userId), 
+        where("guarantorFullName", ">", ""), // Check if guarantorFullName is not empty or null
+        orderBy("recordedAt", "desc")
+      );
+      const guarantorSnapshot = await getDocs(guarantorQuery);
+      const fetchedGuarantorDetails = guarantorSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as AdminPaymentRecordType));
+      setGuarantorDetailsList(fetchedGuarantorDetails);
+      setLoadingGuarantorDetails(false);
+
 
     } catch (err) {
-      console.error("Error fetching user details/transactions:", err);
+      console.error("Error fetching user details/transactions/guarantors:", err);
       setError("Error loading user details.");
       setUser(null);
       setTransactionError("Failed to fetch payment history.");
+      setLoadingGuarantorDetails(false); // Ensure loading state is reset on error
     } finally {
       setLoading(false);
-      setLoadingTransactions(false);
     }
   }, [userId, form]);
 
@@ -398,10 +418,10 @@ export default function AdminUserDetailPage() {
       } else if (selectedTransactionFilter === "last30Days") {
         startDate = subDays(now, 30);
       } else {
-        setFilteredUserTransactions(rawUserTransactions);
+        setFilteredUserTransactions(rawUserTransactions); // Fallback to all if filter type is unknown
         return;
       }
-      startDate.setHours(0, 0, 0, 0);
+      startDate.setHours(0, 0, 0, 0); // Set to start of the day for comparison
       const filtered = rawUserTransactions.filter(tx => isAfter(tx.dateTime, startDate));
       setFilteredUserTransactions(filtered);
     };
@@ -410,7 +430,7 @@ export default function AdminUserDetailPage() {
 
   const requestCameraPermission = useCallback(async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setHasCameraPermission(false);
+      setHasCameraPermission(false); // Camera API not supported
       toast({ variant: 'destructive', title: 'Camera Not Supported', description: 'Your browser does not support camera access.' });
       return;
     }
@@ -419,7 +439,7 @@ export default function AdminUserDetailPage() {
       setHasCameraPermission(true);
       if (videoRef.current) videoRef.current.srcObject = stream;
     } catch (error) {
-      console.error("Error accessing camera:", error);
+      console.error("Error accessing camera:", error); 
       setHasCameraPermission(false);
       toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'Please enable camera permissions in your browser settings.' });
     }
@@ -430,16 +450,19 @@ export default function AdminUserDetailPage() {
     if (showCamera && hasCameraPermission === null) {
       requestCameraPermission();
     }
+    
     if (videoRef.current && videoRef.current.srcObject) {
         stream = videoRef.current.srcObject as MediaStream;
     }
+
     return () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
+      // Additional cleanup if camera was shown but then hidden
       if (showCamera && videoRef.current && videoRef.current.srcObject) {
         (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
-        videoRef.current.srcObject = null;
+        videoRef.current.srcObject = null; // Release the camera
       }
     };
   }, [showCamera, requestCameraPermission, hasCameraPermission]);
@@ -454,22 +477,23 @@ export default function AdminUserDetailPage() {
         const dataUrl = canvas.toDataURL('image/jpeg');
         setCapturedImage(dataUrl);
         form.setValue("recentPhotographWebcamDataUrl", dataUrl, { shouldValidate: true });
-        form.setValue("recentPhotographFile", null);
-        setShowCamera(false);
+        form.setValue("recentPhotographFile", null); // Clear file input if webcam used
+        setShowCamera(false); // Hide camera view after capture
+        // Stop camera stream
         if (videoRef.current?.srcObject) {
             (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
-            videoRef.current.srcObject = null;
-            setHasCameraPermission(null);
+            videoRef.current.srcObject = null; // Release the camera
+            setHasCameraPermission(null); // Reset permission status
         }
       }
     }
   };
 
   const handleRetake = () => {
-    setCapturedImage(user?.photoUrl || null);
+    setCapturedImage(user?.photoUrl || null); // Revert to original or null
     form.setValue("recentPhotographWebcamDataUrl", null);
-    setShowCamera(true);
-    setHasCameraPermission(null);
+    setShowCamera(true); // Show camera again
+    setHasCameraPermission(null); // Reset permission status to re-trigger request
   };
 
   const dataURLtoFile = (dataurl: string, filename: string): File => {
@@ -492,12 +516,13 @@ export default function AdminUserDetailPage() {
     if (!user) return;
     setIsSubmitting(true);
     try {
+      // Phone uniqueness check (if changed)
       if (values.phone !== user.phone) {
         const phoneQuery = query(collection(db, "users"), where("phone", "==", values.phone));
         const phoneSnapshot = await getDocs(phoneQuery);
         if (!phoneSnapshot.empty) {
           const existingUser = phoneSnapshot.docs[0];
-          if (existingUser.id !== userId) {
+          if (existingUser.id !== userId) { // Check if it's not the current user
             toast({ title: "Error", description: "Phone number already registered.", variant: "destructive" });
             setIsSubmitting(false);
             return;
@@ -513,28 +538,31 @@ export default function AdminUserDetailPage() {
         referralSourcePhone: values.referralSourcePhone || "",
         referralSourceAddress: values.referralSourceAddress || "",
         isAdmin: values.isAdmin,
-        dueAmount: values.dueAmount ?? undefined,
-        dueType: values.dueType ?? undefined,
+        dueAmount: values.dueAmount ?? undefined, // Save as undefined if null
+        dueType: values.dueType ?? undefined, // Save as undefined if null
       };
       if (values.password && values.password.length >= 6) {
-        updatedUserData.password = values.password;
+        updatedUserData.password = values.password; // Only update password if provided
       }
 
       let oldPhotoUrl = user.photoUrl;
 
+      // Handle Photograph
       if (values.recentPhotographFile) {
-        if (oldPhotoUrl) { try { await deleteObject(storageRef(storage, oldPhotoUrl)); } catch (e) { console.warn("Old photo delete failed", e);}}
+        if (oldPhotoUrl) { try { await deleteObject(storageRef(storage, oldPhotoUrl));} catch(e) {console.warn("Old photo delete failed", e);}}
         updatedUserData.photoUrl = await uploadFile(values.recentPhotographFile, `userFiles/${user.phone}/photo/${values.recentPhotographFile.name}`);
       } else if (values.recentPhotographWebcamDataUrl && values.recentPhotographWebcamDataUrl !== user.photoUrl) {
-        if (oldPhotoUrl) { try { await deleteObject(storageRef(storage, oldPhotoUrl)); } catch (e) { console.warn("Old photo delete failed", e);}}
+        if (oldPhotoUrl) { try { await deleteObject(storageRef(storage, oldPhotoUrl));} catch(e) {console.warn("Old photo delete failed", e);}}
         const photoFile = dataURLtoFile(values.recentPhotographWebcamDataUrl, `webcam_photo_${Date.now()}.jpg`);
         updatedUserData.photoUrl = await uploadFile(photoFile, `userFiles/${user.phone}/photo/${photoFile.name}`);
       }
 
+      // Handle Aadhaar Card
       if (values.aadhaarCard) {
         if(user.aadhaarCardUrl) {try { await deleteObject(storageRef(storage, user.aadhaarCardUrl));} catch(e) {console.warn("Old aadhaar delete failed", e);}}
         updatedUserData.aadhaarCardUrl = await uploadFile(values.aadhaarCard, `userFiles/${user.phone}/aadhaar/${values.aadhaarCard.name}`);
       }
+      // Handle PAN Card
       if (values.panCard) {
          if(user.panCardUrl) {try { await deleteObject(storageRef(storage, user.panCardUrl));} catch(e) {console.warn("Old PAN delete failed", e);}}
         updatedUserData.panCardUrl = await uploadFile(values.panCard, `userFiles/${user.phone}/pan/${values.panCard.name}`);
@@ -544,7 +572,7 @@ export default function AdminUserDetailPage() {
       await updateDoc(userDocRef, updatedUserData);
       toast({ title: "User Updated", description: `${values.fullname}'s details updated successfully.` });
       setIsEditing(false);
-      fetchUserDetailsAndTransactions();
+      fetchUserDetailsAndTransactions(); // Re-fetch data to show updated details
     } catch (error) {
       console.error("User update error:", error);
       toast({ title: "Error", description: `Could not update user. ${(error as Error).message}`, variant: "destructive" });
@@ -851,6 +879,7 @@ export default function AdminUserDetailPage() {
         </Card>
       ) : (
         // VIEW MODE
+        <>
         <Card className="shadow-xl overflow-hidden">
           <CardHeader className="bg-secondary/50 p-6 border-b">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -929,6 +958,62 @@ export default function AdminUserDetailPage() {
               ) : (
                 <p className="text-sm text-muted-foreground">This user has not joined any groups yet.</p>
               )}
+            </section>
+            <Separator />
+            <section>
+              <Card className="shadow-md">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <UserIconLucide className="mr-2 h-6 w-6 text-primary" /> {/* Changed icon to better represent guarantor */}
+                    <CardTitle className="text-xl font-bold text-foreground">Guarantor Details</CardTitle>
+                  </div>
+                  <CardDescription>Guarantor information recorded for payments to this user.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loadingGuarantorDetails ? (
+                    <div className="flex justify-center items-center py-10">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <p className="ml-3 text-muted-foreground">Loading guarantor details...</p>
+                    </div>
+                  ) : guarantorDetailsList.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-10">No guarantor details found for this user.</p>
+                  ) : (
+                    <div className="space-y-6">
+                      {guarantorDetailsList.map((record) => (
+                        <Card key={record.id} className="bg-secondary/30 shadow-sm">
+                          <CardHeader className="pb-2 pt-3">
+                            <CardTitle className="text-md font-semibold text-primary">
+                              Guarantor for Payment on {formatDateSafe(record.paymentDate, "PPP")}
+                            </CardTitle>
+                            <CardDescription>
+                              Related to Group: {record.groupName || "N/A"}, Auction No: {record.auctionNumber || "N/A"}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="text-sm space-y-2 pb-3">
+                            <div><strong className="text-foreground">Guarantor Name:</strong> {record.guarantorFullName || "N/A"}</div>
+                            <div><strong className="text-foreground">Relationship:</strong> {record.guarantorRelationship || "N/A"}</div>
+                            <div><strong className="text-foreground">Phone:</strong> {record.guarantorPhone || "N/A"}</div>
+                            <div><strong className="text-foreground">Address:</strong> {record.guarantorAddress || "N/A"}</div>
+                            <div><strong className="text-foreground">Aadhaar:</strong> {record.guarantorAadhaarNumber || "N/A"}</div>
+                            <div><strong className="text-foreground">PAN:</strong> {record.guarantorPanCardNumber || "N/A"}</div>
+                            {record.guarantorAuthDocUrl ? (
+                              <div className="flex items-center">
+                                <CreditCardIcon className="mr-2 h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <strong className="text-foreground">Auth Document:</strong>
+                                <Button variant="link" asChild className="p-0 h-auto ml-1">
+                                  <a href={record.guarantorAuthDocUrl} target="_blank" rel="noopener noreferrer">View Document</a>
+                                </Button>
+                              </div>
+                            ) : (
+                              <div><strong className="text-foreground">Auth Document:</strong> Not Uploaded</div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </section>
             <Separator />
             <section>
@@ -1058,7 +1143,10 @@ export default function AdminUserDetailPage() {
             </section>
           </CardContent>
         </Card>
+        </>
       )}
     </div>
   );
 }
+
+    
