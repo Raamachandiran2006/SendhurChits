@@ -7,21 +7,23 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, Users as UsersIcon, Layers as LayersIcon } from "lucide-react";
+import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, Users as UsersIcon, Layers as LayersIcon, FileText } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase"; // Import storage
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"; // Import storage functions
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, orderBy, doc } from "firebase/firestore";
-import type { Group, User, AuctionRecord, CollectionRecord } from "@/types"; // Ensure CollectionRecord is imported
+import type { Group, User, AuctionRecord, PaymentRecord } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { Separator } from "@/components/ui/separator";
 
-// Helper for time formatting
 const formatTimeTo12Hour = (timeStr?: string): string => {
   if (!timeStr) return "";
   if (/^([01]\d|2[0-3]):([0-5]\d)$/.test(timeStr)) {
@@ -52,6 +54,15 @@ const formatTimeTo24HourInput = (timeStr?: string): string => {
 };
 
 const NO_AUCTION_SELECTED_VALUE = "no-auction-selected";
+const MAX_FILE_SIZE_MB = 5;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const ACCEPTED_DOCUMENT_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
+
+const optionalFileSchema = z.custom<File>((val) => val instanceof File, "File is required")
+  .refine((file) => file.size <= MAX_FILE_SIZE_BYTES, `Max file size is ${MAX_FILE_SIZE_MB}MB.`)
+  .refine((file) => ACCEPTED_DOCUMENT_TYPES.includes(file.type), "Only .pdf, .jpg, .jpeg, .png files.")
+  .optional()
+  .nullable();
 
 const recordPaymentFormSchema = z.object({
   selectedGroupId: z.string().min(1, "Please select a Group."),
@@ -59,15 +70,28 @@ const recordPaymentFormSchema = z.object({
   selectedUserId: z.string().min(1, "Please select a User."),
   paymentDate: z.date({ required_error: "Payment date is required." }),
   paymentTime: z.string().min(1, "Payment time is required."),
-  // paymentReason: z.string().min(3, "Payment reason is required."), // Removed
   paymentMode: z.enum(["Cash", "UPI", "Netbanking", "Cheque"], { required_error: "Payment mode is required." }),
   amount: z.coerce.number().int("Amount must be a whole number.").positive("Amount must be a positive number."),
   remarks: z.string().optional(),
+  // Guarantor fields
+  guarantorFullName: z.string().optional().or(z.literal('')),
+  guarantorRelationship: z.string().optional().or(z.literal('')),
+  guarantorPhone: z.string().regex(/^\d{10}$/, "Phone number must be 10 digits").optional().or(z.literal('')),
+  guarantorAddress: z.string().optional().or(z.literal('')),
+  guarantorAuthDocFile: optionalFileSchema,
 });
 
 type RecordPaymentFormValues = z.infer<typeof recordPaymentFormSchema>;
 
 const generateVirtualId = () => Math.floor(100000 + Math.random() * 900000).toString();
+
+// Helper function to upload file (can be moved to a utils file later)
+const uploadFile = async (file: File, path: string): Promise<string> => {
+  const fileRef = storageRef(storage, path);
+  await uploadBytes(fileRef, file);
+  return getDownloadURL(fileRef);
+};
+
 
 export function RecordPaymentForm() {
   const { toast } = useToast();
@@ -90,15 +114,21 @@ export function RecordPaymentForm() {
       selectedUserId: "",
       paymentDate: new Date(),
       paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
-      // paymentReason: "", // Removed
       paymentMode: undefined,
       amount: undefined,
       remarks: "Auction Payment",
+      guarantorFullName: "",
+      guarantorRelationship: "",
+      guarantorPhone: "",
+      guarantorAddress: "",
+      guarantorAuthDocFile: null,
     },
   });
 
   const { watch, setValue } = form;
   const watchedGroupId = watch("selectedGroupId");
+  const watchedGuarantorAuthDocFile = watch("guarantorAuthDocFile");
+
 
   useEffect(() => {
     const fetchGroups = async () => {
@@ -196,9 +226,15 @@ export function RecordPaymentForm() {
       : null;
 
     try {
-      // Using CollectionRecord type as it shares many fields.
-      // If PaymentRecord becomes distinct, use a separate type.
-      const paymentData: Omit<CollectionRecord, "id" | "recordedAt" | "paymentType" | "collectionLocation" | "recordedByEmployeeId" | "recordedByEmployeeName" > & { recordedAt?: any, paymentReason?: string } = { 
+      let guarantorAuthDocUrl = "";
+      if (values.guarantorAuthDocFile && values.selectedUserId) {
+        guarantorAuthDocUrl = await uploadFile(
+          values.guarantorAuthDocFile,
+          `guarantorDocs/${values.selectedUserId}/${values.guarantorAuthDocFile.name}`
+        );
+      }
+
+      const paymentData: Omit<PaymentRecord, "id" | "recordedAt"> & { recordedAt?: any } = { 
         groupId: selectedGroupObject.id,
         groupName: selectedGroupObject.groupName,
         auctionId: selectedAuction ? selectedAuction.id : null,
@@ -208,14 +244,17 @@ export function RecordPaymentForm() {
         userFullname: selectedUser.fullname,
         paymentDate: format(values.paymentDate, "yyyy-MM-dd"),
         paymentTime: values.paymentTime, 
-        // paymentReason: values.paymentReason, // Removed
         paymentMode: values.paymentMode,
         amount: values.amount,
         remarks: values.remarks || "Auction Payment",
         virtualTransactionId: generateVirtualId(),
-        // Fields from CollectionRecord not directly applicable here or need specific admin context
-        // paymentType: "Admin Recorded", // Example differentiation
-        // collectionLocation: "N/A" 
+        recordedBy: "Admin",
+        // Guarantor fields
+        guarantorFullName: values.guarantorFullName || undefined,
+        guarantorRelationship: values.guarantorRelationship || undefined,
+        guarantorPhone: values.guarantorPhone || undefined,
+        guarantorAddress: values.guarantorAddress || undefined,
+        guarantorAuthDocUrl: guarantorAuthDocUrl || undefined,
       };
 
       await addDoc(collection(db, "paymentRecords"), { 
@@ -230,10 +269,14 @@ export function RecordPaymentForm() {
         selectedUserId: "",
         paymentDate: new Date(),
         paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
-        // paymentReason: "", // Removed
         paymentMode: undefined,
         amount: undefined,
         remarks: "Auction Payment",
+        guarantorFullName: "",
+        guarantorRelationship: "",
+        guarantorPhone: "",
+        guarantorAddress: "",
+        guarantorAuthDocFile: null,
       }); 
     } catch (error) {
       console.error("Error recording payment:", error);
@@ -251,206 +294,41 @@ export function RecordPaymentForm() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Group and User Selection */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="selectedGroupId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Group Name</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={loadingGroups}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={loadingGroups ? "Loading groups..." : "Select a group"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {groups.map((group) => (
-                          <SelectItem key={group.id} value={group.id}>
-                            {group.groupName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormItem>
-                <FormLabel>Group ID</FormLabel>
-                <Input readOnly value={selectedGroupObject?.id || ""} placeholder="Auto-filled" />
-              </FormItem>
+              <FormField control={form.control} name="selectedGroupId" render={({ field }) => (<FormItem><FormLabel>Group Name</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={loadingGroups}><FormControl><SelectTrigger><SelectValue placeholder={loadingGroups ? "Loading groups..." : "Select a group"} /></SelectTrigger></FormControl><SelectContent>{groups.map((group) => (<SelectItem key={group.id} value={group.id}>{group.groupName}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)} />
+              <FormItem><FormLabel>Group ID</FormLabel><Input readOnly value={selectedGroupObject?.id || ""} placeholder="Auto-filled" /></FormItem>
             </div>
-
-            <FormField
-              control={form.control}
-              name="selectedAuctionId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Auction No (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || NO_AUCTION_SELECTED_VALUE} disabled={!watchedGroupId || loadingAuctions}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={!watchedGroupId ? "Select group first" : (loadingAuctions ? "Loading auctions..." : "Select auction (if applicable)")} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value={NO_AUCTION_SELECTED_VALUE}>None</SelectItem> 
-                      {groupAuctions.map((auction) => (
-                        <SelectItem key={auction.id} value={auction.id}>
-                          Auction #{auction.auctionNumber} - {auction.auctionMonth}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="selectedUserId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>User</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={!watchedGroupId || loadingMembers}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={!watchedGroupId ? "Select group first" : (loadingMembers ? "Loading members..." : "Select a user")} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {groupMembers.map((member) => (
-                        <SelectItem key={member.id} value={member.id}>
-                          {member.fullname} (@{member.username})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <FormField control={form.control} name="selectedAuctionId" render={({ field }) => (<FormItem><FormLabel>Auction No (Optional)</FormLabel><Select onValueChange={field.onChange} value={field.value || NO_AUCTION_SELECTED_VALUE} disabled={!watchedGroupId || loadingAuctions}><FormControl><SelectTrigger><SelectValue placeholder={!watchedGroupId ? "Select group first" : (loadingAuctions ? "Loading auctions..." : "Select auction (if applicable)")} /></SelectTrigger></FormControl><SelectContent><SelectItem value={NO_AUCTION_SELECTED_VALUE}>None</SelectItem> {groupAuctions.map((auction) => (<SelectItem key={auction.id} value={auction.id}>Auction #{auction.auctionNumber} - {auction.auctionMonth}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="selectedUserId" render={({ field }) => (<FormItem><FormLabel>User</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!watchedGroupId || loadingMembers}><FormControl><SelectTrigger><SelectValue placeholder={!watchedGroupId ? "Select group first" : (loadingMembers ? "Loading members..." : "Select a user")} /></SelectTrigger></FormControl><SelectContent>{groupMembers.map((member) => (<SelectItem key={member.id} value={member.id}>{member.fullname} (@{member.username})</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)} />
             
+            {/* Payment Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="paymentDate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Payment Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                            <CalendarIconLucide className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="paymentTime"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment Time</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="time"
-                        value={formatTimeTo24HourInput(field.value)}
-                        onChange={(e) => field.onChange(e.target.value ? formatTimeTo12Hour(e.target.value) : "")}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <FormField control={form.control} name="paymentDate" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>Payment Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIconLucide className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="paymentTime" render={({ field }) => (<FormItem><FormLabel>Payment Time</FormLabel><FormControl><Input type="time" value={formatTimeTo24HourInput(field.value)} onChange={(e) => field.onChange(e.target.value ? formatTimeTo12Hour(e.target.value) : "")} /></FormControl><FormMessage /></FormItem>)} />
+            </div>
+            <FormField control={form.control} name="paymentMode" render={({ field }) => (<FormItem><FormLabel>Payment Mode</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payment mode" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Cash">Cash</SelectItem><SelectItem value="UPI">UPI</SelectItem><SelectItem value="Netbanking">Netbanking</SelectItem><SelectItem value="Cheque">Cheque</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (₹)</FormLabel><FormControl><div className="flex items-center gap-2"><DollarSign className="h-5 w-5 text-muted-foreground" /><Input type="text" placeholder="e.g., 10000" value={field.value === undefined ? "" : String(field.value)} onChange={e => { const val = e.target.value; if (val === "") { field.onChange(undefined); } else { const num = parseInt(val, 10); field.onChange(isNaN(num) ? undefined : num); } }}/></div></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="remarks" render={({ field }) => (<FormItem><FormLabel>Remarks</FormLabel><Select onValueChange={field.onChange} value={field.value || "Auction Payment"}><FormControl><SelectTrigger><SelectValue placeholder="Select remark type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Auction Payment">Auction Payment</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+
+            {/* Guarantor Details */}
+            <Separator className="my-8" />
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-foreground">Guarantor Details (Optional)</h3>
+              <FormField control={form.control} name="guarantorFullName" render={({ field }) => (<FormItem><FormLabel>Guarantor's Full Name</FormLabel><FormControl><Input placeholder="Enter guarantor's full name" {...field} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="guarantorRelationship" render={({ field }) => (<FormItem><FormLabel>Relationship to Member</FormLabel><FormControl><Input placeholder="e.g., Father, Friend" {...field} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="guarantorPhone" render={({ field }) => (<FormItem><FormLabel>Guarantor's Phone Number</FormLabel><FormControl><Input type="tel" placeholder="10-digit phone number" {...field} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="guarantorAddress" render={({ field }) => (<FormItem><FormLabel>Guarantor's Address</FormLabel><FormControl><Textarea placeholder="Enter guarantor's full address" {...field} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="guarantorAuthDocFile" render={({ field: { onChange, onBlur, name, ref }}) => (
+                <FormItem>
+                  <FormLabel>Guarantor's Authorization Document (Aadhaar/PAN)</FormLabel>
+                  <FormControl><Input type="file" onChange={(e) => onChange(e.target.files?.[0] || null)} onBlur={onBlur} name={name} ref={ref} accept=".pdf,image/jpeg,image/png" /></FormControl>
+                  {watchedGuarantorAuthDocFile && <FormDescription className="text-xs">{watchedGuarantorAuthDocFile.name}</FormDescription>}
+                  <FormMessage />
+                </FormItem>
+              )} />
             </div>
             
-            {/* Payment Reason Field Removed */}
-
-            <FormField
-              control={form.control}
-              name="paymentMode"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Payment Mode</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger><SelectValue placeholder="Select payment mode" /></SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Cash">Cash</SelectItem>
-                      <SelectItem value="UPI">UPI</SelectItem>
-                      <SelectItem value="Netbanking">Netbanking</SelectItem>
-                      <SelectItem value="Cheque">Cheque</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Amount (₹)</FormLabel>
-                  <FormControl>
-                    <div className="flex items-center gap-2">
-                        <DollarSign className="h-5 w-5 text-muted-foreground" />
-                        <Input
-                        type="text" 
-                        placeholder="e.g., 10000"
-                        value={field.value === undefined ? "" : String(field.value)}
-                        onChange={e => {
-                            const val = e.target.value;
-                            if (val === "") {
-                                field.onChange(undefined);
-                            } else {
-                                const num = parseInt(val, 10);
-                                field.onChange(isNaN(num) ? undefined : num);
-                            }
-                        }}
-                        />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="remarks"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Remarks</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || "Auction Payment"}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select remark type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Auction Payment">Auction Payment</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Record Payment
@@ -461,4 +339,3 @@ export function RecordPaymentForm() {
     </Card>
   );
 }
-

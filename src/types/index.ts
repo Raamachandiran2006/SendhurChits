@@ -16,7 +16,7 @@ export interface User {
   groups: string[]; // Array of group IDs
   isAdmin?: boolean;
   dueAmount?: number; // Optional: due amount for the user
-  dueType?: "Day" | "Week" | "Month"; // Added dueType
+  dueType?: "Day" | "Week" | "Month"; 
 }
 
 export interface Group {
@@ -86,7 +86,6 @@ export interface AuctionRecord {
   netDiscount?: number | null;
   dividendPerMember?: number | null;
   finalAmountToBePaid?: number | null; // This is the installment paid by other members
-  amountPaidToWinner?: number | null;
   recordedAt: import('firebase/firestore').Timestamp;
 }
 
@@ -104,14 +103,13 @@ export interface ExpenseRecord {
   virtualTransactionId?: string;
 }
 
-// For payments received from users (recorded by employees or admin via collection forms)
 export interface CollectionRecord {
   id: string; // Firestore document ID
   groupId: string;
   groupName: string;
   auctionId?: string | null;
   auctionNumber?: number | null;
-  userId: string; // Firestore doc ID of the User making/receiving payment
+  userId: string; 
   userUsername: string;
   userFullname: string;
   paymentDate: string; // YYYY-MM-DD
@@ -130,11 +128,11 @@ export interface CollectionRecord {
 // For payments made BY THE COMPANY (e.g., to auction winners, other payouts recorded by admin)
 export interface PaymentRecord {
   id: string; // Firestore document ID
-  groupId?: string | null; // Optional, if payment is related to a group
+  groupId?: string | null; 
   groupName?: string | null;
   auctionId?: string | null;
   auctionNumber?: number | null;
-  userId?: string | null; // Firestore doc ID of the User receiving payment
+  userId?: string | null; 
   userUsername?: string | null;
   userFullname?: string | null;
   paymentDate: string; // YYYY-MM-DD
@@ -143,6 +141,13 @@ export interface PaymentRecord {
   amount: number;
   remarks?: string | null;
   recordedAt: import('firebase/firestore').Timestamp;
-  recordedBy?: "Admin" | string; // Could be Admin or specific employee ID if delegated
+  recordedBy?: "Admin" | string; 
   virtualTransactionId?: string;
+  // Guarantor fields
+  guarantorFullName?: string;
+  guarantorRelationship?: string;
+  guarantorPhone?: string;
+  guarantorAddress?: string;
+  guarantorAuthDocUrl?: string;
 }
+
