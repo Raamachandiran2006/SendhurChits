@@ -8,12 +8,13 @@ import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { useRouter } from "next/navigation"; // Import useRouter
 import { Loader2, ArrowLeft, Sheet as SheetIcon, UserCircle, Phone, Search } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Input } from "@/components/ui/input"; // Import Input component
+import { Input } from "@/components/ui/input"; 
 
 const formatCurrency = (amount: number | null | undefined) => {
-  if (amount === null || amount === undefined || isNaN(amount)) return "₹0.00"; // Or "N/A"
+  if (amount === null || amount === undefined || isNaN(amount)) return "₹0.00"; 
   return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
@@ -21,6 +22,7 @@ export default function EmployeeDueSheetPage() {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const router = useRouter(); // Initialize useRouter
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -54,9 +56,13 @@ export default function EmployeeDueSheetPage() {
     return allUsers.filter(user => 
       user.username.toLowerCase().includes(lowercasedSearchTerm) ||
       user.fullname.toLowerCase().includes(lowercasedSearchTerm) ||
-      user.phone.includes(searchTerm) // Phone number might not need lowercasing if it's just digits
+      user.phone.includes(searchTerm) 
     );
   }, [allUsers, searchTerm]);
+
+  const handleRowClick = (userId: string) => {
+    router.push(`/employee/users/${userId}`); 
+  };
 
   return (
     <div className="container mx-auto py-8">
@@ -123,7 +129,11 @@ export default function EmployeeDueSheetPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.map((user, index) => (
-                    <TableRow key={user.id}>
+                    <TableRow 
+                      key={user.id} 
+                      onClick={() => handleRowClick(user.id)}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    >
                       <TableCell>{index + 1}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

@@ -8,6 +8,7 @@ import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { useRouter } from "next/navigation"; // Import useRouter
 import { Loader2, ArrowLeft, Sheet as SheetIcon, UserCircle, Phone, Search } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ export default function AdminDueSheetPage() {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const router = useRouter(); // Initialize useRouter
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -32,8 +34,8 @@ export default function AdminDueSheetPage() {
         const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
         
         const relevantUsers = fetchedUsers.filter(user => 
-          !(user.isAdmin || user.username === 'admin') && // Exclude admins
-          (user.dueAmount && user.dueAmount > 0) // Only include users with positive due amounts
+          !(user.isAdmin || user.username === 'admin') && 
+          (user.dueAmount && user.dueAmount > 0) 
         );
         setAllUsers(relevantUsers);
 
@@ -57,6 +59,10 @@ export default function AdminDueSheetPage() {
       user.phone.includes(searchTerm)
     );
   }, [allUsers, searchTerm]);
+
+  const handleRowClick = (userId: string) => {
+    router.push(`/admin/users/${userId}#due-sheet`);
+  };
 
   return (
     <div className="container mx-auto py-8">
@@ -123,7 +129,11 @@ export default function AdminDueSheetPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.map((user, index) => (
-                    <TableRow key={user.id}>
+                    <TableRow 
+                      key={user.id} 
+                      onClick={() => handleRowClick(user.id)}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    >
                       <TableCell>{index + 1}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

@@ -170,17 +170,17 @@ interface AdminUserTransaction {
 type TransactionFilterType = "all" | "last7Days" | "last10Days" | "last30Days";
 
 interface DueSheetItem {
-  dueNo: number; // From auctionRecord.auctionNumber
+  dueNo: number; 
   groupId: string;
   groupName: string;
   auctionId: string;
-  dueDate: string; // auctionDate + 5 days (formatted)
-  amount: number; // From auctionRecord.finalAmountToBePaid
-  penalty: number; // Placeholder for now (0)
-  paidAmount: number; // Sum from collectionRecords
-  balance: number; // amount - paidAmount
+  dueDate: string; 
+  amount: number; 
+  penalty: number; 
+  paidAmount: number; 
+  balance: number; 
   status: 'Paid' | 'Not Paid' | 'Partially Paid';
-  paidDateTime?: string; // From latest relevant collectionRecord (formatted)
+  paidDateTime?: string; 
 }
 
 
@@ -250,6 +250,7 @@ export default function AdminUserDetailPage() {
   
   const [dueSheetItems, setDueSheetItems] = useState<DueSheetItem[]>([]);
   const [loadingDueSheet, setLoadingDueSheet] = useState(true);
+  const dueSheetRef = useRef<HTMLDivElement>(null); // Ref for scrolling
 
 
   const [showCamera, setShowCamera] = useState(false);
@@ -428,7 +429,7 @@ export default function AdminUserDetailPage() {
               auctionId: auctionRecord.id,
               dueDate: formatDateSafe(addDays(parseISO(auctionRecord.auctionDate), 5), "dd MMM yyyy"),
               amount: amountDue,
-              penalty: 0, // Placeholder
+              penalty: 0, 
               paidAmount: paidAmount,
               balance: balance,
               status: status,
@@ -437,7 +438,7 @@ export default function AdminUserDetailPage() {
           }
         }
       }
-      processedDueSheetItems.sort((a,b) => a.dueNo - b.dueNo); // Sort by due number
+      processedDueSheetItems.sort((a,b) => a.dueNo - b.dueNo); 
       setDueSheetItems(processedDueSheetItems);
       setLoadingDueSheet(false);
 
@@ -456,6 +457,12 @@ export default function AdminUserDetailPage() {
   useEffect(() => {
     fetchUserDetailsAndTransactions();
   }, [fetchUserDetailsAndTransactions]);
+
+  useEffect(() => {
+    if (window.location.hash === "#due-sheet" && dueSheetRef.current) {
+      dueSheetRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [loadingDueSheet]); // Trigger scroll after due sheet data is loaded
 
   useEffect(() => {
     const applyFilter = () => {
@@ -1007,7 +1014,7 @@ export default function AdminUserDetailPage() {
               )}
             </section>
             <Separator />
-            <section>
+            <section ref={dueSheetRef}>
               <Card className="shadow-md">
                 <CardHeader>
                   <div className="flex items-center gap-3">
