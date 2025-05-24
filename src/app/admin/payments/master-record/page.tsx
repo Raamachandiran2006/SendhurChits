@@ -167,7 +167,7 @@ export default function MasterRecordPage() {
                 const record = data as CollectionRecord;
                 transformed = {
                   id,
-                  transactionDisplayId: `COLL-${id.substring(0, 6)}`,
+                  transactionDisplayId: `COLL-${record.virtualTransactionId || id.substring(0, 6)}`,
                   direction: "Received",
                   dateTime: parseDateTimeForSort(record.paymentDate, record.paymentTime, record.recordedAt),
                   fromParty: `User: ${record.userFullname} (${record.userUsername})`,
@@ -182,7 +182,7 @@ export default function MasterRecordPage() {
                 const record = data as AdminPaymentRecord; 
                 transformed = {
                   id,
-                  transactionDisplayId: `PAY-${id.substring(0,6)}`,
+                  transactionDisplayId: `PAY-${record.virtualTransactionId || id.substring(0,6)}`,
                   direction: "Sent", 
                   dateTime: parseDateTimeForSort(record.paymentDate, record.paymentTime, record.recordedAt),
                   fromParty: "ChitConnect (Company)",
@@ -197,7 +197,7 @@ export default function MasterRecordPage() {
                 const record = data as SalaryRecord;
                 transformed = {
                   id,
-                  transactionDisplayId: `SAL-${id.substring(0,6)}`,
+                  transactionDisplayId: `SAL-${record.virtualTransactionId || id.substring(0,6)}`,
                   direction: "Sent",
                   dateTime: parseDateTimeForSort(record.paymentDate, undefined, record.recordedAt),
                   fromParty: "ChitConnect (Company)",
@@ -212,7 +212,7 @@ export default function MasterRecordPage() {
                 const record = data as ExpenseRecord;
                 transformed = {
                   id,
-                  transactionDisplayId: `EXP-${id.substring(0,6)}`,
+                  transactionDisplayId: `EXP-${record.virtualTransactionId || id.substring(0,6)}`,
                   direction: record.type === "spend" ? "Sent" : "Received",
                   dateTime: parseDateTimeForSort(record.date, record.time, record.recordedAt),
                   fromParty: record.type === "spend" ? "ChitConnect (Company)" : (record.fromPerson || "Unknown Source"),
@@ -280,7 +280,13 @@ export default function MasterRecordPage() {
 
   const handleDownloadPdf = () => {
     const doc = new jsPDF();
-    const tableColumn = ["S.No", "Direction", "Date & Time", "From", "To", "Amount (₹)", "Mode", "Remarks/Source", "Type"];
+    
+    const formatCurrencyPdf = (amount: number | null | undefined) => {
+      if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
+      return `Rs. ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+    const tableColumn = ["S.No", "Direction", "Date & Time", "From", "To", "Amount", "Mode", "Remarks/Source", "Type", "Virtual ID"];
     const tableRows: any[][] = [];
 
     filteredTransactions.forEach((tx, index) => {
@@ -290,10 +296,11 @@ export default function MasterRecordPage() {
         formatDateSafe(tx.dateTime),
         tx.fromParty,
         tx.toParty,
-        formatCurrency(tx.amount),
+        formatCurrencyPdf(tx.amount), // Use PDF specific formatter
         tx.mode || "N/A",
         tx.remarksOrSource,
         tx.originalSource,
+        tx.virtualTransactionId || "N/A",
       ];
       tableRows.push(txData);
     });
@@ -317,15 +324,18 @@ export default function MasterRecordPage() {
       startY: 35,
       theme: 'grid',
       headStyles: { fillColor: [30, 144, 255] }, // Dodger blue
-      styles: { fontSize: 7 }, // Adjusted font size for more columns
+      styles: { fontSize: 7, cellPadding: 1.5 }, 
       columnStyles: { 
         0: { cellWidth: 8 }, // S.No
+        1: { cellWidth: 15 }, // Direction
         2: { cellWidth: 25 }, // Date & Time
-        3: { cellWidth: 35 }, // From
-        4: { cellWidth: 35 }, // To
+        3: { cellWidth: 'auto' }, // From
+        4: { cellWidth: 'auto' }, // To
+        5: { cellWidth: 20, halign: 'right'}, // Amount
         6: { cellWidth: 15 }, // Mode
-        7: { cellWidth: 30 }, // Remarks
+        7: { cellWidth: 'auto' }, // Remarks
         8: { cellWidth: 15 }, // Type
+        9: { cellWidth: 18 }, // Virtual ID
       },
     });
     doc.save(`master_financial_record_${selectedFilter}.pdf`);
