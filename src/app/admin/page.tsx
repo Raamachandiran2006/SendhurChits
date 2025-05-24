@@ -8,16 +8,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useLanguage } from "@/contexts/LanguageContext"; // Import useLanguage
+// Removed: import { useLanguage } from "@/contexts/LanguageContext"; 
 
 export default function AdminOverviewPage() {
-  const { loggedInEntity } = useAuth(); // Use loggedInEntity for admin details
-  const { t } = useLanguage(); // Get translation function
+  const { loggedInEntity } = useAuth(); 
+  // Removed: const { t } = useLanguage(); 
   const [userCount, setUserCount] = useState(0);
   const [groupCount, setGroupCount] = useState(0);
   const [employeeCount, setEmployeeCount] = useState(0);
 
-  const adminUser = loggedInEntity; // adminUser is the loggedInEntity
+  const adminUser = loggedInEntity; 
 
   useEffect(() => {
     const fetchData = async () => {
@@ -37,11 +37,13 @@ export default function AdminOverviewPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold text-foreground mb-8">{t('adminOverview')}</h1>
+      {/* Reverted: <h1 className="text-3xl font-bold text-foreground mb-8">{t('adminOverview')}</h1> */}
+      <h1 className="text-3xl font-bold text-foreground mb-8">Admin Overview</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <Card className="shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('totalUsers')}</CardTitle>
+            {/* Reverted: <CardTitle className="text-sm font-medium">{t('totalUsers')}</CardTitle> */}
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
             <Users className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -51,7 +53,8 @@ export default function AdminOverviewPage() {
         </Card>
         <Card className="shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('totalGroups')}</CardTitle>
+            {/* Reverted: <CardTitle className="text-sm font-medium">{t('totalGroups')}</CardTitle> */}
+            <CardTitle className="text-sm font-medium">Total Groups</CardTitle>
             <Layers className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -61,7 +64,8 @@ export default function AdminOverviewPage() {
         </Card>
         <Card className="shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('totalEmployees')}</CardTitle>
+            {/* Reverted: <CardTitle className="text-sm font-medium">{t('totalEmployees')}</CardTitle> */}
+            <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
             <Briefcase className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -71,11 +75,13 @@ export default function AdminOverviewPage() {
         </Card>
          <Card className="shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('systemStatus')}</CardTitle>
+            {/* Reverted: <CardTitle className="text-sm font-medium">{t('systemStatus')}</CardTitle> */}
+            <CardTitle className="text-sm font-medium">System Status</CardTitle>
             <BarChart3 className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{t('operational')}</div>
+            {/* Reverted: <div className="text-2xl font-bold text-green-600">{t('operational')}</div> */}
+            <div className="text-2xl font-bold text-green-600">Operational</div>
             <p className="text-xs text-muted-foreground">All systems running smoothly</p>
           </CardContent>
         </Card>
@@ -84,28 +90,27 @@ export default function AdminOverviewPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <Card className="shadow-md">
           <CardHeader>
-            <CardTitle>{t('quickActions')}</CardTitle>
+            {/* Reverted: <CardTitle>{t('quickActions')}</CardTitle> */}
+            <CardTitle>Quick Actions</CardTitle>
             <CardDescription>Perform common administrative tasks.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button asChild className="w-full justify-start" variant="outline">
-              <Link href="/admin/users"><Users className="mr-2 h-4 w-4" /> {t('manageUsers')}</Link>
-            </Button>
-            <Button asChild className="w-full justify-start" variant="outline">
-              <Link href="/admin/groups"><Layers className="mr-2 h-4 w-4" /> {t('manageGroups')}</Link>
-            </Button>
-            <Button asChild className="w-full justify-start" variant="outline">
-              <Link href="/admin/employees"><Briefcase className="mr-2 h-4 w-4" /> {t('manageEmployees')}</Link>
-            </Button>
-            <Button asChild className="w-full justify-start" variant="default">
-              <Link href="/admin/groups/create"><PlusCircle className="mr-2 h-4 w-4" /> {t('createGroup')}</Link>
-            </Button>
+            {/* Reverted: <Button asChild className="w-full justify-start" variant="outline"><Link href="/admin/users"><Users className="mr-2 h-4 w-4" /> {t('manageUsers')}</Link></Button> */}
+            <Button asChild className="w-full justify-start" variant="outline"><Link href="/admin/users"><Users className="mr-2 h-4 w-4" /> Manage Users</Link></Button>
+            {/* Reverted: <Button asChild className="w-full justify-start" variant="outline"><Link href="/admin/groups"><Layers className="mr-2 h-4 w-4" /> {t('manageGroups')}</Link></Button> */}
+            <Button asChild className="w-full justify-start" variant="outline"><Link href="/admin/groups"><Layers className="mr-2 h-4 w-4" /> Manage Groups</Link></Button>
+            {/* Reverted: <Button asChild className="w-full justify-start" variant="outline"><Link href="/admin/employees"><Briefcase className="mr-2 h-4 w-4" /> {t('manageEmployees')}</Link></Button> */}
+            <Button asChild className="w-full justify-start" variant="outline"><Link href="/admin/employees"><Briefcase className="mr-2 h-4 w-4" /> Manage Employees</Link></Button>
+            {/* Reverted: <Button asChild className="w-full justify-start" variant="default"><Link href="/admin/groups/create"><PlusCircle className="mr-2 h-4 w-4" /> {t('createGroup')}</Link></Button> */}
+            <Button asChild className="w-full justify-start" variant="default"><Link href="/admin/groups/create"><PlusCircle className="mr-2 h-4 w-4" /> Create Group</Link></Button>
           </CardContent>
         </Card>
         <Card className="shadow-md">
           <CardHeader>
-            <CardTitle>{adminUser ? t('welcomeAdmin').replace('{name}', adminUser.fullname) : 'Welcome Admin!'}</CardTitle>
-            <CardDescription>{t('adminTips')}</CardDescription>
+            {/* Reverted: <CardTitle>{adminUser ? t('welcomeAdmin').replace('{name}', adminUser.fullname) : 'Welcome Admin!'}</CardTitle> */}
+            <CardTitle>{adminUser ? `Welcome, ${adminUser.fullname}!` : 'Welcome Admin!'}</CardTitle>
+            {/* Reverted: <CardDescription>{t('adminTips')}</CardDescription> */}
+            <CardDescription>Here are some tips for managing ChitConnect:</CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">

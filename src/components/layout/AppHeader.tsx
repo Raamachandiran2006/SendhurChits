@@ -1,11 +1,11 @@
 
 "use client";
 
-import Link from "next/link"; // Corrected import
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, UserCircle, Shield, Briefcase, Landmark, Globe, Wallet } from "lucide-react"; // Added Globe and Wallet
+import { LogOut, UserCircle, Shield, Briefcase, Landmark, Wallet } from "lucide-react"; // Removed Globe
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,17 +13,16 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
+  // Removed: DropdownMenuRadioGroup,
+  // Removed: DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import type { User, Employee } from "@/types";
 import { cn } from "@/lib/utils";
-import { useLanguage } from "@/contexts/LanguageContext";
+// Removed: import { useLanguage } from "@/contexts/LanguageContext";
 import React from "react";
 
 const formatCurrency = (amount: number | null | undefined) => {
   if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
-  // Ensure it's a number before calling toLocaleString
   const numericAmount = Number(amount);
   if (isNaN(numericAmount)) return "N/A";
   return `₹${numericAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -32,11 +31,12 @@ const formatCurrency = (amount: number | null | undefined) => {
 export function AppHeader() {
   const { loggedInEntity, userType, logout } = useAuth();
   
-  const isAdmin = userType === 'admin';
-  const languageHook = isAdmin ? useLanguage() : null;
-  const language = languageHook?.language;
-  const setLanguage = languageHook?.setLanguage;
-  const t = languageHook?.t;
+  // Removed: Language hook logic
+  // const isAdmin = userType === 'admin';
+  // const languageHook = isAdmin ? useLanguage() : null;
+  // const language = languageHook?.language;
+  // const setLanguage = languageHook?.setLanguage;
+  // const t = languageHook?.t;
 
   if (!loggedInEntity) return null;
 
@@ -68,7 +68,8 @@ export function AppHeader() {
         <div className="flex items-center gap-4">
           <div className="hidden sm:flex flex-col items-end text-right">
             <span className="text-sm text-foreground">
-              {isAdmin && t ? t('welcomeAdmin').replace('{name}', entityFullname) : `Welcome, ${entityFullname}`}
+              {/* Reverted: {isAdmin && t ? t('welcomeAdmin').replace('{name}', entityFullname) : `Welcome, ${entityFullname}`} */}
+              Welcome, {entityFullname}
             </span>
             {userType === 'user' && userDueAmount !== undefined && (
               <div className="flex items-center text-xs">
@@ -83,24 +84,8 @@ export function AppHeader() {
             )}
           </div>
 
-          {isAdmin && language && setLanguage && t && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Globe className="mr-2 h-4 w-4" />
-                  {language === 'en' ? t('english') : t('tamil')}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>{t('language')}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuRadioGroup value={language} onValueChange={(value) => setLanguage(value as 'en' | 'ta')}>
-                  <DropdownMenuRadioItem value="en">{t('english')}</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="ta">{t('tamil')}</DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          {/* Removed: Language Switcher Dropdown */}
+          {/* {isAdmin && language && setLanguage && t && ( ... )} */}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -129,11 +114,12 @@ export function AppHeader() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {userType === 'admin' && t && (
+              {userType === 'admin' && (
                  <DropdownMenuItem asChild>
                    <Link href="/admin" className="flex items-center">
                     <Shield className="mr-2 h-4 w-4" />
-                    {t('sidebarOverview')}
+                    {/* Reverted: {t('sidebarOverview')} */}
+                    Overview
                    </Link>
                  </DropdownMenuItem>
               )}
@@ -164,7 +150,8 @@ export function AppHeader() {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive-foreground focus:bg-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
-                {isAdmin && t ? t('sidebarLogout') : 'Log out'}
+                {/* Reverted: {isAdmin && t ? t('sidebarLogout') : 'Log out'} */}
+                Log out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

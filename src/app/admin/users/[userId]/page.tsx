@@ -64,12 +64,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { useLanguage } from "@/contexts/LanguageContext"; // Import useLanguage
+// Removed: import { useLanguage } from "@/contexts/LanguageContext"; 
 
 
 // Helper function to format date safely
-const formatDateSafe = (dateInput: string | Date | Timestamp | undefined | null, outputFormat: string = "dd MMMM yyyy", t?: (key: string) => string): string => {
-  if (!dateInput) return t ? t('common.notAvailable') : "N/A";
+const formatDateSafe = (dateInput: string | Date | Timestamp | undefined | null, outputFormat: string = "dd MMMM yyyy"): string => {
+  if (!dateInput) return "N/A";
   try {
     let date: Date;
     if (dateInput instanceof Timestamp) {
@@ -78,7 +78,7 @@ const formatDateSafe = (dateInput: string | Date | Timestamp | undefined | null,
       const parsedDate = new Date(dateInput.replace(/-/g, '/'));
       if (isNaN(parsedDate.getTime())) {
         const isoParsed = parseISO(dateInput);
-        if(isNaN(isoParsed.getTime())) return t ? t('common.notAvailable') : "N/A";
+        if(isNaN(isoParsed.getTime())) return "N/A";
         date = isoParsed;
       } else {
         date = parsedDate;
@@ -86,23 +86,23 @@ const formatDateSafe = (dateInput: string | Date | Timestamp | undefined | null,
     } else if (dateInput instanceof Date) {
       date = dateInput;
     } else {
-      return t ? t('common.notAvailable') : "N/A";
+      return "N/A";
     }
     
-    if (isNaN(date.getTime())) return t ? t('common.notAvailable') : "N/A";
+    if (isNaN(date.getTime())) return "N/A";
     return format(date, outputFormat);
   } catch (e) {
     console.error("Error formatting date:", dateInput, e);
-    return t ? t('common.notAvailable') : "N/A";
+    return "N/A";
   }
 };
 
-const formatDateTimeSafe = (dateInput: string | Date | Timestamp | undefined | null, outputFormat: string = "dd MMM yy, hh:mm a", t?: (key: string) => string): string => {
-    return formatDateSafe(dateInput, outputFormat, t);
+const formatDateTimeSafe = (dateInput: string | Date | Timestamp | undefined | null, outputFormat: string = "dd MMM yy, hh:mm a"): string => {
+    return formatDateSafe(dateInput, outputFormat);
 };
 
-const formatCurrency = (amount: number | null | undefined, t?: (key: string) => string) => {
-  if (amount === null || amount === undefined || isNaN(amount)) return t ? t('common.notAvailable') : "N/A";
+const formatCurrency = (amount: number | null | undefined) => {
+  if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
   return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
@@ -201,7 +201,7 @@ const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestam
 };
 
 export default function AdminUserDetailPage() {
-  const { t } = useLanguage(); // Get translation function
+  // Removed: const { t } = useLanguage(); 
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -234,7 +234,8 @@ export default function AdminUserDetailPage() {
 
   const fetchUserDetailsAndTransactions = useCallback(async () => {
     if (!userId) {
-      setError(t('adminUserDetailError'));
+      // Reverted: setError(t('adminUserDetailError'));
+      setError("Error loading user details.");
       setLoading(false);
       setLoadingTransactions(false);
       return;
@@ -246,7 +247,8 @@ export default function AdminUserDetailPage() {
       const userDocSnap = await getDoc(userDocRef);
 
       if (!userDocSnap.exists()) {
-        setError(t('adminUserDetailDataUnavailable'));
+        // Reverted: setError(t('adminUserDetailDataUnavailable'));
+        setError("User data not available.");
         setUser(null); 
         setLoading(false); setLoadingTransactions(false);
         return;
@@ -292,7 +294,8 @@ export default function AdminUserDetailPage() {
         const data = docSnap.data() as CollectionRecord;
         combinedTransactions.push({
           id: docSnap.id,
-          type: t('adminUserDetailPaymentHistorySentByUser') as "Sent by User",
+          // Reverted: type: t('adminUserDetailPaymentHistorySentByUser') as "Sent by User",
+          type: "Sent by User",
           dateTime: parseDateTimeForSort(data.paymentDate, data.paymentTime, data.recordedAt),
           fromParty: `User: ${userData.fullname} (${userData.username})`,
           toParty: "ChitConnect (Company)",
@@ -311,7 +314,8 @@ export default function AdminUserDetailPage() {
         const data = docSnap.data() as AdminPaymentRecordType;
         combinedTransactions.push({
           id: docSnap.id,
-          type: t('adminUserDetailPaymentHistoryReceivedByUser') as "Received by User",
+          // Reverted: type: t('adminUserDetailPaymentHistoryReceivedByUser') as "Received by User",
+          type: "Received by User",
           dateTime: parseDateTimeForSort(data.paymentDate, data.paymentTime, data.recordedAt),
           fromParty: "ChitConnect (Company)",
           toParty: `User: ${userData.fullname} (${userData.username})`,
@@ -329,14 +333,16 @@ export default function AdminUserDetailPage() {
 
     } catch (err) {
       console.error("Error fetching user details/transactions:", err);
-      setError(t('adminUserDetailError'));
+      // Reverted: setError(t('adminUserDetailError'));
+      setError("Error loading user details.");
       setUser(null);
-      setTransactionError(t('adminUserDetailPaymentHistoryError'));
+      // Reverted: setTransactionError(t('adminUserDetailPaymentHistoryError'));
+      setTransactionError("Failed to fetch payment history.");
     } finally {
       setLoading(false);
       setLoadingTransactions(false);
     }
-  }, [userId, form, t]); // Added t to dependency array
+  }, [userId, form]); 
 
   useEffect(() => {
     fetchUserDetailsAndTransactions();
@@ -370,7 +376,8 @@ export default function AdminUserDetailPage() {
   const requestCameraPermission = useCallback(async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setHasCameraPermission(false); 
-      toast({ variant: 'destructive', title: t('formsCameraNotSupported'), description: t('formsCameraNotSupportedDesc') });
+      // Reverted: toast({ variant: 'destructive', title: t('formsCameraNotSupported'), description: t('formsCameraNotSupportedDesc') });
+      toast({ variant: 'destructive', title: 'Camera Not Supported', description: 'Your browser does not support camera access.' });
       return;
     }
     try {
@@ -380,9 +387,10 @@ export default function AdminUserDetailPage() {
     } catch (error) {
       console.error("Error accessing camera:", error); 
       setHasCameraPermission(false);
-      toast({ variant: 'destructive', title: t('formsCameraAccessDenied'), description: t('formsCameraAccessDeniedDesc') });
+      // Reverted: toast({ variant: 'destructive', title: t('formsCameraAccessDenied'), description: t('formsCameraAccessDeniedDesc') });
+      toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'Please enable camera permissions in your browser settings.' });
     }
-  }, [toast, t]);
+  }, [toast]);
 
   useEffect(() => {
     let stream: MediaStream | null = null;
@@ -457,7 +465,8 @@ export default function AdminUserDetailPage() {
         if (!phoneSnapshot.empty) {
           const existingUser = phoneSnapshot.docs[0];
           if (existingUser.id !== userId) {
-            toast({ title: t('common.error'), description: t('formsPhoneRegisteredError'), variant: "destructive" });
+            // Reverted: toast({ title: t('common.error'), description: t('formsPhoneRegisteredError'), variant: "destructive" });
+            toast({ title: "Error", description: "Phone number already registered.", variant: "destructive" });
             setIsSubmitting(false);
             return;
           }
@@ -498,12 +507,14 @@ export default function AdminUserDetailPage() {
       
       const userDocRef = doc(db, "users", userId);
       await updateDoc(userDocRef, updatedUserData);
-      toast({ title: t('formsUserCreatedSuccess'), description: t('formsUserCreatedSuccessDesc', { fullname: values.fullname }) });
+      // Reverted: toast({ title: t('formsUserCreatedSuccess'), description: t('formsUserCreatedSuccessDesc', { fullname: values.fullname }) });
+      toast({ title: "User Updated", description: `${values.fullname}'s details updated successfully.` });
       setIsEditing(false);
       fetchUserDetailsAndTransactions(); 
     } catch (error) {
       console.error("User update error:", error);
-      toast({ title: t('common.error'), description: t('formsUserUpdateError', { error: (error as Error).message }), variant: "destructive" });
+      // Reverted: toast({ title: t('common.error'), description: t('formsUserUpdateError', { error: (error as Error).message }), variant: "destructive" });
+      toast({ title: "Error", description: `Could not update user. ${(error as Error).message}`, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -515,7 +526,8 @@ export default function AdminUserDetailPage() {
 
   const handleDownloadPdfTransactions = () => {
     if (!user || filteredUserTransactions.length === 0) {
-      toast({ title: t('common.notAvailable'), description: "No transaction data to download.", variant: "default"});
+      // Reverted: toast({ title: t('common.notAvailable'), description: "No transaction data to download.", variant: "default"});
+      toast({ title: "Not Available", description: "No transaction data to download.", variant: "default"});
       return;
     }
     const doc = new jsPDF();
@@ -524,35 +536,43 @@ export default function AdminUserDetailPage() {
       return `Rs. ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
-    const tableColumn = [t('adminUserDetailPaymentHistoryTableSno'), t('adminUserDetailPaymentHistoryTableDateTime'), t('adminUserDetailPaymentHistoryTableFrom'), t('adminUserDetailPaymentHistoryTableTo'), t('adminUserDetailPaymentHistoryTableType'), t('adminUserDetailPaymentHistoryTableAmount'), t('adminUserDetailPaymentHistoryTableMode'), t('adminUserDetailPaymentHistoryTableRemarksSource'), t('adminUserDetailPaymentHistoryVirtualId')];
+    // Reverted: const tableColumn = [t('adminUserDetailPaymentHistoryTableSno'), t('adminUserDetailPaymentHistoryTableDateTime'), ..., t('adminUserDetailPaymentHistoryVirtualId')];
+    const tableColumn = ["S.No", "Date & Time", "From", "To", "Type", "Amount", "Mode", "Remarks/Source", "Virtual ID"];
     const tableRows: any[][] = [];
 
     filteredUserTransactions.forEach((tx, index) => {
       const txData = [
         index + 1,
-        formatDateTimeSafe(tx.dateTime, "dd MMM yy, hh:mm a", t),
+        // Reverted: formatDateTimeSafe(tx.dateTime, "dd MMM yy, hh:mm a", t),
+        formatDateTimeSafe(tx.dateTime, "dd MMM yy, hh:mm a"),
         tx.fromParty,
         tx.toParty,
         tx.type,
         formatCurrencyPdf(tx.amount),
-        tx.mode || t('common.notAvailable'),
-        tx.remarksOrSource || t('common.notAvailable'),
-        tx.virtualTransactionId || t('common.notAvailable'),
+        // Reverted: tx.mode || t('common.notAvailable'),
+        tx.mode || "N/A",
+        // Reverted: tx.remarksOrSource || t('common.notAvailable'),
+        tx.remarksOrSource || "N/A",
+        // Reverted: tx.virtualTransactionId || t('common.notAvailable'),
+        tx.virtualTransactionId || "N/A",
       ];
       tableRows.push(txData);
     });
     
+    // Reverted: const filterLabel: Record<TransactionFilterType, string> = { ... };
     const filterLabel: Record<TransactionFilterType, string> = { 
-        all: t('adminUserDetailPaymentHistoryAllTime'), 
-        last7Days: t('adminUserDetailPaymentHistoryLast7Days'), 
-        last10Days: t('adminUserDetailPaymentHistoryLast10Days'), 
-        last30Days: t('adminUserDetailPaymentHistoryLast30Days')
+        all: "All Time", 
+        last7Days: "Last 7 Days", 
+        last10Days: "Last 10 Days", 
+        last30Days: "Last 30 Days"
     };
 
     doc.setFontSize(18);
-    doc.text(`${t('adminUserDetailSectionPaymentHistory')} - ${user.fullname}`, 14, 15);
+    // Reverted: doc.text(`${t('adminUserDetailSectionPaymentHistory')} - ${user.fullname}`, 14, 15);
+    doc.text(`Payment History - ${user.fullname}`, 14, 15);
     doc.setFontSize(12);
-    doc.text(`${t('adminUserDetailPaymentHistoryFilterByDate')}: ${filterLabel[selectedTransactionFilter]}`, 14, 22);
+    // Reverted: doc.text(`${t('adminUserDetailPaymentHistoryFilterByDate')}: ${filterLabel[selectedTransactionFilter]}`, 14, 22);
+    doc.text(`Filter: ${filterLabel[selectedTransactionFilter]}`, 14, 22);
     doc.text(`Generated on: ${format(new Date(), "dd MMM yyyy, hh:mm a")}`, 14, 29);
 
     autoTable(doc, {
@@ -579,7 +599,8 @@ export default function AdminUserDetailPage() {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-lg text-foreground">{t('adminUserDetailLoading')}</p>
+        {/* Reverted: <p className="mt-4 text-lg text-foreground">{t('adminUserDetailLoading')}</p> */}
+        <p className="mt-4 text-lg text-foreground">Loading user details...</p>
       </div>
     );
   }
@@ -588,10 +609,12 @@ export default function AdminUserDetailPage() {
     return (
       <div className="container mx-auto py-8 text-center">
         <Card className="max-w-md mx-auto shadow-lg">
-          <CardHeader><CardTitle className="text-destructive flex items-center justify-center"><AlertTriangle className="mr-2 h-6 w-6" /> {t('common.error')}</CardTitle></CardHeader>
+          {/* Reverted: <CardHeader><CardTitle className="text-destructive flex items-center justify-center"><AlertTriangle className="mr-2 h-6 w-6" /> {t('common.error')}</CardTitle></CardHeader> */}
+          <CardHeader><CardTitle className="text-destructive flex items-center justify-center"><AlertTriangle className="mr-2 h-6 w-6" /> Error</CardTitle></CardHeader>
           <CardContent>
             <p className="text-muted-foreground">{error}</p>
-            <Button onClick={() => router.push("/admin/users")} className="mt-6"><ArrowLeft className="mr-2 h-4 w-4" /> {t('adminUserDetailBackToAllUsers')}</Button>
+            {/* Reverted: <Button onClick={() => router.push("/admin/users")} className="mt-6"><ArrowLeft className="mr-2 h-4 w-4" /> {t('adminUserDetailBackToAllUsers')}</Button> */}
+            <Button onClick={() => router.push("/admin/users")} className="mt-6"><ArrowLeft className="mr-2 h-4 w-4" /> Back to All Users</Button>
           </CardContent>
         </Card>
       </div>
@@ -604,46 +627,55 @@ export default function AdminUserDetailPage() {
             <Card className="max-w-md mx-auto shadow-lg">
             <CardHeader><CardTitle className="text-amber-600 flex items-center justify-center"><AlertTriangle className="mr-2 h-6 w-6" /> Data Issue</CardTitle></CardHeader>
             <CardContent>
-                <p className="text-muted-foreground">{t('adminUserDetailDataUnavailable')}</p>
-                <Button onClick={() => router.push("/admin/users")} className="mt-6"><ArrowLeft className="mr-2 h-4 w-4" /> {t('adminUserDetailBackToAllUsers')}</Button>
+                {/* Reverted: <p className="text-muted-foreground">{t('adminUserDetailDataUnavailable')}</p> */}
+                <p className="text-muted-foreground">User data not available.</p>
+                {/* Reverted: <Button onClick={() => router.push("/admin/users")} className="mt-6"><ArrowLeft className="mr-2 h-4 w-4" /> {t('adminUserDetailBackToAllUsers')}</Button> */}
+                <Button onClick={() => router.push("/admin/users")} className="mt-6"><ArrowLeft className="mr-2 h-4 w-4" /> Back to All Users</Button>
             </CardContent>
             </Card>
         </div>
     );
   }
 
+  // const isAdminUser = user.isAdmin || user.username === 'admin';
   const isAdminUser = user?.isAdmin || user?.username === 'admin';
+
 
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
-        <Button variant="outline" onClick={() => isEditing ? setIsEditing(false) : router.push("/admin/users")} className="mb-6">
-          <ArrowLeft className="mr-2 h-4 w-4" /> {isEditing ? t('adminUserDetailCancelEdit') : t('adminUserDetailBackToAllUsers')}
-        </Button>
+        {/* Reverted: <Button variant="outline" onClick={() => isEditing ? setIsEditing(false) : router.push("/admin/users")} className="mb-6"><ArrowLeft className="mr-2 h-4 w-4" /> {isEditing ? t('adminUserDetailCancelEdit') : t('adminUserDetailBackToAllUsers')}</Button> */}
+        <Button variant="outline" onClick={() => isEditing ? setIsEditing(false) : router.push("/admin/users")} className="mb-6"><ArrowLeft className="mr-2 h-4 w-4" /> {isEditing ? "Cancel Edit" : "Back to All Users"}</Button>
         {!isEditing && (
-          <Button onClick={() => setIsEditing(true)} className="mb-6">
-            <Edit3 className="mr-2 h-4 w-4" /> {t('adminUserDetailEditUserButton')}
-          </Button>
+          // Reverted: <Button onClick={() => setIsEditing(true)} className="mb-6"><Edit3 className="mr-2 h-4 w-4" /> {t('adminUserDetailEditUserButton')}</Button>
+          <Button onClick={() => setIsEditing(true)} className="mb-6"><Edit3 className="mr-2 h-4 w-4" /> Edit User</Button>
         )}
       </div>
 
       {isEditing ? (
         <Card className="shadow-xl w-full max-w-2xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-2xl font-bold text-foreground">{t('adminUserDetailEditUserFormTitle', { fullname: user.fullname })}</CardTitle>
-            <CardDescription>{t('adminUserDetailEditUserFormDescription')}</CardDescription>
+            {/* Reverted: <CardTitle className="text-2xl font-bold text-foreground">{t('adminUserDetailEditUserFormTitle', { fullname: user.fullname })}</CardTitle> */}
+            <CardTitle className="text-2xl font-bold text-foreground">Edit User: {user.fullname}</CardTitle>
+            {/* Reverted: <CardDescription>{t('adminUserDetailEditUserFormDescription')}</CardDescription> */}
+            <CardDescription>Modify the user's details below.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField control={form.control} name="fullname" render={({ field }) => (<FormItem><FormLabel>{t('formsFullNameLabel')}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                {/* Reverted: <FormField control={form.control} name="fullname" render={({ field }) => (<FormItem><FormLabel>{t('formsFullNameLabel')}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} /> */}
+                <FormField control={form.control} name="fullname" render={({ field }) => (<FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <div className="grid md:grid-cols-2 gap-6">
-                  <FormField control={form.control} name="phone" render={({ field }) => (<FormItem><FormLabel>{t('formsPhoneLabel')}</FormLabel><FormControl><Input type="tel" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                  {/* Reverted: <FormField control={form.control} name="phone" render={({ field }) => (<FormItem><FormLabel>{t('formsPhoneLabel')}</FormLabel><FormControl><Input type="tel" {...field} /></FormControl><FormMessage /></FormItem>)} /> */}
+                  <FormField control={form.control} name="phone" render={({ field }) => (<FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" {...field} /></FormControl><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="dob" render={({ field }) => (
-                    <FormItem className="flex flex-col"><FormLabel>{t('formsDobLabel')}</FormLabel>
+                    <FormItem className="flex flex-col">
+                      {/* Reverted: <FormLabel>{t('formsDobLabel')}</FormLabel> */}
+                      <FormLabel>Date of Birth</FormLabel>
                       <Popover><PopoverTrigger asChild><FormControl>
                             <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal",!field.value && "text-muted-foreground")}>
-                              {field.value ? format(field.value, "PPP") : <span>{t('formsPickADate')}</span>}
+                              {/* Reverted: {field.value ? format(field.value, "PPP") : <span>{t('formsPickADate')}</span>} */}
+                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                               <CalendarDays className="ml-auto h-4 w-4 opacity-50" />
                             </Button></FormControl></PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
@@ -652,11 +684,14 @@ export default function AdminUserDetailPage() {
                       </Popover><FormMessage />
                     </FormItem>)} />
                 </div>
-                <FormField control={form.control} name="password" render={({ field }) => (<FormItem><FormLabel>{t('formsNewPasswordOptionalLabel')}</FormLabel><FormControl><Input type="password" placeholder={t('formsPasswordPlaceholder')} {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="address" render={({ field }) => (<FormItem><FormLabel>{t('formsAddressLabel')}</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>)} />
+                {/* Reverted: <FormField control={form.control} name="password" render={({ field }) => (<FormItem><FormLabel>{t('formsNewPasswordOptionalLabel')}</FormLabel><FormControl><Input type="password" placeholder={t('formsPasswordPlaceholder')} {...field} /></FormControl><FormMessage /></FormItem>)} /> */}
+                <FormField control={form.control} name="password" render={({ field }) => (<FormItem><FormLabel>New Password (optional)</FormLabel><FormControl><Input type="password" placeholder="Leave blank to keep current password" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                {/* Reverted: <FormField control={form.control} name="address" render={({ field }) => (<FormItem><FormLabel>{t('formsAddressLabel')}</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>)} /> */}
+                <FormField control={form.control} name="address" render={({ field }) => (<FormItem><FormLabel>Address</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="referralPerson" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('formsReferralPersonLabel')}</FormLabel>
+                      {/* Reverted: <FormLabel>{t('formsReferralPersonLabel')}</FormLabel> */}
+                      <FormLabel>Referral Person (Optional)</FormLabel>
                       <FormControl>
                         <Input {...field} value={field.value ?? ""} />
                       </FormControl>
@@ -666,7 +701,8 @@ export default function AdminUserDetailPage() {
                 />
                  <FormField control={form.control} name="dueAmount" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('formsDueAmountLabel')}</FormLabel>
+                      {/* Reverted: <FormLabel>{t('formsDueAmountLabel')}</FormLabel> */}
+                      <FormLabel>Due Amount (₹)</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
@@ -682,34 +718,41 @@ export default function AdminUserDetailPage() {
                 />
                 
                 <Card>
-                  <CardHeader><CardTitle className="text-lg">{t('formsDocumentUploadsTitle')}</CardTitle></CardHeader>
+                  {/* Reverted: <CardHeader><CardTitle className="text-lg">{t('formsDocumentUploadsTitle')}</CardTitle></CardHeader> */}
+                  <CardHeader><CardTitle className="text-lg">Update Documents (Optional)</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
                     <FormField control={form.control} name="aadhaarCard" render={({ field: { onChange, onBlur, name, ref }}) => (
-                      <FormItem><FormLabel>{t('formsAadhaarCardLabel')} ({t('formsAadhaarUploadHelper')})</FormLabel>
-                        {user.aadhaarCardUrl && <p className="text-xs text-muted-foreground">{t('adminUserDetailDocsCurrentAadhaar')}: <a href={user.aadhaarCardUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{t('adminUserDetailViewDocument')}</a></p>}
-                        <FormControl><Input type="file" onChange={(e) => onChange(e.target.files?.[0] ?? null)} onBlur={onBlur} name={name} ref={ref} accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
+                      // Reverted: <FormItem><FormLabel>{t('formsAadhaarCardLabel')} ({t('formsAadhaarUploadHelper')})</FormLabel>
+                      <FormItem><FormLabel>Aadhaar Card (Upload new to replace)</FormLabel>
+                        {/* Reverted: {user.aadhaarCardUrl && <p className="text-xs text-muted-foreground">{t('adminUserDetailDocsCurrentAadhaar')}: <a href={user.aadhaarCardUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{t('adminUserDetailViewDocument')}</a></p>} */}
+                        {user.aadhaarCardUrl && <p className="text-xs text-muted-foreground">Current: View Aadhaar: <a href={user.aadhaarCardUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Document</a></p>}
+                        <FormControl><Input type="file" onChange={(e) => {const file = e.target.files?.[0]; onChange(file ?? null)}} onBlur={onBlur} name={name} ref={ref} accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
                       </FormItem>)} />
                     <FormField control={form.control} name="panCard" render={({ field: { onChange, onBlur, name, ref }}) => (
-                      <FormItem><FormLabel>{t('formsPanCardLabel')} ({t('formsPanUploadHelper')})</FormLabel>
-                         {user.panCardUrl && <p className="text-xs text-muted-foreground">{t('adminUserDetailDocsCurrentPAN')}: <a href={user.panCardUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{t('adminUserDetailViewDocument')}</a></p>}
-                        <FormControl><Input type="file" onChange={(e) => onChange(e.target.files?.[0] ?? null)} onBlur={onBlur} name={name} ref={ref} accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
+                      // Reverted: <FormItem><FormLabel>{t('formsPanCardLabel')} ({t('formsPanUploadHelper')})</FormLabel>
+                      <FormItem><FormLabel>PAN Card (Upload new to replace)</FormLabel>
+                         {/* Reverted: {user.panCardUrl && <p className="text-xs text-muted-foreground">{t('adminUserDetailDocsCurrentPAN')}: <a href={user.panCardUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{t('adminUserDetailViewDocument')}</a></p>} */}
+                         {user.panCardUrl && <p className="text-xs text-muted-foreground">Current: View PAN: <a href={user.panCardUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Document</a></p>}
+                        <FormControl><Input type="file" onChange={(e) => {const file = e.target.files?.[0]; onChange(file ?? null)}} onBlur={onBlur} name={name} ref={ref} accept=".pdf,image/jpeg,image/png" /></FormControl><FormMessage />
                       </FormItem>)} />
                   </CardContent>
                 </Card>
 
                 <Card>
-                  <CardHeader><CardTitle className="text-lg">{t('formsPhotoUploadsTitle')}</CardTitle></CardHeader>
+                  {/* Reverted: <CardHeader><CardTitle className="text-lg">{t('formsPhotoUploadsTitle')}</CardTitle></CardHeader> */}
+                  <CardHeader><CardTitle className="text-lg">Update Photograph (Optional)</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
                      { (capturedImage || user.photoUrl) && !showCamera && (
                         <div className="mb-2">
-                          <FormLabel>{t('adminUserDetailPhotoCurrentCaptured')}</FormLabel>
+                          {/* Reverted: <FormLabel>{t('adminUserDetailPhotoCurrentCaptured')}</FormLabel> */}
+                          <FormLabel>Current/Captured Photograph:</FormLabel>
                           <Image src={capturedImage || user.photoUrl!} alt="User photo" width={150} height={150} className="rounded-md border mt-1" data-ai-hint="user profile"/>
                         </div>
                       )}
                     {!showCamera && (
                       <>
-                        <FormField control={form.control} name="recentPhotographFile" render={({ field: { onChange, onBlur, name, ref }}) => (
-                          <FormItem><FormLabel>{t('formsUploadPhotoLabel')}</FormLabel>
+                        {/* Reverted: <FormField control={form.control} name="recentPhotographFile" render={({ field: { onChange, onBlur, name, ref }}) => (<FormItem><FormLabel>{t('formsUploadPhotoLabel')}</FormLabel> */}
+                        <FormField control={form.control} name="recentPhotographFile" render={({ field: { onChange, onBlur, name, ref }}) => (<FormItem><FormLabel>Upload New Photo</FormLabel>
                             <FormControl><Input type="file" 
                               onChange={(e) => { 
                                 const file = e.target.files?.[0]; 
@@ -725,18 +768,20 @@ export default function AdminUserDetailPage() {
                               accept="image/jpeg,image/png" /></FormControl><FormMessage />
                           </FormItem>)} />
                         <div className="text-center my-2 text-sm text-muted-foreground">OR</div>
-                        <Button type="button" variant="outline" className="w-full" onClick={() => {setShowCamera(true); setCapturedImage(null); form.setValue("recentPhotographFile", null); requestCameraPermission(); }}>
-                          <Camera className="mr-2 h-4 w-4" /> {t('formsCaptureWithWebcamButton')}
-                        </Button>
+                        {/* Reverted: <Button type="button" variant="outline" className="w-full" onClick={() => {setShowCamera(true); setCapturedImage(null); form.setValue("recentPhotographFile", null); requestCameraPermission(); }}><Camera className="mr-2 h-4 w-4" /> {t('formsCaptureWithWebcamButton')}</Button> */}
+                        <Button type="button" variant="outline" className="w-full" onClick={() => {setShowCamera(true); setCapturedImage(null); form.setValue("recentPhotographFile", null); requestCameraPermission(); }}><Camera className="mr-2 h-4 w-4" /> Capture with Webcam</Button>
                       </>
                     )}
-                    {showCamera && hasCameraPermission === false && <Alert variant="destructive"><AlertTitle>{t('formsCameraAccessDenied')}</AlertTitle><AlertDescriptionUI>{t('formsCameraAccessDeniedDesc')}</AlertDescriptionUI></Alert>}
+                    {/* Reverted: {showCamera && hasCameraPermission === false && <Alert variant="destructive"><AlertTitle>{t('formsCameraAccessDenied')}</AlertTitle><AlertDescriptionUI>{t('formsCameraAccessDeniedDesc')}</AlertDescriptionUI></Alert>} */}
+                    {showCamera && hasCameraPermission === false && <Alert variant="destructive"><AlertTitle>Camera Access Denied</AlertTitle><AlertDescriptionUI>Please enable camera permissions.</AlertDescriptionUI></Alert>}
                     
                     <video ref={videoRef} className={cn("w-full aspect-video rounded-md border bg-muted", { 'hidden': !showCamera || hasCameraPermission !== true })} autoPlay playsInline muted />
                     
                     {showCamera && hasCameraPermission === true && (
                       <div className="space-y-2">
-                        <Button type="button" className="w-full" onClick={handleCapturePhoto}><ImageIconLucide className="mr-2 h-4 w-4" /> {t('formsCapturePhotoButton')}</Button>
+                        {/* Reverted: <Button type="button" className="w-full" onClick={handleCapturePhoto}><ImageIconLucide className="mr-2 h-4 w-4" /> {t('formsCapturePhotoButton')}</Button> */}
+                        <Button type="button" className="w-full" onClick={handleCapturePhoto}><ImageIconLucide className="mr-2 h-4 w-4" /> Capture Photo</Button>
+                        {/* Reverted: <Button type="button" variant="ghost" className="w-full" onClick={() => { ... }}>{t('formsCancelWebcamButton')}</Button> */}
                         <Button type="button" variant="ghost" className="w-full" onClick={() => {
                             setShowCamera(false); 
                             setCapturedImage(user.photoUrl || null);
@@ -745,11 +790,12 @@ export default function AdminUserDetailPage() {
                                 videoRef.current.srcObject = null;
                                 setHasCameraPermission(null);
                             }
-                            }}>{t('formsCancelWebcamButton')}</Button>
+                            }}>Cancel Webcam</Button>
                       </div>
                     )}
                      {capturedImage && !showCamera && ( 
-                       <Button type="button" variant="outline" onClick={handleRetake} className="w-full"><RefreshCw className="mr-2 h-4 w-4" /> {t('adminUserDetailPhotoRetake')}</Button>
+                       // Reverted: <Button type="button" variant="outline" onClick={handleRetake} className="w-full"><RefreshCw className="mr-2 h-4 w-4" /> {t('adminUserDetailPhotoRetake')}</Button>
+                       <Button type="button" variant="outline" onClick={handleRetake} className="w-full"><RefreshCw className="mr-2 h-4 w-4" /> Retake Photo</Button>
                      )}
                     <canvas ref={canvasRef} className="hidden"></canvas>
                   </CardContent>
@@ -758,13 +804,14 @@ export default function AdminUserDetailPage() {
                 <FormField control={form.control} name="isAdmin" render={({ field }) => (
                     <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
                       <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                      <div className="space-y-1 leading-none"><FormLabel>{t('formsIsAdminLabel')}</FormLabel><FormDescription>{t('formsIsAdminDescription')}</FormDescription></div>
+                      {/* Reverted: <div className="space-y-1 leading-none"><FormLabel>{t('formsIsAdminLabel')}</FormLabel><FormDescription>{t('formsIsAdminDescription')}</FormDescription></div> */}
+                      <div className="space-y-1 leading-none"><FormLabel>Administrator?</FormLabel><FormDescription>Grants full access to admin panel.</FormDescription></div>
                     </FormItem>)} />
                 <div className="flex gap-4">
-                  <Button type="button" variant="outline" onClick={() => {setIsEditing(false); fetchUserDetailsAndTransactions();}} disabled={isSubmitting}><XCircle className="mr-2 h-4 w-4" />{t('common.cancel')}</Button>
-                  <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90 flex-grow" disabled={isSubmitting}>
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}<Save className="mr-2 h-4 w-4" /> {t('common.saveChanges')}
-                  </Button>
+                  {/* Reverted: <Button type="button" variant="outline" onClick={() => {setIsEditing(false); fetchUserDetailsAndTransactions();}} disabled={isSubmitting}><XCircle className="mr-2 h-4 w-4" />{t('common.cancel')}</Button> */}
+                  <Button type="button" variant="outline" onClick={() => {setIsEditing(false); fetchUserDetailsAndTransactions();}} disabled={isSubmitting}><XCircle className="mr-2 h-4 w-4" />Cancel</Button>
+                  {/* Reverted: <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90 flex-grow" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}<Save className="mr-2 h-4 w-4" /> {t('common.saveChanges')}</Button> */}
+                  <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90 flex-grow" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}<Save className="mr-2 h-4 w-4" /> Save Changes</Button>
                 </div>
               </form>
             </Form>
@@ -778,7 +825,8 @@ export default function AdminUserDetailPage() {
               {(user.photoUrl) && (<Image src={user.photoUrl} alt={`${user.fullname}'s photo`} width={100} height={100} className="rounded-full border-4 border-card object-cover" data-ai-hint="user profile"/>)}
               <div className="flex-grow">
                 <CardTitle className="text-3xl font-bold text-foreground flex items-center">
-                  {user.fullname} {isAdminUser && <Badge variant="destructive" className="ml-3"><Shield className="mr-1 h-4 w-4"/>{t('common.admin')}</Badge>}
+                  {/* Reverted: {user.fullname} {isAdminUser && <Badge variant="destructive" className="ml-3"><Shield className="mr-1 h-4 w-4"/>{t('common.admin')}</Badge>} */}
+                  {user.fullname} {isAdminUser && <Badge variant="destructive" className="ml-3"><Shield className="mr-1 h-4 w-4"/>Admin</Badge>}
                 </CardTitle>
                 <CardDescription>@{user.username} (User ID: {user.id})</CardDescription>
               </div>
@@ -786,34 +834,47 @@ export default function AdminUserDetailPage() {
           </CardHeader>
           <CardContent className="p-6 space-y-6">
             <section>
-              <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><Info className="mr-2 h-5 w-5" />{t('adminUserDetailSectionPersonalInfo')}</h3>
+              {/* Reverted: <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><Info className="mr-2 h-5 w-5" />{t('adminUserDetailSectionPersonalInfo')}</h3> */}
+              <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><Info className="mr-2 h-5 w-5" />Personal Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
-                <div className="flex items-start"><Phone className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">{t('adminUserDetailLabelPhone')}</strong> {user.phone}</div></div>
-                <div className="flex items-start"><CalendarDays className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">{t('adminUserDetailLabelDob')}</strong> {formatDateSafe(user.dob, "dd MMMM yyyy", t)}</div></div>
-                <div className="flex items-start col-span-1 md:col-span-2"><Home className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">{t('adminUserDetailLabelAddress')}</strong> {user.address || t('common.notAvailable')}</div></div>
-                <div className="flex items-start"><Briefcase className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">{t('adminUserDetailLabelReferredBy')}</strong> {user.referralPerson || t('common.notAvailable')}</div></div>
+                {/* Reverted: <div className="flex items-start"><Phone className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">{t('adminUserDetailLabelPhone')}</strong> {user.phone}</div></div> */}
+                <div className="flex items-start"><Phone className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Phone:</strong> {user.phone}</div></div>
+                {/* Reverted: <div className="flex items-start"><CalendarDays className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">{t('adminUserDetailLabelDob')}</strong> {formatDateSafe(user.dob, "dd MMMM yyyy", t)}</div></div> */}
+                <div className="flex items-start"><CalendarDays className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Date of Birth:</strong> {formatDateSafe(user.dob, "dd MMMM yyyy")}</div></div>
+                {/* Reverted: <div className="flex items-start col-span-1 md:col-span-2"><Home className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">{t('adminUserDetailLabelAddress')}</strong> {user.address || t('common.notAvailable')}</div></div> */}
+                <div className="flex items-start col-span-1 md:col-span-2"><Home className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Address:</strong> {user.address || "N/A"}</div></div>
+                {/* Reverted: <div className="flex items-start"><Briefcase className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">{t('adminUserDetailLabelReferredBy')}</strong> {user.referralPerson || t('common.notAvailable')}</div></div> */}
+                <div className="flex items-start"><Briefcase className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Referred By:</strong> {user.referralPerson || "N/A"}</div></div>
               </div>
             </section>
             <Separator />
              <section>
-              <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><DollarSign className="mr-2 h-5 w-5" />{t('adminUserDetailSectionFinancialInfo')}</h3>
+              {/* Reverted: <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><DollarSign className="mr-2 h-5 w-5" />{t('adminUserDetailSectionFinancialInfo')}</h3> */}
+              <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><DollarSign className="mr-2 h-5 w-5" />Financial Information</h3>
               <div className="space-y-3 text-sm">
-                 <div className="flex items-center"><strong className="text-foreground w-28">{t('adminUserDetailLabelDueAmount')}</strong>{user.dueAmount !== undefined && user.dueAmount !== null ? formatCurrency(user.dueAmount, t) : t('common.notAvailable')}</div>
+                 {/* Reverted: <div className="flex items-center"><strong className="text-foreground w-28">{t('adminUserDetailLabelDueAmount')}</strong>{user.dueAmount !== undefined && user.dueAmount !== null ? formatCurrency(user.dueAmount, t) : t('common.notAvailable')}</div> */}
+                 <div className="flex items-center"><strong className="text-foreground w-28">Due Amount:</strong>{user.dueAmount !== undefined && user.dueAmount !== null ? formatCurrency(user.dueAmount) : "N/A"}</div>
               </div>
             </section>
             <Separator />
             <section>
-              <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><FileText className="mr-2 h-5 w-5" />{t('adminUserDetailSectionDocuments')}</h3>
+              {/* Reverted: <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><FileText className="mr-2 h-5 w-5" />{t('adminUserDetailSectionDocuments')}</h3> */}
+              <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><FileText className="mr-2 h-5 w-5" />Uploaded Documents</h3>
               <div className="space-y-3 text-sm">
-                {user.aadhaarCardUrl ? (<div className="flex items-center"><strong className="text-foreground w-28">{t('formsAadhaarCardLabel')}:</strong><Button variant="link" asChild className="p-0 h-auto"><a href={user.aadhaarCardUrl} target="_blank" rel="noopener noreferrer">{t('adminUserDetailViewDocument')}</a></Button></div>) : <p className="text-muted-foreground">{t('formsAadhaarCardLabel')}: {t('adminUserDetailNotUploaded')}</p>}
-                {user.panCardUrl ? (<div className="flex items-center"><strong className="text-foreground w-28">{t('formsPanCardLabel')}:</strong><Button variant="link" asChild className="p-0 h-auto"><a href={user.panCardUrl} target="_blank" rel="noopener noreferrer">{t('adminUserDetailViewDocument')}</a></Button></div>) : <p className="text-muted-foreground">{t('formsPanCardLabel')}: {t('adminUserDetailNotUploaded')}</p>}
-                {user.photoUrl ? (<div className="flex items-center"><strong className="text-foreground w-28">{t('formsRecentPhotographLabel')}:</strong><Button variant="link" asChild className="p-0 h-auto"><a href={user.photoUrl} target="_blank" rel="noopener noreferrer">{t('adminUserDetailViewPhoto')}</a></Button></div>) : <p className="text-muted-foreground">{t('formsRecentPhotographLabel')}: {t('adminUserDetailNotUploaded')}</p>}
+                {/* Reverted: {user.aadhaarCardUrl ? (<div className="flex items-center"><strong className="text-foreground w-28">{t('formsAadhaarCardLabel')}:</strong><Button variant="link" asChild className="p-0 h-auto"><a href={user.aadhaarCardUrl} target="_blank" rel="noopener noreferrer">{t('adminUserDetailViewDocument')}</a></Button></div>) : <p className="text-muted-foreground">{t('formsAadhaarCardLabel')}: {t('adminUserDetailNotUploaded')}</p>} */}
+                {user.aadhaarCardUrl ? (<div className="flex items-center"><strong className="text-foreground w-28">Aadhaar Card:</strong><Button variant="link" asChild className="p-0 h-auto"><a href={user.aadhaarCardUrl} target="_blank" rel="noopener noreferrer">View Document</a></Button></div>) : <p className="text-muted-foreground">Aadhaar Card: Not Uploaded</p>}
+                {/* Reverted: {user.panCardUrl ? (<div className="flex items-center"><strong className="text-foreground w-28">{t('formsPanCardLabel')}:</strong><Button variant="link" asChild className="p-0 h-auto"><a href={user.panCardUrl} target="_blank" rel="noopener noreferrer">{t('adminUserDetailViewDocument')}</a></Button></div>) : <p className="text-muted-foreground">{t('formsPanCardLabel')}: {t('adminUserDetailNotUploaded')}</p>} */}
+                {user.panCardUrl ? (<div className="flex items-center"><strong className="text-foreground w-28">PAN Card:</strong><Button variant="link" asChild className="p-0 h-auto"><a href={user.panCardUrl} target="_blank" rel="noopener noreferrer">View Document</a></Button></div>) : <p className="text-muted-foreground">PAN Card: Not Uploaded</p>}
+                {/* Reverted: {user.photoUrl ? (<div className="flex items-center"><strong className="text-foreground w-28">{t('formsRecentPhotographLabel')}:</strong><Button variant="link" asChild className="p-0 h-auto"><a href={user.photoUrl} target="_blank" rel="noopener noreferrer">{t('adminUserDetailViewPhoto')}</a></Button></div>) : <p className="text-muted-foreground">{t('formsRecentPhotographLabel')}: {t('adminUserDetailNotUploaded')}</p>} */}
+                {user.photoUrl ? (<div className="flex items-center"><strong className="text-foreground w-28">Recent Photograph:</strong><Button variant="link" asChild className="p-0 h-auto"><a href={user.photoUrl} target="_blank" rel="noopener noreferrer">View Photo</a></Button></div>) : <p className="text-muted-foreground">Recent Photograph: Not Uploaded</p>}
               </div>
             </section>
             <Separator />
             <section>
-              <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><GroupIcon className="mr-2 h-5 w-5" />{t('adminUserDetailSectionJoinedGroups')} ({userGroups.length})</h3>
-              {userGroups.length > 0 ? (<ul className="list-disc list-inside space-y-1 text-sm">{userGroups.map(group => (<li key={group.id}><Link href={`/admin/groups/${group.id}`} className="text-primary hover:underline">{group.groupName}</Link><span className="text-muted-foreground text-xs ml-2">(ID: {group.id})</span></li>))}</ul>) : (<p className="text-sm text-muted-foreground">{t('adminUserDetailNoGroups')}</p>)}
+              {/* Reverted: <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><GroupIcon className="mr-2 h-5 w-5" />{t('adminUserDetailSectionJoinedGroups')} ({userGroups.length})</h3> */}
+              <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><GroupIcon className="mr-2 h-5 w-5" />Joined Groups ({userGroups.length})</h3>
+              {/* Reverted: {userGroups.length > 0 ? (<ul className="list-disc list-inside space-y-1 text-sm">{userGroups.map(group => (<li key={group.id}><Link href={`/admin/groups/${group.id}`} className="text-primary hover:underline">{group.groupName}</Link><span className="text-muted-foreground text-xs ml-2">(ID: {group.id})</span></li>))}</ul>) : (<p className="text-sm text-muted-foreground">{t('adminUserDetailNoGroups')}</p>)} */}
+              {userGroups.length > 0 ? (<ul className="list-disc list-inside space-y-1 text-sm">{userGroups.map(group => (<li key={group.id}><Link href={`/admin/groups/${group.id}`} className="text-primary hover:underline">{group.groupName}</Link><span className="text-muted-foreground text-xs ml-2">(ID: {group.id})</span></li>))}</ul>) : (<p className="text-sm text-muted-foreground">This user has not joined any groups yet.</p>)}
             </section>
             <Separator />
             <section>
@@ -821,29 +882,36 @@ export default function AdminUserDetailPage() {
                 <CardHeader className="flex flex-row items-center justify-between pb-4">
                     <div className="flex items-center gap-3">
                         <ReceiptText className="h-6 w-6 text-primary" />
-                        <CardTitle className="text-xl font-bold text-foreground">{t('adminUserDetailSectionPaymentHistory')}</CardTitle>
+                        {/* Reverted: <CardTitle className="text-xl font-bold text-foreground">{t('adminUserDetailSectionPaymentHistory')}</CardTitle> */}
+                        <CardTitle className="text-xl font-bold text-foreground">Payment History</CardTitle>
                     </div>
                     <div className="flex items-center gap-2">
                         <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm"><Filter className="mr-2 h-4 w-4" /> {t('adminUserDetailPaymentHistoryFilterByDate')}</Button>
-                        </DropdownMenuTrigger>
+                        {/* Reverted: <DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Filter className="mr-2 h-4 w-4" /> {t('adminUserDetailPaymentHistoryFilterByDate')}</Button></DropdownMenuTrigger> */}
+                        <DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Filter className="mr-2 h-4 w-4" /> Filter by Date</Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>{t('adminUserDetailPaymentHistoryFilterByDate')}</DropdownMenuLabel><DropdownMenuSeparator />
-                            <DropdownMenuItem onSelect={() => setSelectedTransactionFilter("all")}>{t('adminUserDetailPaymentHistoryAllTime')}</DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => setSelectedTransactionFilter("last7Days")}>{t('adminUserDetailPaymentHistoryLast7Days')}</DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => setSelectedTransactionFilter("last10Days")}>{t('adminUserDetailPaymentHistoryLast10Days')}</DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => setSelectedTransactionFilter("last30Days")}>{t('adminUserDetailPaymentHistoryLast30Days')}</DropdownMenuItem>
+                            {/* Reverted: <DropdownMenuLabel>{t('adminUserDetailPaymentHistoryFilterByDate')}</DropdownMenuLabel><DropdownMenuSeparator /> */}
+                            <DropdownMenuLabel>Filter by Date</DropdownMenuLabel><DropdownMenuSeparator />
+                            {/* Reverted: <DropdownMenuItem onSelect={() => setSelectedTransactionFilter("all")}>{t('adminUserDetailPaymentHistoryAllTime')}</DropdownMenuItem> */}
+                            <DropdownMenuItem onSelect={() => setSelectedTransactionFilter("all")}>All Time</DropdownMenuItem>
+                            {/* Reverted: <DropdownMenuItem onSelect={() => setSelectedTransactionFilter("last7Days")}>{t('adminUserDetailPaymentHistoryLast7Days')}</DropdownMenuItem> */}
+                            <DropdownMenuItem onSelect={() => setSelectedTransactionFilter("last7Days")}>Last 7 Days</DropdownMenuItem>
+                            {/* Reverted: <DropdownMenuItem onSelect={() => setSelectedTransactionFilter("last10Days")}>{t('adminUserDetailPaymentHistoryLast10Days')}</DropdownMenuItem> */}
+                            <DropdownMenuItem onSelect={() => setSelectedTransactionFilter("last10Days")}>Last 10 Days</DropdownMenuItem>
+                            {/* Reverted: <DropdownMenuItem onSelect={() => setSelectedTransactionFilter("last30Days")}>{t('adminUserDetailPaymentHistoryLast30Days')}</DropdownMenuItem> */}
+                            <DropdownMenuItem onSelect={() => setSelectedTransactionFilter("last30Days")}>Last 30 Days</DropdownMenuItem>
                         </DropdownMenuContent>
                         </DropdownMenu>
-                        <Button variant="outline" size="sm" onClick={handleDownloadPdfTransactions} disabled={filteredUserTransactions.length === 0}><Download className="mr-2 h-4 w-4" /> {t('adminUserDetailPaymentHistoryDownloadPDF')}</Button>
+                        {/* Reverted: <Button variant="outline" size="sm" onClick={handleDownloadPdfTransactions} disabled={filteredUserTransactions.length === 0}><Download className="mr-2 h-4 w-4" /> {t('adminUserDetailPaymentHistoryDownloadPDF')}</Button> */}
+                        <Button variant="outline" size="sm" onClick={handleDownloadPdfTransactions} disabled={filteredUserTransactions.length === 0}><Download className="mr-2 h-4 w-4" /> Download PDF</Button>
                     </div>
                 </CardHeader>
                 <CardContent>
                     {loadingTransactions && (
                         <div className="flex justify-center items-center py-10">
                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                            <p className="ml-3 text-muted-foreground">{t('adminUserDetailPaymentHistoryLoading')}</p>
+                            {/* Reverted: <p className="ml-3 text-muted-foreground">{t('adminUserDetailPaymentHistoryLoading')}</p> */}
+                            <p className="ml-3 text-muted-foreground">Loading payment history...</p>
                         </div>
                     )}
                     {!loadingTransactions && transactionError && (
@@ -852,22 +920,29 @@ export default function AdminUserDetailPage() {
                             <p>{transactionError}</p>
                         </div>
                     )}
-                    {!loadingTransactions && !transactionError && filteredUserTransactions.length === 0 && (
-                        <p className="text-muted-foreground text-center py-10">{t('adminUserDetailPaymentHistoryNoHistory', { period: selectedTransactionFilter !== 'all' ? `in the selected period` : '' })}</p>
-                    )}
+                    {/* Reverted: {!loadingTransactions && !transactionError && filteredUserTransactions.length === 0 && (<p className="text-muted-foreground text-center py-10">{t('adminUserDetailPaymentHistoryNoHistory', { period: selectedTransactionFilter !== 'all' ? `in the selected period` : '' })}</p>)} */}
+                    {!loadingTransactions && !transactionError && filteredUserTransactions.length === 0 && (<p className="text-muted-foreground text-center py-10">{`No payment history found for this user ${selectedTransactionFilter !== 'all' ? `in the selected period` : ''}`}.</p>)}
                     {!loadingTransactions && !transactionError && filteredUserTransactions.length > 0 && (
                     <div className="overflow-x-auto rounded-md border">
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>{t('adminUserDetailPaymentHistoryTableSno')}</TableHead>
-                                    <TableHead>{t('adminUserDetailPaymentHistoryTableDateTime')}</TableHead>
-                                    <TableHead>{t('adminUserDetailPaymentHistoryTableFrom')}</TableHead>
-                                    <TableHead>{t('adminUserDetailPaymentHistoryTableTo')}</TableHead>
-                                    <TableHead>{t('adminUserDetailPaymentHistoryTableType')}</TableHead>
-                                    <TableHead className="text-right">{t('adminUserDetailPaymentHistoryTableAmount')}</TableHead>
-                                    <TableHead>{t('adminUserDetailPaymentHistoryTableMode')}</TableHead>
-                                    <TableHead>{t('adminUserDetailPaymentHistoryTableRemarksSource')}</TableHead>
+                                    {/* Reverted: <TableHead>{t('adminUserDetailPaymentHistoryTableSno')}</TableHead> */}
+                                    <TableHead>S.No</TableHead>
+                                    {/* Reverted: <TableHead>{t('adminUserDetailPaymentHistoryTableDateTime')}</TableHead> */}
+                                    <TableHead>Date & Time</TableHead>
+                                    {/* Reverted: <TableHead>{t('adminUserDetailPaymentHistoryTableFrom')}</TableHead> */}
+                                    <TableHead>From</TableHead>
+                                    {/* Reverted: <TableHead>{t('adminUserDetailPaymentHistoryTableTo')}</TableHead> */}
+                                    <TableHead>To</TableHead>
+                                    {/* Reverted: <TableHead>{t('adminUserDetailPaymentHistoryTableType')}</TableHead> */}
+                                    <TableHead>Type</TableHead>
+                                    {/* Reverted: <TableHead className="text-right">{t('adminUserDetailPaymentHistoryTableAmount')}</TableHead> */}
+                                    <TableHead className="text-right">Amount (₹)</TableHead>
+                                    {/* Reverted: <TableHead>{t('adminUserDetailPaymentHistoryTableMode')}</TableHead> */}
+                                    <TableHead>Mode</TableHead>
+                                    {/* Reverted: <TableHead>{t('adminUserDetailPaymentHistoryTableRemarksSource')}</TableHead> */}
+                                    <TableHead>Remarks/Source</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -884,20 +959,25 @@ export default function AdminUserDetailPage() {
                                         </Button>
                                         {index + 1}
                                         </div>
-                                        {isExpanded && (<div className="pl-7 mt-1 text-xs text-muted-foreground">{t('adminUserDetailPaymentHistoryVirtualId')} {tx.virtualTransactionId || t('common.notAvailable')}</div>)}
+                                        {/* Reverted: {isExpanded && (<div className="pl-7 mt-1 text-xs text-muted-foreground">{t('adminUserDetailPaymentHistoryVirtualId')} {tx.virtualTransactionId || t('common.notAvailable')}</div>)} */}
+                                        {isExpanded && (<div className="pl-7 mt-1 text-xs text-muted-foreground">Virtual ID: {tx.virtualTransactionId || "N/A"}</div>)}
                                     </TableCell>
-                                    <TableCell>{formatDateTimeSafe(tx.dateTime, "dd MMM yy, hh:mm a", t)}</TableCell>
+                                    {/* Reverted: <TableCell>{formatDateTimeSafe(tx.dateTime, "dd MMM yy, hh:mm a", t)}</TableCell> */}
+                                    <TableCell>{formatDateTimeSafe(tx.dateTime, "dd MMM yy, hh:mm a")}</TableCell>
                                     <TableCell>{tx.fromParty}</TableCell>
                                     <TableCell>{tx.toParty}</TableCell>
                                     <TableCell>
-                                        <span className={cn("font-semibold px-2 py-1 rounded-full text-xs",
-                                            tx.type === t('adminUserDetailPaymentHistorySentByUser') ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" : "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300")}>
+                                        {/* Reverted: <span className={cn("font-semibold px-2 py-1 rounded-full text-xs", tx.type === t('adminUserDetailPaymentHistorySentByUser') ? ... : ...)}> {tx.type} </span> */}
+                                        <span className={cn("font-semibold px-2 py-1 rounded-full text-xs", tx.type === "Sent by User" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" : "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300")}>
                                         {tx.type}
                                         </span>
                                     </TableCell>
-                                    <TableCell className="text-right font-mono">{formatCurrency(tx.amount, t)}</TableCell>
-                                    <TableCell>{tx.mode || t('common.notAvailable')}</TableCell>
-                                    <TableCell className="max-w-[200px] truncate">{tx.remarksOrSource || t('common.notAvailable')}</TableCell>
+                                    {/* Reverted: <TableCell className="text-right font-mono">{formatCurrency(tx.amount, t)}</TableCell> */}
+                                    <TableCell className="text-right font-mono">{formatCurrency(tx.amount)}</TableCell>
+                                    {/* Reverted: <TableCell>{tx.mode || t('common.notAvailable')}</TableCell> */}
+                                    <TableCell>{tx.mode || "N/A"}</TableCell>
+                                    {/* Reverted: <TableCell className="max-w-[200px] truncate">{tx.remarksOrSource || t('common.notAvailable')}</TableCell> */}
+                                    <TableCell className="max-w-[200px] truncate">{tx.remarksOrSource || "N/A"}</TableCell>
                                     </TableRow>
                                 </React.Fragment>
                                 );
@@ -915,5 +995,3 @@ export default function AdminUserDetailPage() {
     </div>
   );
 }
-
-    

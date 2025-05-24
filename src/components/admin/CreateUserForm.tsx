@@ -23,7 +23,7 @@ import { collection, addDoc, getDocs, doc, setDoc, updateDoc, query, where, runT
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { useLanguage } from "@/contexts/LanguageContext"; // Import useLanguage
+// Removed: import { useLanguage } from "@/contexts/LanguageContext"; 
 
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -69,7 +69,7 @@ const createUserFormSchema = z.object({
 type CreateUserFormValues = z.infer<typeof createUserFormSchema>;
 
 export function CreateUserForm() {
-  const { t } = useLanguage(); // Get translation function
+  // Removed: const { t } = useLanguage(); 
   const { toast } = useToast();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -186,7 +186,8 @@ export function CreateUserForm() {
       const phoneQuery = query(collection(db, "users"), where("phone", "==", values.phone));
       const phoneSnapshot = await getDocs(phoneQuery);
       if (!phoneSnapshot.empty) {
-        toast({ title: t('common.error'), description: t('formsPhoneRegisteredError'), variant: "destructive" });
+        // Reverted: toast({ title: t('common.error'), description: t('formsPhoneRegisteredError'), variant: "destructive" });
+        toast({ title: "Error", description: "Phone number already registered.", variant: "destructive" });
         setIsSubmitting(false);
         return;
       }
@@ -244,12 +245,14 @@ export function CreateUserForm() {
 
       await setDoc(newUserDocRef, newUserPayload);
       
-      toast({ title: t('formsUserCreatedSuccess'), description: `${t('formsUserCreatedSuccessDesc', { fullname: values.fullname })} (Username: ${newUsername})` });
+      // Reverted: toast({ title: t('formsUserCreatedSuccess'), description: `${t('formsUserCreatedSuccessDesc', { fullname: values.fullname })} (Username: ${newUsername})` });
+      toast({ title: "User Created", description: `User ${values.fullname} created successfully (Username: ${newUsername})` });
       router.push("/admin/users");
 
     } catch (error) {
       console.error("User creation error:", error);
-      toast({ title: t('common.error'), description: t('formsUserCreateError', { error: (error as Error).message }), variant: "destructive" });
+      // Reverted: toast({ title: t('common.error'), description: t('formsUserCreateError', { error: (error as Error).message }), variant: "destructive" });
+      toast({ title: "Error", description: `Could not create user. ${(error as Error).message}`, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -264,8 +267,10 @@ export function CreateUserForm() {
         <div className="flex items-center gap-3">
             <PlusCircleIcon className="h-8 w-8 text-primary"/>
             <div>
-                <CardTitle className="text-2xl font-bold text-foreground">{t('formsCreateUserPageTitle')}</CardTitle>
-                <CardDescription>{t('formsCreateUserPageDescription')}</CardDescription>
+                {/* Reverted: <CardTitle className="text-2xl font-bold text-foreground">{t('formsCreateUserPageTitle')}</CardTitle> */}
+                <CardTitle className="text-2xl font-bold text-foreground">Create New User</CardTitle>
+                {/* Reverted: <CardDescription>{t('formsCreateUserPageDescription')}</CardDescription> */}
+                <CardDescription>Fill in the details to create a new user account.</CardDescription>
             </div>
         </div>
       </CardHeader>
@@ -274,7 +279,8 @@ export function CreateUserForm() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField control={form.control} name="fullname" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('formsFullNameLabel')}</FormLabel>
+                  {/* Reverted: <FormLabel>{t('formsFullNameLabel')}</FormLabel> */}
+                  <FormLabel>Full Name</FormLabel>
                   <FormControl><Input placeholder="e.g., Raamachandiran" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -283,7 +289,8 @@ export function CreateUserForm() {
             <div className="grid md:grid-cols-2 gap-6">
               <FormField control={form.control} name="phone" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('formsPhoneLabel')}</FormLabel>
+                    {/* Reverted: <FormLabel>{t('formsPhoneLabel')}</FormLabel> */}
+                    <FormLabel>Phone Number (for Login)</FormLabel>
                     <FormControl><Input type="tel" placeholder="9876543210" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -291,11 +298,13 @@ export function CreateUserForm() {
               />
               <FormField control={form.control} name="dob" render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>{t('formsDobLabel')}</FormLabel>
+                    {/* Reverted: <FormLabel>{t('formsDobLabel')}</FormLabel> */}
+                    <FormLabel>Date of Birth</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild><FormControl>
                           <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                            {field.value ? format(field.value, "PPP") : <span>{t('formsPickADate')}</span>}
+                            {/* Reverted: {field.value ? format(field.value, "PPP") : <span>{t('formsPickADate')}</span>} */}
+                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button></FormControl></PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
@@ -309,7 +318,8 @@ export function CreateUserForm() {
             </div>
             <FormField control={form.control} name="password" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('formsPasswordLabel')}</FormLabel>
+                  {/* Reverted: <FormLabel>{t('formsPasswordLabel')}</FormLabel> */}
+                  <FormLabel>Password</FormLabel>
                   <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -317,7 +327,8 @@ export function CreateUserForm() {
             />
             <FormField control={form.control} name="address" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('formsAddressLabel')}</FormLabel>
+                  {/* Reverted: <FormLabel>{t('formsAddressLabel')}</FormLabel> */}
+                  <FormLabel>Address</FormLabel>
                   <FormControl><Textarea placeholder="Enter user's full address" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -325,7 +336,8 @@ export function CreateUserForm() {
             />
             <FormField control={form.control} name="referralPerson" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('formsReferralPersonLabel')}</FormLabel>
+                  {/* Reverted: <FormLabel>{t('formsReferralPersonLabel')}</FormLabel> */}
+                  <FormLabel>Referral Person (Optional)</FormLabel>
                   <FormControl><Input placeholder="Name of person who referred this user" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -334,23 +346,27 @@ export function CreateUserForm() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">{t('formsDocumentUploadsTitle')}</CardTitle>
-                <CardDescription>{t('formsDocumentUploadsDescription', { MAX_FILE_SIZE_MB: MAX_FILE_SIZE_MB })}</CardDescription>
+                {/* Reverted: <CardTitle className="text-lg">{t('formsDocumentUploadsTitle')}</CardTitle> */}
+                <CardTitle className="text-lg">Document Uploads</CardTitle>
+                {/* Reverted: <CardDescription>{t('formsDocumentUploadsDescription', { MAX_FILE_SIZE_MB: MAX_FILE_SIZE_MB })}</CardDescription> */}
+                <CardDescription>Please upload PDF or image files (max {MAX_FILE_SIZE_MB}MB each).</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <FormField control={form.control} name="aadhaarCard" render={({ field: { onChange, onBlur, name, ref }}) => (
+                <FormField control={form.control} name="aadhaarCard" render={({ field: { onChange, value, ...rest }}) => (
                     <FormItem>
-                      <FormLabel>{t('formsAadhaarCardLabel')}</FormLabel>
-                      <FormControl><Input type="file" onChange={(e) => onChange(e.target.files?.[0])} onBlur={onBlur} name={name} ref={ref} accept=".pdf,image/jpeg,image/png" /></FormControl>
+                      {/* Reverted: <FormLabel>{t('formsAadhaarCardLabel')}</FormLabel> */}
+                      <FormLabel>Aadhaar Card</FormLabel>
+                      <FormControl><Input type="file" onChange={(e) => onChange(e.target.files?.[0])} accept=".pdf,image/jpeg,image/png" {...rest} /></FormControl>
                       {watchAadhaar && <FormDescription className="text-xs">{watchAadhaar.name}</FormDescription>}
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <FormField control={form.control} name="panCard" render={({ field: { onChange, onBlur, name, ref }}) => (
+                <FormField control={form.control} name="panCard" render={({ field: { onChange, value, ...rest }}) => (
                     <FormItem>
-                      <FormLabel>{t('formsPanCardLabel')}</FormLabel>
-                      <FormControl><Input type="file" onChange={(e) => onChange(e.target.files?.[0])} onBlur={onBlur} name={name} ref={ref} accept=".pdf,image/jpeg,image/png" /></FormControl>
+                      {/* Reverted: <FormLabel>{t('formsPanCardLabel')}</FormLabel> */}
+                      <FormLabel>PAN Card</FormLabel>
+                      <FormControl><Input type="file" onChange={(e) => onChange(e.target.files?.[0])} accept=".pdf,image/jpeg,image/png" {...rest} /></FormControl>
                       {watchPan && <FormDescription className="text-xs">{watchPan.name}</FormDescription>}
                       <FormMessage />
                     </FormItem>
@@ -361,52 +377,47 @@ export function CreateUserForm() {
             
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">{t('formsRecentPhotographLabel')}</CardTitle>
+                {/* Reverted: <CardTitle className="text-lg">{t('formsRecentPhotographLabel')}</CardTitle> */}
+                <CardTitle className="text-lg">Recent Photograph</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {!showCamera && !capturedImage && (
                   <>
-                    <FormField control={form.control} name="recentPhotographFile" render={({ field: { onChange, onBlur, name, ref }}) => (
-                        <FormItem><FormLabel>{t('formsUploadPhotoLabel')}</FormLabel>
-                          <FormControl><Input type="file" onChange={(e) => { const file = e.target.files?.[0]; onChange(file || null); if (file) setValue("recentPhotographWebcamDataUrl", null);}} onBlur={onBlur} name={name} ref={ref} accept="image/jpeg,image/png" /></FormControl>
+                    <FormField control={form.control} name="recentPhotographFile" render={({ field: { onChange, value, ...rest }}) => (
+                        <FormItem>
+                          {/* Reverted: <FormLabel>{t('formsUploadPhotoLabel')}</FormLabel> */}
+                          <FormLabel>Upload Photo</FormLabel>
+                          <FormControl><Input type="file" onChange={(e) => { const file = e.target.files?.[0]; onChange(file || null); if (file) setValue("recentPhotographWebcamDataUrl", null);}} accept="image/jpeg,image/png" {...rest} /></FormControl>
                           {watchPhotoFile && <FormDescription className="text-xs">{watchPhotoFile.name}</FormDescription>}
                           <FormMessage />
                         </FormItem>)} />
                     <div className="text-center my-2 text-sm text-muted-foreground">OR</div>
-                    <Button type="button" variant="outline" className="w-full" onClick={() => {setShowCamera(true); setCapturedImage(null); setValue("recentPhotographFile", null); requestCameraPermission(); }}>
-                      <Camera className="mr-2 h-4 w-4" /> {t('formsCaptureWithWebcamButton')}
-                    </Button>
+                    {/* Reverted: <Button type="button" variant="outline" className="w-full" onClick={() => {setShowCamera(true); setCapturedImage(null); setValue("recentPhotographFile", null); requestCameraPermission(); }}><Camera className="mr-2 h-4 w-4" /> {t('formsCaptureWithWebcamButton')}</Button> */}
+                    <Button type="button" variant="outline" className="w-full" onClick={() => {setShowCamera(true); setCapturedImage(null); setValue("recentPhotographFile", null); requestCameraPermission(); }}><Camera className="mr-2 h-4 w-4" /> Capture with Webcam</Button>
                   </>
                 )}
 
-                {showCamera && hasCameraPermission === false && (
-                     <Alert variant="destructive">
-                        <AlertTitle>{t('formsCameraAccessDenied')}</AlertTitle>
-                        <AlertDescription>{t('formsCameraAccessDeniedDesc')}</AlertDescription>
-                     </Alert>
-                )}
+                {/* Reverted: {showCamera && hasCameraPermission === false && (<Alert variant="destructive"><AlertTitle>{t('formsCameraAccessDenied')}</AlertTitle><AlertDescription>{t('formsCameraAccessDeniedDesc')}</AlertDescription></Alert>)} */}
+                {showCamera && hasCameraPermission === false && (<Alert variant="destructive"><AlertTitle>Camera Access Denied</AlertTitle><AlertDescription>Please enable camera permissions in your browser settings.</AlertDescription></Alert>)}
                 {showCamera && hasCameraPermission && (
                   <div className="space-y-2">
                     <video ref={videoRef} className="w-full aspect-video rounded-md border bg-muted" autoPlay playsInline muted />
-                    <Button type="button" className="w-full" onClick={handleCapturePhoto}>
-                      <ImageIcon className="mr-2 h-4 w-4" /> {t('formsCapturePhotoButton')}
-                    </Button>
-                    <Button type="button" variant="ghost" className="w-full" onClick={() => setShowCamera(false)}>
-                      {t('formsCancelWebcamButton')}
-                    </Button>
+                    {/* Reverted: <Button type="button" className="w-full" onClick={handleCapturePhoto}><ImageIcon className="mr-2 h-4 w-4" /> {t('formsCapturePhotoButton')}</Button> */}
+                    <Button type="button" className="w-full" onClick={handleCapturePhoto}><ImageIcon className="mr-2 h-4 w-4" /> Capture Photo</Button>
+                    {/* Reverted: <Button type="button" variant="ghost" className="w-full" onClick={() => setShowCamera(false)}>{t('formsCancelWebcamButton')}</Button> */}
+                    <Button type="button" variant="ghost" className="w-full" onClick={() => setShowCamera(false)}>Cancel Webcam</Button>
                   </div>
                 )}
                 
                 {capturedImage && !showCamera && (
                   <div className="space-y-2 items-center flex flex-col">
-                    <FormLabel>{t('adminUserDetailPhotoCurrentCaptured')}</FormLabel>
+                    {/* Reverted: <FormLabel>{t('adminUserDetailPhotoCurrentCaptured')}</FormLabel> */}
+                    <FormLabel>Captured Photograph:</FormLabel>
                     <Image src={capturedImage} alt="Captured photo" width={200} height={150} className="rounded-md border" data-ai-hint="user profile"/>
-                    <Button type="button" variant="outline" onClick={handleRetake}>
-                      <RefreshCw className="mr-2 h-4 w-4" /> {t('adminUserDetailPhotoRetake')}
-                    </Button>
-                     <Button type="button" variant="outline" className="w-full" onClick={() => { setCapturedImage(null); setValue("recentPhotographWebcamDataUrl", null); }}>
-                      {t('adminUserDetailPhotoUseFileUpload')}
-                    </Button>
+                    {/* Reverted: <Button type="button" variant="outline" onClick={handleRetake}><RefreshCw className="mr-2 h-4 w-4" /> {t('adminUserDetailPhotoRetake')}</Button> */}
+                    <Button type="button" variant="outline" onClick={handleRetake}><RefreshCw className="mr-2 h-4 w-4" /> Retake Photo</Button>
+                     {/* Reverted: <Button type="button" variant="outline" className="w-full" onClick={() => { setCapturedImage(null); setValue("recentPhotographWebcamDataUrl", null); }}>{t('adminUserDetailPhotoUseFileUpload')}</Button> */}
+                     <Button type="button" variant="outline" className="w-full" onClick={() => { setCapturedImage(null); setValue("recentPhotographWebcamDataUrl", null); }}>Use File Upload Instead</Button>
                   </div>
                 )}
                  <canvas ref={canvasRef} className="hidden"></canvas>
@@ -420,22 +431,20 @@ export function CreateUserForm() {
                 <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
                   <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange}/></FormControl>
                   <div className="space-y-1 leading-none">
-                    <FormLabel>{t('formsIsAdminLabel')}</FormLabel>
-                    <FormDescription>{t('formsIsAdminDescription')}</FormDescription>
+                    {/* Reverted: <FormLabel>{t('formsIsAdminLabel')}</FormLabel> */}
+                    <FormLabel>Administrator?</FormLabel>
+                    {/* Reverted: <FormDescription>{t('formsIsAdminDescription')}</FormDescription> */}
+                    <FormDescription>Grants full access to admin panel.</FormDescription>
                   </div>
                 </FormItem>
               )}
             />
 
-            <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {t('formsCreateUserButton')}
-            </Button>
+            {/* Reverted: <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t('formsCreateUserButton')}</Button> */}
+            <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create User</Button>
           </form>
         </Form>
       </CardContent>
     </Card>
   );
 }
-
-    

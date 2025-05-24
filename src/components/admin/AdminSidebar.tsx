@@ -7,7 +7,7 @@ import { Home, Users, Layers, PlusCircle, LogOut, Briefcase, CreditCard } from "
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext"; // Import useLanguage
+// Removed: import { useLanguage } from "@/contexts/LanguageContext"; 
 import {
   Sidebar,
   SidebarContent,
@@ -23,15 +23,15 @@ import Image from "next/image";
 export function AdminSidebar() {
   const pathname = usePathname();
   const { logout } = useAuth();
-  const { t } = useLanguage(); // Get translation function
+  // Removed: const { t } = useLanguage(); 
 
   const navItems = [
-    { href: "/admin", labelKey: "sidebarOverview" as const, icon: Home },
-    { href: "/admin/users", labelKey: "sidebarManageUsers" as const, icon: Users },
-    { href: "/admin/groups", labelKey: "sidebarManageGroups" as const, icon: Layers },
-    { href: "/admin/groups/create", labelKey: "sidebarCreateGroup" as const, icon: PlusCircle },
-    { href: "/admin/employees", labelKey: "sidebarManageEmployees" as const, icon: Briefcase },
-    { href: "/admin/payments", labelKey: "sidebarPayments" as const, icon: CreditCard },
+    { href: "/admin", label: "Overview", icon: Home },
+    { href: "/admin/users", label: "Manage Users", icon: Users },
+    { href: "/admin/groups", label: "Manage Groups", icon: Layers },
+    { href: "/admin/groups/create", label: "Create Group", icon: PlusCircle },
+    { href: "/admin/employees", label: "Manage Employees", icon: Briefcase },
+    { href: "/admin/payments", label: "Payments", icon: CreditCard },
   ];
 
   return (
@@ -54,12 +54,12 @@ export function AdminSidebar() {
                 <SidebarMenuButton
                   asChild
                   isActive={pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))}
-                  tooltip={t(item.labelKey)} // Use translated tooltip
+                  tooltip={item.label} // Reverted from t(item.labelKey)
                   className="justify-start"
                 >
                   <Link href={item.href}>
                     <item.icon className="h-5 w-5 mr-3" />
-                    <span className="group-data-[collapsible=icon]:hidden">{t(item.labelKey)}</span> {/* Translate label */}
+                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span> {/* Reverted from t(item.labelKey) */}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -67,9 +67,9 @@ export function AdminSidebar() {
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="p-4 border-t">
-            <SidebarMenuButton onClick={logout} tooltip={t('sidebarLogout')} className="justify-start w-full text-destructive hover:bg-destructive hover:text-destructive-foreground">
+            <SidebarMenuButton onClick={logout} tooltip="Logout" className="justify-start w-full text-destructive hover:bg-destructive hover:text-destructive-foreground">
                 <LogOut className="h-5 w-5 mr-3" />
-                <span className="group-data-[collapsible=icon]:hidden">{t('sidebarLogout')}</span> {/* Translate logout */}
+                <span className="group-data-[collapsible=icon]:hidden">Logout</span> {/* Reverted from t('sidebarLogout') */}
             </SidebarMenuButton>
         </SidebarFooter>
       </Sidebar>

@@ -9,7 +9,7 @@ import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { LanguageProvider } from "@/contexts/LanguageContext"; // Import LanguageProvider
+// Removed: import { LanguageProvider } from "@/contexts/LanguageContext";
 
 
 export default function AdminLayout({
@@ -44,7 +44,7 @@ export default function AdminLayout({
   }
 
   return (
-    <LanguageProvider> {/* Wrap with LanguageProvider */}
+    // Removed: <LanguageProvider>
       <SidebarProvider>
         <div className="flex min-h-screen flex-col">
           <AppHeader />
@@ -64,6 +64,6 @@ export default function AdminLayout({
           </footer>
         </div>
       </SidebarProvider>
-    </LanguageProvider>
+    // Removed: </LanguageProvider>
   );
 }

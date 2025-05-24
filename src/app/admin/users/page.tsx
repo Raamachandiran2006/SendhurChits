@@ -13,10 +13,10 @@ import { useRouter } from "next/navigation";
 import { Loader2, Users, PlusCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
-import { useLanguage } from "@/contexts/LanguageContext"; // Import useLanguage
+// Removed: import { useLanguage } from "@/contexts/LanguageContext"; 
 
 export default function AdminUsersPage() {
-  const { t } = useLanguage(); // Get translation function
+  // Removed: const { t } = useLanguage(); 
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -41,17 +41,20 @@ export default function AdminUsersPage() {
 
   const formatDateSafe = (dateString: string | undefined | null): string => {
     if (!dateString) {
-      return t('common.notAvailable');
+      // Reverted: return t('common.notAvailable');
+      return "N/A";
     }
     try {
       const date = parseISO(dateString);
       if (isNaN(date.getTime())) {
-        return t('common.notAvailable');
+        // Reverted: return t('common.notAvailable');
+        return "N/A";
       }
       return format(date, "dd MMM yyyy");
     } catch (e) {
       console.warn("Date formatting error for:", dateString, e);
-      return t('common.notAvailable');
+      // Reverted: return t('common.notAvailable');
+      return "N/A";
     }
   };
 
@@ -63,7 +66,8 @@ export default function AdminUsersPage() {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-lg">{t('common.loading')}</p>
+        {/* Reverted: <p className="mt-4 text-lg">{t('common.loading')}</p> */}
+        <p className="mt-4 text-lg">Loading...</p>
       </div>
     );
   }
@@ -74,37 +78,46 @@ export default function AdminUsersPage() {
         <div className="flex items-center gap-3">
             <Users className="h-8 w-8 text-primary"/>
             <div>
-                <h1 className="text-3xl font-bold text-foreground">{t('adminUsersPageTitle')}</h1>
-                <p className="text-muted-foreground">{t('adminUsersPageDescription')}</p>
+                {/* Reverted: <h1 className="text-3xl font-bold text-foreground">{t('adminUsersPageTitle')}</h1> */}
+                <h1 className="text-3xl font-bold text-foreground">User Management</h1>
+                {/* Reverted: <p className="text-muted-foreground">{t('adminUsersPageDescription')}</p> */}
+                <p className="text-muted-foreground">View and manage all registered users.</p>
             </div>
         </div>
         <Button asChild className="mt-4 sm:mt-0 bg-accent text-accent-foreground hover:bg-accent/90">
           <Link href="/admin/users/create">
-            <PlusCircle className="mr-2 h-4 w-4" /> {t('adminUsersCreateUserButton')}
+            {/* Reverted: <PlusCircle className="mr-2 h-4 w-4" /> {t('adminUsersCreateUserButton')} */}
+            <PlusCircle className="mr-2 h-4 w-4" /> Create New User
           </Link>
         </Button>
       </div>
 
       <Card className="shadow-xl">
         <CardHeader>
-           {/* Title moved up */}
         </CardHeader>
         <CardContent>
           {users.length === 0 ? (
             <div className="text-center py-10">
-              <p className="text-muted-foreground">{t('adminUsersNoUsersFound')}</p>
+              {/* Reverted: <p className="text-muted-foreground">{t('adminUsersNoUsersFound')}</p> */}
+              <p className="text-muted-foreground">No users found. Click "Create New User" to add one.</p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>{t('adminUsersTableFullName')}</TableHead>
-                    <TableHead>{t('adminUsersTableUsernameId')}</TableHead>
-                    <TableHead>{t('adminUsersTablePhone')}</TableHead>
-                    <TableHead>{t('adminUsersTableDob')}</TableHead>
-                    <TableHead>{t('adminUsersTableRole')}</TableHead>
-                    <TableHead className="text-right">{t('adminUsersTableGroupsJoined')}</TableHead>
+                    {/* Reverted: <TableHead>{t('adminUsersTableFullName')}</TableHead> */}
+                    <TableHead>Full Name</TableHead>
+                    {/* Reverted: <TableHead>{t('adminUsersTableUsernameId')}</TableHead> */}
+                    <TableHead>Username (ID)</TableHead>
+                    {/* Reverted: <TableHead>{t('adminUsersTablePhone')}</TableHead> */}
+                    <TableHead>Phone Number</TableHead>
+                    {/* Reverted: <TableHead>{t('adminUsersTableDob')}</TableHead> */}
+                    <TableHead>Date of Birth</TableHead>
+                    {/* Reverted: <TableHead>{t('adminUsersTableRole')}</TableHead> */}
+                    <TableHead>Role</TableHead>
+                    {/* Reverted: <TableHead className="text-right">{t('adminUsersTableGroupsJoined')}</TableHead> */}
+                    <TableHead className="text-right">Groups Joined</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -114,7 +127,7 @@ export default function AdminUsersPage() {
                       onClick={() => handleUserRowClick(user.id)}
                       className="cursor-pointer hover:bg-muted/70 transition-colors"
                     >
-                      <TableCell className="font-medium">{user.fullname}</TableCell><TableCell>{user.username}</TableCell><TableCell>{user.phone}</TableCell><TableCell>{formatDateSafe(user.dob)}</TableCell><TableCell>{user.isAdmin || user.username === 'admin' ? (<Badge variant="destructive">{t('common.admin')}</Badge>) : (<Badge variant="secondary">{t('common.user')}</Badge>)}</TableCell><TableCell className="text-right">{user.groups?.length || 0}</TableCell>
+                      <TableCell className="font-medium">{user.fullname}</TableCell><TableCell>{user.username}</TableCell><TableCell>{user.phone}</TableCell><TableCell>{formatDateSafe(user.dob)}</TableCell><TableCell>{user.isAdmin || user.username === 'admin' ? (<Badge variant="destructive">Admin</Badge>) : (<Badge variant="secondary">User</Badge>)}</TableCell><TableCell className="text-right">{user.groups?.length || 0}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -126,5 +139,3 @@ export default function AdminUsersPage() {
     </div>
   );
 }
-
-    
