@@ -37,8 +37,8 @@ import {
   ReceiptText,
   ChevronRight,
   ChevronDown,
-  Filter, // Added Filter icon
-  Download // Added Download icon
+  Filter, 
+  Download
 } from "lucide-react";
 import {
   AlertDialog,
@@ -215,7 +215,7 @@ const convert12hTo24hFormat = (time12?: string): string => {
 
 interface CombinedPaymentHistoryTransaction {
   id: string;
-  type: "Sent" | "Received"; // "Sent" by company, "Received" by company
+  type: "Sent" | "Received"; 
   dateTime: Date;
   fromParty: string;
   toParty: string;
@@ -354,7 +354,7 @@ export default function AdminGroupDetailPage() {
 
       const combined = [...fetchedCollections, ...fetchedPayments].sort((a,b) => b.dateTime.getTime() - a.dateTime.getTime());
       setRawPaymentHistory(combined);
-      setFilteredPaymentHistory(combined); // Initially show all
+      setFilteredPaymentHistory(combined); 
       setLoadingPaymentHistory(false);
 
     } catch (err) {
@@ -387,7 +387,7 @@ export default function AdminGroupDetailPage() {
         setFilteredPaymentHistory(rawPaymentHistory);
         return;
       }
-      startDate.setHours(0, 0, 0, 0); // Start of the day for comparison
+      startDate.setHours(0, 0, 0, 0); 
       const filtered = rawPaymentHistory.filter(tx => isAfter(tx.dateTime, startDate));
       setFilteredPaymentHistory(filtered);
     };
@@ -397,7 +397,14 @@ export default function AdminGroupDetailPage() {
   const handleDownloadPdf = () => {
     if (!group) return;
     const doc = new jsPDF();
-    const tableColumn = ["S.No", "Type", "Date & Time", "From", "To", "Amount (₹)", "Mode", "Remarks"];
+    
+    // PDF specific currency formatter
+    const formatCurrencyPdf = (amount: number | null | undefined) => {
+      if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
+      return `Rs. ${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+    };
+
+    const tableColumn = ["S.No", "Type", "Date & Time", "From", "To", "Amount", "Mode", "Remarks", "Virtual ID"];
     const tableRows: any[][] = [];
 
     filteredPaymentHistory.forEach((payment, index) => {
@@ -407,9 +414,10 @@ export default function AdminGroupDetailPage() {
         formatDateSafe(payment.dateTime, "dd MMM yy, hh:mm a"),
         payment.fromParty,
         payment.toParty,
-        formatCurrency(payment.amount),
+        formatCurrencyPdf(payment.amount),
         payment.mode || "N/A",
         payment.remarks || "N/A",
+        payment.virtualTransactionId || "N/A",
       ];
       tableRows.push(paymentData);
     });
@@ -432,9 +440,24 @@ export default function AdminGroupDetailPage() {
       body: tableRows,
       startY: 35,
       theme: 'grid',
-      headStyles: { fillColor: [30, 144, 255] }, // Dodger blue
-      styles: { fontSize: 8 },
-      columnStyles: { 0: { cellWidth: 10 } } // Adjust S.No column width
+      headStyles: { fillColor: [30, 144, 255] }, 
+      styles: { fontSize: 8, cellPadding: 1.5 },
+      columnStyles: { 
+        0: { cellWidth: 8 },  // S.No
+        1: { cellWidth: 15 }, // Type
+        2: { cellWidth: 23 }, // Date & Time
+        3: { cellWidth: 'auto' }, // From (auto)
+        4: { cellWidth: 'auto' }, // To (auto)
+        5: { cellWidth: 20, halign: 'right' }, // Amount
+        6: { cellWidth: 15 }, // Mode
+        7: { cellWidth: 'auto' }, // Remarks (auto)
+        8: { cellWidth: 18 }  // Virtual ID
+      },
+      didParseCell: function (data) {
+        // For the Rupee symbol, jsPDF might require specific font handling
+        // or a simpler representation if the default font doesn't support '₹'.
+        // The formatCurrencyPdf helper function now uses "Rs. ".
+      }
     });
     doc.save(`payment_history_${group.groupName.replace(/\s+/g, '_')}_${selectedPaymentFilter}.pdf`);
   };
@@ -693,12 +716,24 @@ export default function AdminGroupDetailPage() {
             <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
-                  <TableRow><TableHead>Full Name</TableHead><TableHead>Username</TableHead><TableHead>Phone Number</TableHead><TableHead className="text-right">Due Amount (₹)</TableHead></TableRow>
+                  <TableRow>
+                    <TableHead>Full Name</TableHead>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Phone Number</TableHead>
+                    <TableHead className="text-right">Due Amount (₹)</TableHead>
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
                   {membersDetails.map((member) => (
                     <TableRow key={member.id} className="hover:bg-muted/50 transition-colors">
-                      <TableCell className="font-medium">{member.fullname}</TableCell><TableCell>{member.username}</TableCell><TableCell><div className="flex items-center"><Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}</div></TableCell><TableCell className="text-right">{formatCurrency(member.dueAmount)}</TableCell>
+                      <TableCell className="font-medium">{member.fullname}</TableCell>
+                      <TableCell>{member.username}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(member.dueAmount)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -889,7 +924,7 @@ export default function AdminGroupDetailPage() {
                 <DropdownMenuItem onSelect={() => setSelectedPaymentFilter("last30Days")}>Last 30 Days</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
+            <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={filteredPaymentHistory.length === 0}>
               <Download className="mr-2 h-4 w-4" /> Download PDF
             </Button>
           </div>
@@ -974,4 +1009,4 @@ export default function AdminGroupDetailPage() {
   );
 }
 
-
+    
