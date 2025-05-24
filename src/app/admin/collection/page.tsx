@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react"; // Added useMemo
 import type { CollectionRecord } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query as firestoreQuery, Timestamp } from "firebase/firestore";
@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Loader2, ArchiveRestore, PlusCircle, ArrowLeft, ListChecks, ChevronRight, ChevronDown, Filter, Download } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table"; // Added TableFooter
 import { format, parseISO, subDays, isAfter, startOfDay, endOfDay } from "date-fns";
 import { useSearchParams } from "next/navigation";
 import {
@@ -182,6 +182,10 @@ export default function AdminCollectionPage() {
     };
     applyFilter();
   }, [selectedFilter, rawCollectionHistory]);
+
+  const totalFilteredAmount = useMemo(() => {
+    return filteredCollectionHistory.reduce((sum, record) => sum + (record.amount || 0), 0);
+  }, [filteredCollectionHistory]);
 
   const handleDownloadPdf = () => {
     if (filteredCollectionHistory.length === 0) {
@@ -374,6 +378,13 @@ export default function AdminCollectionPage() {
                     </React.Fragment>
                   )})}
                 </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-right font-semibold">Total Amount:</TableCell>
+                    <TableCell className="text-right font-bold font-mono">{formatCurrency(totalFilteredAmount)}</TableCell>
+                    <TableCell colSpan={5}></TableCell> 
+                  </TableRow>
+                </TableFooter>
               </Table>
             </div>
           )}
@@ -382,6 +393,3 @@ export default function AdminCollectionPage() {
     </div>
   );
 }
-
-
-    
