@@ -170,10 +170,10 @@ interface DueSheetItem {
   groupName: string;
   auctionId: string;
   dueDate: string; 
-  amount: number; 
-  penalty: number; 
-  paidAmount: number; 
-  balance: number; 
+  amount: number; // Principal amount due for the installment
+  penalty: number; // Penalty charged for this installment
+  paidAmount: number; // Amount paid towards the principal after clearing penalty
+  balance: number; // Remaining balance on the principal (amount - paidAmount)
   status: 'Paid' | 'Not Paid' | 'Partially Paid';
   paidDateTime?: string; 
 }
@@ -230,7 +230,7 @@ export default function AdminUserDetailPage() {
   const userId = params.userId as string;
 
   const [user, setUser] = useState<User | null>(null);
-  const [userGroups, setUserGroups] = useState<Group[]>([]); // Changed from UserGroupWithFinancials to Group
+  const [userGroups, setUserGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -261,7 +261,7 @@ export default function AdminUserDetailPage() {
 
   const fetchUserDetailsAndTransactions = useCallback(async () => {
     if (!userId) {
-      setError("Error loading user details.");
+      setError("User ID is missing or invalid.");
       setLoading(false);
       setLoadingTransactions(false);
       setLoadingDueSheet(false);
@@ -274,7 +274,7 @@ export default function AdminUserDetailPage() {
       const userDocSnap = await getDoc(userDocRef);
 
       if (!userDocSnap.exists()) {
-        setError("User data not available.");
+        setError("User not found.");
         setUser(null);
         setLoading(false); setLoadingTransactions(false); setLoadingDueSheet(false);
         return;
@@ -304,7 +304,7 @@ export default function AdminUserDetailPage() {
       const fetchedGroups: Group[] = [];
       if (userData.groups && userData.groups.length > 0) {
         const groupsRef = collection(db, "groups");
-        const groupIds = userData.groups.slice(0, 30);
+        const groupIds = userData.groups.slice(0, 30); // Firestore 'in' query limit
         if (groupIds.length > 0) {
           const groupQuery = query(groupsRef, where(documentId(), "in", groupIds));
           const groupSnapshots = await getDocs(groupQuery);
@@ -315,7 +315,7 @@ export default function AdminUserDetailPage() {
       }
       setUserGroups(fetchedGroups);
 
-      // Fetch Payment Transactions
+      // Fetch Payment Transactions for the user
       let combinedTransactions: AdminUserTransaction[] = [];
       const collectionsRef = collection(db, "collectionRecords");
       const collectionsQuery = query(collectionsRef, where("userId", "==", userId), orderBy("recordedAt", "desc"));
@@ -361,8 +361,9 @@ export default function AdminUserDetailPage() {
 
       // Fetch and Process Due Sheet Items
       const processedDueSheetItems: DueSheetItem[] = [];
-      if (fetchedGroups.length > 0) { // Use fetchedGroups directly
+      if (fetchedGroups.length > 0) { 
         for (const group of fetchedGroups) {
+          if (!group || !group.id) continue;
           const groupAuctionRecordsQuery = query(
             collection(db, "auctionRecords"),
             where("groupId", "==", group.id),
@@ -372,9 +373,15 @@ export default function AdminUserDetailPage() {
 
           for (const auctionDoc of groupAuctionRecordsSnapshot.docs) {
             const auctionRecord = { id: auctionDoc.id, ...auctionDoc.data() } as AuctionRecord;
-            if (auctionRecord.auctionNumber === undefined || auctionRecord.finalAmountToBePaid === null || auctionRecord.finalAmountToBePaid === undefined) continue;
+            if (auctionRecord.auctionNumber === undefined || auctionRecord.finalAmountToBePaid === null || auctionRecord.finalAmountToBePaid === undefined) {
+              continue;
+            }
+            
+            const amountDueForInstallment = auctionRecord.finalAmountToBePaid;
+            // Placeholder for penalty - needs a data source if you want to implement actual penalties
+            const penaltyChargedForInstallment = 0; 
 
-            let paidAmount = 0;
+            let totalCollectedForThisDue = 0;
             let latestPaidDate: Date | null = null;
 
             const collectionForAuctionQuery = query(
@@ -382,23 +389,39 @@ export default function AdminUserDetailPage() {
               where("userId", "==", userId),
               where("groupId", "==", group.id),
               where("auctionNumber", "==", auctionRecord.auctionNumber)
+              // No order by needed here as we just sum, but for latestPaidDate you might order by recordedAt desc, limit 1
             );
             const collectionsForAuctionSnapshot = await getDocs(collectionForAuctionQuery);
-            collectionsForAuctionSnapshot.forEach(colDoc => {
-              const colData = colDoc.data() as CollectionRecord;
-              paidAmount += colData.amount;
-              const paymentDateTime = parseDateTimeForSort(colData.paymentDate, colData.paymentTime, colData.recordedAt);
-              if (!latestPaidDate || paymentDateTime > latestPaidDate) {
-                latestPaidDate = paymentDateTime;
+            
+            // Sort collections by recordedAt to get the latest payment date if fully paid
+            const sortedCollections = collectionsForAuctionSnapshot.docs
+              .map(doc => ({ ...doc.data(), id: doc.id } as CollectionRecord))
+              .sort((a, b) => (b.recordedAt?.toDate()?.getTime() || 0) - (a.recordedAt?.toDate()?.getTime() || 0));
+
+            sortedCollections.forEach(colData => {
+              totalCollectedForThisDue += colData.amount;
+              if (!latestPaidDate && totalCollectedForThisDue >= amountDueForInstallment) { // or more complex logic for latest payment
+                const paymentDateTime = parseDateTimeForSort(colData.paymentDate, colData.paymentTime, colData.recordedAt);
+                if (paymentDateTime) latestPaidDate = paymentDateTime;
               }
             });
+            
+            let paidTowardsPenalty = 0;
+            let paidTowardsPrincipal = 0;
+            let remainingCollectedAfterPenalty = totalCollectedForThisDue;
 
-            const amountDue = auctionRecord.finalAmountToBePaid;
-            const balance = amountDue - paidAmount;
+            if (penaltyChargedForInstallment > 0) {
+              paidTowardsPenalty = Math.min(totalCollectedForThisDue, penaltyChargedForInstallment);
+              remainingCollectedAfterPenalty = totalCollectedForThisDue - paidTowardsPenalty;
+            }
+
+            paidTowardsPrincipal = Math.min(remainingCollectedAfterPenalty, amountDueForInstallment);
+            const balanceOnPrincipal = amountDueForInstallment - paidTowardsPrincipal;
+            
             let status: DueSheetItem['status'] = 'Not Paid';
-            if (balance <= 0) {
+            if (balanceOnPrincipal <= 0 && amountDueForInstallment > 0) { // Check amountDue > 0 to avoid "Paid" for 0 dues
               status = 'Paid';
-            } else if (paidAmount > 0 && balance > 0) {
+            } else if (paidTowardsPrincipal > 0 && balanceOnPrincipal > 0) {
               status = 'Partially Paid';
             }
             
@@ -408,12 +431,12 @@ export default function AdminUserDetailPage() {
               groupName: group.groupName,
               auctionId: auctionRecord.id,
               dueDate: formatDateSafe(addDays(parseISO(auctionRecord.auctionDate), 5), "dd MMM yyyy"),
-              amount: amountDue,
-              penalty: 0, 
-              paidAmount: paidAmount,
-              balance: balance,
+              amount: amountDueForInstallment,
+              penalty: penaltyChargedForInstallment,
+              paidAmount: paidTowardsPrincipal, 
+              balance: balanceOnPrincipal,
               status: status,
-              paidDateTime: latestPaidDate ? formatDateTimeSafe(latestPaidDate) : undefined,
+              paidDateTime: status === 'Paid' && latestPaidDate ? formatDateTimeSafe(latestPaidDate) : undefined,
             });
           }
         }
@@ -425,7 +448,7 @@ export default function AdminUserDetailPage() {
 
     } catch (err) {
       console.error("Error fetching user details/transactions/due sheet:", err);
-      setError("Error loading user details.");
+      setError("Error loading user details. Please try again later.");
       setUser(null);
       setTransactionError("Failed to fetch payment history.");
       setLoadingDueSheet(false);
@@ -439,10 +462,10 @@ export default function AdminUserDetailPage() {
   }, [fetchUserDetailsAndTransactions]);
 
   useEffect(() => {
-    if (window.location.hash === "#due-sheet" && dueSheetRef.current) {
+    if (window.location.hash === "#due-sheet" && dueSheetRef.current && !loadingDueSheet) {
       dueSheetRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [loadingDueSheet]); 
+  }, [loadingDueSheet]); // Rerun when loadingDueSheet changes
 
   useEffect(() => {
     const applyFilter = () => {
@@ -976,7 +999,6 @@ export default function AdminUserDetailPage() {
                         </CardTitle>
                         <CardDescription>Group ID: {group.id}</CardDescription>
                       </CardHeader>
-                       {/* Financial details for the group removed from here */}
                     </Card>
                   ))}
                 </div>
@@ -1141,3 +1163,6 @@ export default function AdminUserDetailPage() {
     </div>
   );
 }
+
+
+    
