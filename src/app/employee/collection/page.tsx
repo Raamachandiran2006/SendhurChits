@@ -1,29 +1,104 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react"; // Added React import
+import React, { useEffect, useState } from "react";
 import type { CollectionRecord, Employee } from "@/types";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, orderBy, query as firestoreQuery, where } from "firebase/firestore";
+import { collection, getDocs, orderBy, query as firestoreQuery, Timestamp } from "firebase/firestore"; // Added Timestamp
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Loader2, ArchiveRestore, PlusCircle, ArrowLeft, ListChecks, ChevronRight, ChevronDown } from "lucide-react";
+import { Loader2, ArchiveRestore, PlusCircle, ArrowLeft, ListChecks, ChevronRight, ChevronDown, Filter, Download } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, subDays, isAfter } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams } from "next/navigation";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
-const formatDateSafe = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
-  if (!dateString) return "N/A";
+type CollectionFilterType = "all" | "last7Days" | "last10Days" | "last30Days";
+
+const formatDateSafe = (dateInput: Date | string | Timestamp | undefined | null, outputFormat: string = "dd MMM yyyy") => {
+  if (!dateInput) return "N/A";
   try {
-    const date = parseISO(dateString);
+    let date: Date;
+    if (dateInput instanceof Timestamp) {
+      date = dateInput.toDate();
+    } else if (typeof dateInput === 'string') {
+      const parsedDate = new Date(dateInput.replace(/-/g, '/'));
+      if (isNaN(parsedDate.getTime())) {
+        const isoParsed = parseISO(dateInput);
+        if (isNaN(isoParsed.getTime())) return "N/A";
+        date = isoParsed;
+      } else {
+        date = parsedDate;
+      }
+    } else if (dateInput instanceof Date) {
+      date = dateInput;
+    } else {
+      return "N/A";
+    }
+
     if (isNaN(date.getTime())) return "N/A";
     return format(date, outputFormat);
   } catch (e) {
+    console.error("Error formatting date:", dateInput, e);
     return "N/A";
   }
 };
+
+const formatDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestamp?: Timestamp): Date => {
+  if (recordTimestamp) return recordTimestamp.toDate();
+
+  let baseDate: Date;
+  if (dateStr) {
+    const d = new Date(dateStr.replace(/-/g, '/'));
+    if (isNaN(d.getTime())) {
+        const isoD = parseISO(dateStr);
+        if(isNaN(isoD.getTime())) return new Date(0);
+        baseDate = isoD;
+    } else {
+        baseDate = d;
+    }
+  } else {
+    baseDate = new Date();
+  }
+
+  if (isNaN(baseDate.getTime())) return new Date(0);
+
+  if (timeStr) {
+    const timePartsMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (timePartsMatch) {
+      let hours = parseInt(timePartsMatch[1], 10);
+      const minutes = parseInt(timePartsMatch[2], 10);
+      const period = timePartsMatch[3]?.toUpperCase();
+
+      if (period === "PM" && hours < 12) hours += 12;
+      if (period === "AM" && hours === 12) hours = 0;
+
+      baseDate.setHours(hours, minutes, 0, 0);
+      return baseDate;
+    }
+    const time24hMatch = timeStr.match(/^(\d{2}):(\d{2})$/);
+    if (time24hMatch) {
+        const hours = parseInt(time24hMatch[1], 10);
+        const minutes = parseInt(time24hMatch[2], 10);
+        baseDate.setHours(hours, minutes, 0, 0);
+        return baseDate;
+    }
+  }
+  baseDate.setHours(0,0,0,0);
+  return baseDate;
+};
+
 
 const formatCurrency = (amount: number | null | undefined) => {
   if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
@@ -34,11 +109,13 @@ const formatCurrency = (amount: number | null | undefined) => {
 export default function EmployeeCollectionPage() {
   const { loggedInEntity } = useAuth();
   const employee = loggedInEntity as Employee | null;
-  const [collectionHistory, setCollectionHistory] = useState<CollectionRecord[]>([]);
+  const [rawCollectionHistory, setRawCollectionHistory] = useState<CollectionRecord[]>([]);
+  const [filteredCollectionHistory, setFilteredCollectionHistory] = useState<CollectionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
   const refreshId = searchParams.get('refreshId');
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [selectedFilter, setSelectedFilter] = useState<CollectionFilterType>("all");
 
   const toggleRowExpansion = (recordId: string) => {
     setExpandedRows(prev => ({ ...prev, [recordId]: !prev[recordId] }));
@@ -46,17 +123,24 @@ export default function EmployeeCollectionPage() {
 
   useEffect(() => {
     const fetchCollectionHistory = async () => {
-      if (!employee) {
-        setLoading(false);
-        return;
-      }
       setLoading(true);
       try {
         const collectionsRef = collection(db, "collectionRecords"); 
         const q = firestoreQuery(collectionsRef, orderBy("recordedAt", "desc"));
         const querySnapshot = await getDocs(q);
-        const fetchedHistory = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CollectionRecord));
-        setCollectionHistory(fetchedHistory);
+        const fetchedHistory = querySnapshot.docs.map(doc => {
+          const data = doc.data() as CollectionRecord;
+          // Ensure paymentDate, paymentTime, and recordedAt are available for sorting/filtering
+          const sortableDateTime = formatDateTimeForSort(data.paymentDate, data.paymentTime, data.recordedAt);
+          return { 
+            id: doc.id, 
+            ...data,
+            // Add a processed date field for filtering if needed, or rely on recordedAt
+            filterDate: sortableDateTime 
+          } as CollectionRecord & { filterDate: Date };
+        });
+        setRawCollectionHistory(fetchedHistory as any); // Cast if filterDate is not part of CollectionRecord
+        setFilteredCollectionHistory(fetchedHistory as any);
       } catch (error) {
         console.error("Error fetching collection history:", error);
       } finally {
@@ -65,6 +149,89 @@ export default function EmployeeCollectionPage() {
     };
     fetchCollectionHistory();
   }, [employee, refreshId]);
+
+  useEffect(() => {
+    const applyFilter = () => {
+      if (selectedFilter === "all") {
+        setFilteredCollectionHistory(rawCollectionHistory);
+        return;
+      }
+      const now = new Date();
+      let startDate: Date;
+      if (selectedFilter === "last7Days") {
+        startDate = subDays(now, 7);
+      } else if (selectedFilter === "last10Days") {
+        startDate = subDays(now, 10);
+      } else if (selectedFilter === "last30Days") {
+        startDate = subDays(now, 30);
+      } else {
+        setFilteredCollectionHistory(rawCollectionHistory);
+        return;
+      }
+      startDate.setHours(0, 0, 0, 0);
+      const filtered = rawCollectionHistory.filter(record => {
+        // Use the filterDate field if available, otherwise parse from recordedAt
+        const recordDate = (record as any).filterDate || (record.recordedAt ? record.recordedAt.toDate() : new Date(0));
+        return isAfter(recordDate, startDate);
+      });
+      setFilteredCollectionHistory(filtered);
+    };
+    applyFilter();
+  }, [selectedFilter, rawCollectionHistory]);
+
+  const handleDownloadPdf = () => {
+    if (filteredCollectionHistory.length === 0) {
+      alert("No data to download.");
+      return;
+    }
+    const doc = new jsPDF();
+    const formatCurrencyPdf = (amount: number | null | undefined) => {
+      if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
+      return `Rs. ${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+    };
+    
+    const tableColumn = ["S.No", "Group Name", "User", "Date & Time", "Amount (Rs.)", "Type", "Mode", "Location", "Collected By", "Remarks", "Virtual ID"];
+    const tableRows: any[][] = [];
+
+    filteredCollectionHistory.forEach((record, index) => {
+      const recordData = [
+        index + 1,
+        record.groupName,
+        `${record.userFullname} (${record.userUsername})`,
+        `${formatDateSafe(record.paymentDate, "dd MMM yy")} ${record.paymentTime || ''}`,
+        formatCurrencyPdf(record.amount),
+        record.paymentType,
+        record.paymentMode,
+        record.collectionLocation && record.collectionLocation.startsWith('http') ? "Map Link" : record.collectionLocation || "N/A",
+        record.recordedByEmployeeName || "N/A",
+        record.remarks || "N/A",
+        record.virtualTransactionId || "N/A",
+      ];
+      tableRows.push(recordData);
+    });
+    
+    const filterLabel = { all: "All Time", last7Days: "Last 7 Days", last10Days: "Last 10 Days", last30Days: "Last 30 Days" };
+
+    doc.setFontSize(18);
+    doc.text(`Collection History`, 14, 15);
+    doc.setFontSize(12);
+    doc.text(`Filter: ${filterLabel[selectedFilter]}`, 14, 22);
+    doc.text(`Generated on: ${format(new Date(), "dd MMM yyyy, hh:mm a")}`, 14, 29);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 35,
+      theme: 'grid',
+      headStyles: { fillColor: [30, 144, 255] }, 
+      styles: { fontSize: 7, cellPadding: 1.5 },
+      columnStyles: { 
+        0: { cellWidth: 8 }, 4: { halign: 'right' },
+        7: { cellWidth: 'auto', overflow: 'linebreak' } 
+      },
+    });
+    doc.save(`collection_history_${selectedFilter}.pdf`);
+  };
 
   return (
     <div className="container mx-auto py-8">
@@ -76,14 +243,32 @@ export default function EmployeeCollectionPage() {
             <p className="text-muted-foreground">Record and view collected payments.</p>
           </div>
         </div>
-        <div className="flex gap-2 mt-4 sm:mt-0">
-            <Button variant="outline" asChild>
+        <div className="flex items-center gap-2 mt-4 sm:mt-0">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Filter className="mr-2 h-4 w-4" /> Filter
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Filter by Date</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setSelectedFilter("all")}>All Time</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedFilter("last7Days")}>Last 7 Days</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedFilter("last10Days")}>Last 10 Days</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedFilter("last30Days")}>Last 30 Days</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={filteredCollectionHistory.length === 0}>
+              <Download className="mr-2 h-4 w-4" /> Download PDF
+            </Button>
+            <Button variant="outline" asChild size="sm">
                 <Link href="/employee/dashboard">
                     <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to Dashboard
+                    Back
                 </Link>
             </Button>
-            <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
+            <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90" size="sm">
             <Link href="/employee/collection/record">
                 <PlusCircle className="mr-2 h-4 w-4" /> Record Collection
             </Link>
@@ -97,7 +282,7 @@ export default function EmployeeCollectionPage() {
             <ListChecks className="h-6 w-6 text-primary" />
             <CardTitle>Collection History</CardTitle>
           </div>
-          <CardDescription>Chronological record of all collected payments (latest first).</CardDescription>
+          <CardDescription>Chronological record of all collected payments (latest first). Filtered by: {selectedFilter}</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -105,9 +290,9 @@ export default function EmployeeCollectionPage() {
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
               <p className="ml-4 text-lg text-foreground">Loading collection history...</p>
             </div>
-          ) : collectionHistory.length === 0 ? (
+          ) : filteredCollectionHistory.length === 0 ? (
             <div className="text-center py-10">
-              <p className="text-muted-foreground">No collection records found. Click "Record Collection" to add one.</p>
+              <p className="text-muted-foreground">No collection records found {selectedFilter !== 'all' ? `for the selected period` : ''}. Click "Record Collection" to add one.</p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-md border">
@@ -127,7 +312,7 @@ export default function EmployeeCollectionPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {collectionHistory.map((record, index) => {
+                  {filteredCollectionHistory.map((record, index) => {
                     const isExpanded = expandedRows[record.id];
                     return (
                     <React.Fragment key={record.id}>
