@@ -16,8 +16,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { db, storage } from "@/lib/firebase"; // Import storage
-import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"; // Import storage functions
+import { db, storage } from "@/lib/firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, orderBy, doc } from "firebase/firestore";
 import type { Group, User, AuctionRecord, PaymentRecord } from "@/types";
 import { useToast } from "@/hooks/use-toast";
@@ -78,14 +78,16 @@ const recordPaymentFormSchema = z.object({
   guarantorRelationship: z.string().optional().or(z.literal('')),
   guarantorPhone: z.string().regex(/^\d{10}$/, "Phone number must be 10 digits").optional().or(z.literal('')),
   guarantorAddress: z.string().optional().or(z.literal('')),
-  guarantorAuthDocFile: optionalFileSchema,
+  guarantorAadhaarNumber: z.string().regex(/^\d{12}$/, "Aadhaar must be 12 digits").optional().or(z.literal('')),
+  guarantorPanCardNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Invalid PAN format").optional().or(z.literal('')),
+  guarantorAuthorizationDocFile: optionalFileSchema,
 });
 
 type RecordPaymentFormValues = z.infer<typeof recordPaymentFormSchema>;
 
 const generateVirtualId = () => Math.floor(100000 + Math.random() * 900000).toString();
 
-// Helper function to upload file (can be moved to a utils file later)
+// Helper function to upload file
 const uploadFile = async (file: File, path: string): Promise<string> => {
   const fileRef = storageRef(storage, path);
   await uploadBytes(fileRef, file);
@@ -121,13 +123,15 @@ export function RecordPaymentForm() {
       guarantorRelationship: "",
       guarantorPhone: "",
       guarantorAddress: "",
-      guarantorAuthDocFile: null,
+      guarantorAadhaarNumber: "",
+      guarantorPanCardNumber: "",
+      guarantorAuthorizationDocFile: null,
     },
   });
 
   const { watch, setValue } = form;
   const watchedGroupId = watch("selectedGroupId");
-  const watchedGuarantorAuthDocFile = watch("guarantorAuthDocFile");
+  const watchedGuarantorAuthorizationDocFile = watch("guarantorAuthorizationDocFile");
 
 
   useEffect(() => {
@@ -227,10 +231,10 @@ export function RecordPaymentForm() {
 
     try {
       let guarantorAuthDocUrl = "";
-      if (values.guarantorAuthDocFile && values.selectedUserId) {
+      if (values.guarantorAuthorizationDocFile && values.selectedUserId) {
         guarantorAuthDocUrl = await uploadFile(
-          values.guarantorAuthDocFile,
-          `guarantorDocs/${values.selectedUserId}/${values.guarantorAuthDocFile.name}`
+          values.guarantorAuthorizationDocFile,
+          `guarantorDocs/${values.selectedUserId}/authorization/${values.guarantorAuthorizationDocFile.name}`
         );
       }
 
@@ -254,6 +258,8 @@ export function RecordPaymentForm() {
         guarantorRelationship: values.guarantorRelationship || undefined,
         guarantorPhone: values.guarantorPhone || undefined,
         guarantorAddress: values.guarantorAddress || undefined,
+        guarantorAadhaarNumber: values.guarantorAadhaarNumber || undefined,
+        guarantorPanCardNumber: values.guarantorPanCardNumber?.toUpperCase() || undefined,
         guarantorAuthDocUrl: guarantorAuthDocUrl || undefined,
       };
 
@@ -276,7 +282,9 @@ export function RecordPaymentForm() {
         guarantorRelationship: "",
         guarantorPhone: "",
         guarantorAddress: "",
-        guarantorAuthDocFile: null,
+        guarantorAadhaarNumber: "",
+        guarantorPanCardNumber: "",
+        guarantorAuthorizationDocFile: null,
       }); 
     } catch (error) {
       console.error("Error recording payment:", error);
@@ -319,11 +327,13 @@ export function RecordPaymentForm() {
               <FormField control={form.control} name="guarantorRelationship" render={({ field }) => (<FormItem><FormLabel>Relationship to Member</FormLabel><FormControl><Input placeholder="e.g., Father, Friend" {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="guarantorPhone" render={({ field }) => (<FormItem><FormLabel>Guarantor's Phone Number</FormLabel><FormControl><Input type="tel" placeholder="10-digit phone number" {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="guarantorAddress" render={({ field }) => (<FormItem><FormLabel>Guarantor's Address</FormLabel><FormControl><Textarea placeholder="Enter guarantor's full address" {...field} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="guarantorAuthDocFile" render={({ field: { onChange, onBlur, name, ref }}) => (
+              <FormField control={form.control} name="guarantorAadhaarNumber" render={({ field }) => (<FormItem><FormLabel>Guarantor's Aadhaar Number</FormLabel><FormControl><Input placeholder="12-digit Aadhaar number" {...field} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="guarantorPanCardNumber" render={({ field }) => (<FormItem><FormLabel>Guarantor's PAN Card Number</FormLabel><FormControl><Input placeholder="ABCDE1234F" {...field} className="uppercase" onChange={(e) => field.onChange(e.target.value.toUpperCase())} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="guarantorAuthorizationDocFile" render={({ field: { onChange, onBlur, name, ref }}) => (
                 <FormItem>
-                  <FormLabel>Guarantor's Authorization Document (Aadhaar/PAN)</FormLabel>
+                  <FormLabel>Guarantor's Authorization Document (Upload)</FormLabel>
                   <FormControl><Input type="file" onChange={(e) => onChange(e.target.files?.[0] || null)} onBlur={onBlur} name={name} ref={ref} accept=".pdf,image/jpeg,image/png" /></FormControl>
-                  {watchedGuarantorAuthDocFile && <FormDescription className="text-xs">{watchedGuarantorAuthDocFile.name}</FormDescription>}
+                  {watchedGuarantorAuthorizationDocFile && <FormDescription className="text-xs">{watchedGuarantorAuthorizationDocFile.name}</FormDescription>}
                   <FormMessage />
                 </FormItem>
               )} />

@@ -85,8 +85,10 @@ export interface AuctionRecord {
   commissionAmount?: number | null;
   netDiscount?: number | null;
   dividendPerMember?: number | null;
-  finalAmountToBePaid?: number | null; // This is the installment paid by other members
+  finalAmountToBePaid?: number | null; // This is the installment paid by all members
+  amountPaidToWinner?: number | null; // This field is being deprecated
   recordedAt: import('firebase/firestore').Timestamp;
+  virtualTransactionId?: string;
 }
 
 export interface ExpenseRecord {
@@ -103,7 +105,7 @@ export interface ExpenseRecord {
   virtualTransactionId?: string;
 }
 
-export interface CollectionRecord {
+export interface CollectionRecord { // For payments RECEIVED FROM CUSTOMERS
   id: string; // Firestore document ID
   groupId: string;
   groupName: string;
@@ -125,7 +127,7 @@ export interface CollectionRecord {
   virtualTransactionId?: string;
 }
 
-// For payments made BY THE COMPANY (e.g., to auction winners, other payouts recorded by admin)
+// For payments MADE BY THE COMPANY (e.g., to auction winners, other payouts recorded by admin)
 export interface PaymentRecord {
   id: string; // Firestore document ID
   groupId?: string | null; 
@@ -148,6 +150,7 @@ export interface PaymentRecord {
   guarantorRelationship?: string;
   guarantorPhone?: string;
   guarantorAddress?: string;
-  guarantorAuthDocUrl?: string;
+  guarantorAadhaarNumber?: string; // New
+  guarantorPanCardNumber?: string; // New
+  guarantorAuthDocUrl?: string; // This will be for the general authorization document
 }
-
