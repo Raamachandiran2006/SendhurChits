@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Loader2, UploadCloud, Camera, RefreshCw, Image as ImageIcon, Users, PlusCircleIcon, Clock } from "lucide-react";
+import { CalendarIcon, Loader2, UploadCloud, Camera, RefreshCw, Image as ImageIcon, Users, PlusCircleIcon, Clock, Contact, PhoneIcon, HomeIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,6 +24,7 @@ import { collection, addDoc, getDocs, doc, setDoc, updateDoc, query, where, runT
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { Separator } from "@/components/ui/separator";
 
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -50,7 +51,9 @@ const createUserFormSchema = z.object({
   dob: z.date({ required_error: "Date of birth is required." }),
   password: z.string().min(6, "Password must be at least 6 characters"),
   address: z.string().min(10, "Address must be at least 10 characters"),
-  referralPerson: z.string().optional(),
+  referralSourceName: z.string().optional(),
+  referralSourcePhone: z.string().regex(/^\d{10}$/, "Referral phone must be 10 digits").optional().or(z.literal('')),
+  referralSourceAddress: z.string().optional(),
   aadhaarCard: fileSchema,
   panCard: fileSchema,
   recentPhotographFile: imageFileSchema.nullable().optional(),
@@ -89,7 +92,9 @@ export function CreateUserForm() {
       phone: "",
       password: "",
       address: "",
-      referralPerson: "",
+      referralSourceName: "",
+      referralSourcePhone: "",
+      referralSourceAddress: "",
       aadhaarCard: undefined,
       panCard: undefined,
       recentPhotographFile: null,
@@ -219,7 +224,7 @@ export function CreateUserForm() {
       await runTransaction(db, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
         let userCount = 0;
-        if (!counterDoc.exists() || !counterDoc.data()?.userCount) { // Added check for userCount existence
+        if (!counterDoc.exists() || !counterDoc.data()?.userCount) { 
           transaction.set(counterRef, { userCount: 1 }, {merge: true});
           userCount = 0; 
         } else {
@@ -237,7 +242,9 @@ export function CreateUserForm() {
         dob: format(values.dob, "yyyy-MM-dd"),
         password: values.password, 
         address: values.address,
-        referralPerson: values.referralPerson || "",
+        referralSourceName: values.referralSourceName || "",
+        referralSourcePhone: values.referralSourcePhone || "",
+        referralSourceAddress: values.referralSourceAddress || "",
         aadhaarCardUrl,
         panCardUrl,
         photoUrl,
@@ -289,7 +296,10 @@ export function CreateUserForm() {
               )}
             />
             <div className="grid md:grid-cols-2 gap-6">
-              <FormField control={form.control} name="phone" render={({ field }) => (
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
                   <FormItem>
                     <FormLabel>Phone Number (for Login)</FormLabel>
                     <FormControl><Input type="tel" placeholder="9876543210" {...field} /></FormControl>
@@ -325,42 +335,63 @@ export function CreateUserForm() {
             />
             <FormField control={form.control} name="address" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Address</FormLabel>
+                  <FormLabel>User's Address</FormLabel>
                   <FormControl><Textarea placeholder="Enter user's full address" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
-            <div className="grid md:grid-cols-2 gap-6">
-                <FormField control={form.control} name="referralPerson" render={({ field }) => (
+            
+            <Separator />
+            <div className="space-y-2">
+                <h3 className="text-lg font-medium text-foreground flex items-center"><Contact className="mr-2 h-5 w-5 text-primary"/>Referral Source Details (Optional)</h3>
+                <FormField control={form.control} name="referralSourceName" render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Referral Person (Optional)</FormLabel>
+                    <FormLabel>Referral Source Name</FormLabel>
                     <FormControl><Input placeholder="Name of person who referred this user" {...field} /></FormControl>
                     <FormMessage />
                     </FormItem>
                 )}
                 />
-                <FormField control={form.control} name="dueType" render={({ field }) => (
+                <FormField control={form.control} name="referralSourcePhone" render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Due Type (Optional)</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select due type" />
-                                </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                                <SelectItem value="Day">Day</SelectItem>
-                                <SelectItem value="Week">Week</SelectItem>
-                                <SelectItem value="Month">Month</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <FormMessage />
+                    <FormLabel>Referral Source Phone</FormLabel>
+                    <FormControl><Input type="tel" placeholder="Referral's 10-digit phone" {...field} /></FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField control={form.control} name="referralSourceAddress" render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Referral Source Address</FormLabel>
+                    <FormControl><Textarea placeholder="Referral's address" {...field} /></FormControl>
+                    <FormMessage />
                     </FormItem>
                 )}
                 />
             </div>
+            <Separator />
+
+
+            <FormField control={form.control} name="dueType" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Due Type (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select due type" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            <SelectItem value="Day">Day</SelectItem>
+                            <SelectItem value="Week">Week</SelectItem>
+                            <SelectItem value="Month">Month</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <FormMessage />
+                </FormItem>
+            )}
+            />
 
             <Card>
               <CardHeader>

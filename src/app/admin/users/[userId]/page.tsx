@@ -39,7 +39,9 @@ import {
   ChevronDown,
   Landmark,
   ClockIcon,
-  Sheet // Added Sheet icon for Due Sheet
+  Sheet,
+  Contact, // Added Contact icon
+  HomeIcon // Added HomeIcon for address
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, subYears, parseISO, subDays, isAfter } from "date-fns";
@@ -132,7 +134,9 @@ const editUserFormSchema = z.object({
   dob: z.date({ required_error: "Date of birth is required." }),
   password: z.string().min(6, "Password must be at least 6 characters").optional().or(z.literal('')),
   address: z.string().min(10, "Address must be at least 10 characters"),
-  referralPerson: z.string().optional(),
+  referralSourceName: z.string().optional().or(z.literal('')),
+  referralSourcePhone: z.string().regex(/^\d{10}$/, "Referral phone must be 10 digits").optional().or(z.literal('')),
+  referralSourceAddress: z.string().optional().or(z.literal('')),
   aadhaarCard: optionalFileSchema,
   panCard: optionalFileSchema,
   recentPhotographFile: optionalImageFileSchema,
@@ -269,7 +273,9 @@ export default function AdminUserDetailPage() {
         dob: userData.dob ? parseISO(userData.dob) : new Date(),
         password: '',
         address: userData.address,
-        referralPerson: userData.referralPerson || "",
+        referralSourceName: userData.referralSourceName || "",
+        referralSourcePhone: userData.referralSourcePhone || "",
+        referralSourceAddress: userData.referralSourceAddress || "",
         isAdmin: userData.isAdmin || false,
         aadhaarCard: null,
         panCard: null,
@@ -504,7 +510,9 @@ export default function AdminUserDetailPage() {
         phone: values.phone,
         dob: format(values.dob, "yyyy-MM-dd"),
         address: values.address,
-        referralPerson: values.referralPerson || "",
+        referralSourceName: values.referralSourceName || "",
+        referralSourcePhone: values.referralSourcePhone || "",
+        referralSourceAddress: values.referralSourceAddress || "",
         isAdmin: values.isAdmin,
         dueAmount: values.dueAmount ?? undefined,
         dueType: values.dueType ?? undefined,
@@ -688,17 +696,39 @@ export default function AdminUserDetailPage() {
                     </FormItem>)} />
                 </div>
                 <FormField control={form.control} name="password" render={({ field }) => (<FormItem><FormLabel>New Password (optional)</FormLabel><FormControl><Input type="password" placeholder="Leave blank to keep current password" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="address" render={({ field }) => (<FormItem><FormLabel>Address</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="address" render={({ field }) => (<FormItem><FormLabel>User's Address</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>)} />
                 
-                <div className="grid md:grid-cols-2 gap-6">
-                    <FormField control={form.control} name="referralPerson" render={({ field }) => (
+                <Separator />
+                <div className="space-y-2">
+                    <h3 className="text-lg font-medium text-foreground flex items-center"><Contact className="mr-2 h-5 w-5 text-primary"/>Referral Source Details (Optional)</h3>
+                    <FormField control={form.control} name="referralSourceName" render={({ field }) => (
                         <FormItem>
-                        <FormLabel>Referral Person (Optional)</FormLabel>
+                        <FormLabel>Referral Source Name</FormLabel>
                         <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
                         <FormMessage />
                         </FormItem>
                     )}
                     />
+                    <FormField control={form.control} name="referralSourcePhone" render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Referral Source Phone</FormLabel>
+                        <FormControl><Input type="tel" {...field} value={field.value ?? ""} /></FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField control={form.control} name="referralSourceAddress" render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Referral Source Address</FormLabel>
+                        <FormControl><Textarea {...field} value={field.value ?? ""} /></FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                </div>
+                <Separator />
+
+                <div className="grid md:grid-cols-2 gap-6">
                      <FormField control={form.control} name="dueType" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Due Type (Optional)</FormLabel>
@@ -718,24 +748,23 @@ export default function AdminUserDetailPage() {
                         </FormItem>
                     )}
                     />
+                     <FormField control={form.control} name="dueAmount" render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Due Amount (₹)</FormLabel>
+                        <FormControl>
+                            <Input
+                            type="number"
+                            placeholder="e.g., 5000"
+                            {...field}
+                            value={field.value ?? ""}
+                            onChange={e => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
+                            />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
                 </div>
-
-                 <FormField control={form.control} name="dueAmount" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Due Amount (₹)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="e.g., 5000"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={e => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
 
                 <Card>
                   <CardHeader><CardTitle className="text-lg">Update Documents (Optional)</CardTitle></CardHeader>
@@ -842,8 +871,16 @@ export default function AdminUserDetailPage() {
                 <div className="flex items-start"><Phone className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Phone:</strong> {user.phone}</div></div>
                 <div className="flex items-start"><CalendarDays className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Date of Birth:</strong> {formatDateSafe(user.dob, "dd MMMM yyyy")}</div></div>
                 <div className="flex items-start col-span-1 md:col-span-2"><Home className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Address:</strong> {user.address || "N/A"}</div></div>
-                <div className="flex items-start"><Briefcase className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Referred By:</strong> {user.referralPerson || "N/A"}</div></div>
                 <div className="flex items-start"><ClockIcon className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Due Type:</strong> {user.dueType || "N/A"}</div></div>
+              </div>
+            </section>
+            <Separator />
+             <section>
+              <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><Contact className="mr-2 h-5 w-5" />Referral Source Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                <div className="flex items-start"><UserIconLucide className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Name:</strong> {user.referralSourceName || "N/A"}</div></div>
+                <div className="flex items-start"><PhoneIcon className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Phone:</strong> {user.referralSourcePhone || "N/A"}</div></div>
+                <div className="flex items-start col-span-1 md:col-span-2"><HomeIcon className="mr-2 mt-1 h-4 w-4 text-muted-foreground flex-shrink-0" /><div><strong className="block text-foreground">Address:</strong> {user.referralSourceAddress || "N/A"}</div></div>
               </div>
             </section>
             <Separator />
@@ -1026,6 +1063,3 @@ export default function AdminUserDetailPage() {
     </div>
   );
 }
-
-
-    

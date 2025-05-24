@@ -7,7 +7,9 @@ export interface User {
   dob: string; // YYYY-MM-DD
   password?: string; // Stored for custom auth, SHOULD BE HASHED in a real app
   address: string;
-  referralPerson?: string;
+  referralSourceName?: string;
+  referralSourcePhone?: string;
+  referralSourceAddress?: string;
   aadhaarCardUrl?: string;
   panCardUrl?: string;
   photoUrl?: string;
@@ -84,6 +86,7 @@ export interface AuctionRecord {
   netDiscount?: number | null;
   dividendPerMember?: number | null;
   finalAmountToBePaid?: number | null; // This is the installment paid by other members
+  amountPaidToWinner?: number | null;
   recordedAt: import('firebase/firestore').Timestamp;
 }
 
