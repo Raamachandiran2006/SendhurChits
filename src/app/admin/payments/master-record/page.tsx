@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react"; // Added React import
+import React, { useEffect, useState } from "react"; 
 import type { CollectionRecord, ExpenseRecord, SalaryRecord, PaymentRecord as AdminPaymentRecord } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query as firestoreQuery, Timestamp } from "firebase/firestore";
@@ -24,8 +24,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 interface MasterTransaction {
-  id: string; // Original document ID
-  transactionDisplayId: string; // A display-friendly ID for the row
+  id: string; 
+  transactionDisplayId: string; 
   direction: "Sent" | "Received";
   dateTime: Date;
   fromParty: string;
@@ -33,8 +33,8 @@ interface MasterTransaction {
   amount: number;
   mode: string | null;
   remarksOrSource: string;
-  originalSource: string; // e.g., "Collection", "Salary", "Expense", "Payment"
-  virtualTransactionId?: string; // The 6-digit random ID
+  originalSource: string; 
+  virtualTransactionId?: string; 
 }
 
 type PaymentFilterType = "all" | "last7Days" | "last10Days" | "last30Days";
@@ -239,7 +239,7 @@ export default function MasterRecordPage() {
         combinedTransactions.sort((a, b) => b.dateTime.getTime() - a.dateTime.getTime());
         console.log("Master Record: Transactions after sort:", combinedTransactions.length, "items. First item date:", combinedTransactions[0]?.dateTime);
         setRawAllTransactions(combinedTransactions);
-        setFilteredTransactions(combinedTransactions); // Initially show all
+        setFilteredTransactions(combinedTransactions); 
 
       } catch (err) {
         console.error("Master Record: Main fetch error:", err);
@@ -296,7 +296,7 @@ export default function MasterRecordPage() {
         formatDateSafe(tx.dateTime),
         tx.fromParty,
         tx.toParty,
-        formatCurrencyPdf(tx.amount), // Use PDF specific formatter
+        formatCurrencyPdf(tx.amount), 
         tx.mode || "N/A",
         tx.remarksOrSource,
         tx.originalSource,
@@ -323,19 +323,19 @@ export default function MasterRecordPage() {
       body: tableRows,
       startY: 35,
       theme: 'grid',
-      headStyles: { fillColor: [30, 144, 255] }, // Dodger blue
+      headStyles: { fillColor: [30, 144, 255] }, 
       styles: { fontSize: 7, cellPadding: 1.5 }, 
       columnStyles: { 
-        0: { cellWidth: 8 }, // S.No
-        1: { cellWidth: 15 }, // Direction
-        2: { cellWidth: 25 }, // Date & Time
-        3: { cellWidth: 'auto' }, // From
-        4: { cellWidth: 'auto' }, // To
-        5: { cellWidth: 20, halign: 'right'}, // Amount
-        6: { cellWidth: 15 }, // Mode
-        7: { cellWidth: 'auto' }, // Remarks
-        8: { cellWidth: 15 }, // Type
-        9: { cellWidth: 18 }, // Virtual ID
+        0: { cellWidth: 8 }, 
+        1: { cellWidth: 15 }, 
+        2: { cellWidth: 25 }, 
+        3: { cellWidth: 'auto' }, 
+        4: { cellWidth: 'auto' }, 
+        5: { cellWidth: 20, halign: 'right'}, 
+        6: { cellWidth: 15 }, 
+        7: { cellWidth: 'auto' }, 
+        8: { cellWidth: 15 }, 
+        9: { cellWidth: 18 }, 
       },
     });
     doc.save(`master_financial_record_${selectedFilter}.pdf`);
@@ -469,8 +469,8 @@ export default function MasterRecordPage() {
                             </span>
                           </TableCell>
                           <TableCell>{formatDateSafe(tx.dateTime)}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{tx.fromParty}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{tx.toParty}</TableCell>
+                          <TableCell>{tx.fromParty}</TableCell>
+                          <TableCell>{tx.toParty}</TableCell>
                           <TableCell className="text-right font-mono">{formatCurrency(tx.amount)}</TableCell>
                           <TableCell>{tx.mode || "N/A"}</TableCell>
                           <TableCell className="max-w-[200px] truncate">{tx.remarksOrSource}</TableCell>
