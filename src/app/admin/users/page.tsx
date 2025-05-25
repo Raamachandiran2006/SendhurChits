@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import type { User } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
@@ -9,13 +10,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Users, PlusCircle } from "lucide-react"; // Removed Edit, not used in this version
+import { Loader2, Users, PlusCircle, Search, UserCircle as UserCircleIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
+import { Input } from "@/components/ui/input"; // Added Input import
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState(""); // State for search term
   const router = useRouter();
 
   useEffect(() => {
@@ -41,14 +44,12 @@ export default function AdminUsersPage() {
       return "N/A";
     }
     try {
-      // Attempt to parse ISO strings first, then general date strings
       const date = dateString.includes('T') ? parseISO(dateString) : new Date(dateString.replace(/-/g, '/'));
       if (isNaN(date.getTime())) {
-        // If still NaN, try parsing as YYYY-MM-DD directly
         const parts = dateString.split('-');
         if (parts.length === 3) {
           const year = parseInt(parts[0]);
-          const month = parseInt(parts[1]) - 1; // Month is 0-indexed
+          const month = parseInt(parts[1]) - 1;
           const day = parseInt(parts[2]);
           const directDate = new Date(year, month, day);
           if (!isNaN(directDate.getTime())) {
@@ -67,6 +68,18 @@ export default function AdminUsersPage() {
   const handleUserRowClick = (userId: string) => {
     router.push(`/admin/users/${userId}`);
   };
+
+  const filteredUsers = useMemo(() => {
+    if (!searchTerm) {
+      return users;
+    }
+    const lowercasedSearchTerm = searchTerm.toLowerCase();
+    return users.filter(user =>
+      user.fullname.toLowerCase().includes(lowercasedSearchTerm) ||
+      user.phone.includes(searchTerm) ||
+      user.username.toLowerCase().includes(lowercasedSearchTerm)
+    );
+  }, [users, searchTerm]);
 
   if (loading) {
     return (
@@ -94,13 +107,29 @@ export default function AdminUsersPage() {
         </Button>
       </div>
 
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search by Name, Phone, or User ID..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 w-full max-w-md shadow-sm"
+          />
+        </div>
+      </div>
+
       <Card className="shadow-xl">
         <CardHeader>
+          {/* Title and description can be part of the main page heading */}
         </CardHeader>
         <CardContent>
-          {users.length === 0 ? (
+          {filteredUsers.length === 0 ? (
             <div className="text-center py-10">
-              <p className="text-muted-foreground">No users found. Click "Create New User" to add one.</p>
+              <p className="text-muted-foreground">
+                {searchTerm ? `No users found matching "${searchTerm}".` : "No users found. Click \"Create New User\" to add one."}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-md border">
@@ -113,10 +142,11 @@ export default function AdminUsersPage() {
                     <TableHead>Date of Birth</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead className="text-right">Groups Joined</TableHead>
+                    <TableHead className="text-center">Actions</TableHead> {/* Actions column */}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
+                  {filteredUsers.map((user) => (
                     <TableRow key={user.id} onClick={() => handleUserRowClick(user.id)} className="cursor-pointer hover:bg-muted/50 transition-colors">
                       <TableCell className="font-medium">{user.fullname}</TableCell>
                       <TableCell>{user.username}</TableCell>
@@ -124,6 +154,9 @@ export default function AdminUsersPage() {
                       <TableCell>{formatDateSafe(user.dob)}</TableCell>
                       <TableCell>{user.isAdmin || user.username === 'admin' ? (<Badge variant="destructive">Admin</Badge>) : (<Badge variant="secondary">User</Badge>)}</TableCell>
                       <TableCell className="text-right">{user.groups?.length || 0}</TableCell>
+                      <TableCell className="text-center">
+                        {/* This button was moved to the user detail page */}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
