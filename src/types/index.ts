@@ -89,6 +89,7 @@ export interface AuctionRecord {
   finalAmountToBePaid?: number | null; // This is the installment paid by all members (including winner)
   recordedAt: import('firebase/firestore').Timestamp;
   virtualTransactionId?: string;
+  amountPaidToWinner?: number | null;
 }
 
 export interface ExpenseRecord {
@@ -105,7 +106,7 @@ export interface ExpenseRecord {
   virtualTransactionId?: string;
 }
 
-export interface CollectionRecord { 
+export interface CollectionRecord {
   id: string; // Firestore document ID
   groupId: string;
   groupName: string;
@@ -164,4 +165,14 @@ export interface CreditRecord {
   remarks: "Credit"; // Fixed remark
   recordedAt: import('firebase/firestore').Timestamp;
   virtualTransactionId?: string;
+}
+
+export interface DaySheetRow {
+  sno: number;
+  date: string; // YYYY-MM-DD
+  particulars: string;
+  credit: number;
+  debit: number;
+  remarks: string;
+  _timestamp?: Date; // Internal for sorting, not displayed directly
 }
