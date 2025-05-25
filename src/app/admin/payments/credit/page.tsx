@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Loader2, PlusCircle, ListChecks, ArrowLeft, Banknote, Filter, Download, ChevronRight, ChevronDown } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, parseISO, subDays, isAfter, startOfDay, endOfDay } from "date-fns";
 import { useSearchParams } from "next/navigation";
 import {
@@ -137,10 +137,6 @@ export default function CreditManagementPage() {
     };
     applyFilter();
   }, [selectedFilter, rawCreditHistory]);
-
-  const totalFilteredAmount = useMemo(() => {
-    return filteredCreditHistory.reduce((sum, record) => sum + (record.amount || 0), 0);
-  }, [filteredCreditHistory]);
 
   const handleDownloadPdf = () => {
     if (filteredCreditHistory.length === 0) {
@@ -309,13 +305,6 @@ export default function CreditManagementPage() {
                     </React.Fragment>
                   )})}
                 </TableBody>
-                <TableFooter>
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-right font-semibold">Total Amount:</TableCell>
-                    <TableCell className="text-right font-bold font-mono">{formatCurrency(totalFilteredAmount)}</TableCell>
-                    <TableCell colSpan={2}></TableCell>
-                  </TableRow>
-                </TableFooter>
               </Table>
             </div>
           )}
