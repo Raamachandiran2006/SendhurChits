@@ -217,7 +217,7 @@ export default function AdminOverviewPage() {
             ) : (
               <div className="text-2xl font-bold">{formatCurrency(currentBalance)}</div>
             )}
-            <p className="text-xs text-muted-foreground">(Total Received - Total Sent)</p>
+            {/* Removed the descriptive text for calculation here */}
           </CardContent>
         </Card>
       </div>
