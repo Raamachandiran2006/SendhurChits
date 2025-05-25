@@ -13,12 +13,12 @@ import { useRouter } from "next/navigation";
 import { Loader2, Users, PlusCircle, Search, UserCircle as UserCircleIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
-import { Input } from "@/components/ui/input"; // Added Input import
+import { Input } from "@/components/ui/input";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState(""); // State for search term
+  const [searchTerm, setSearchTerm] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -142,22 +142,12 @@ export default function AdminUsersPage() {
                     <TableHead>Date of Birth</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead className="text-right">Groups Joined</TableHead>
-                    <TableHead className="text-center">Actions</TableHead> {/* Actions column */}
+                    <TableHead className="text-center">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.map((user) => (
-                    <TableRow key={user.id} onClick={() => handleUserRowClick(user.id)} className="cursor-pointer hover:bg-muted/50 transition-colors">
-                      <TableCell className="font-medium">{user.fullname}</TableCell>
-                      <TableCell>{user.username}</TableCell>
-                      <TableCell>{user.phone}</TableCell>
-                      <TableCell>{formatDateSafe(user.dob)}</TableCell>
-                      <TableCell>{user.isAdmin || user.username === 'admin' ? (<Badge variant="destructive">Admin</Badge>) : (<Badge variant="secondary">User</Badge>)}</TableCell>
-                      <TableCell className="text-right">{user.groups?.length || 0}</TableCell>
-                      <TableCell className="text-center">
-                        {/* This button was moved to the user detail page */}
-                      </TableCell>
-                    </TableRow>
+                    <TableRow key={user.id} onClick={() => handleUserRowClick(user.id)} className="cursor-pointer hover:bg-muted/50 transition-colors"><TableCell className="font-medium">{user.fullname}</TableCell><TableCell>{user.username}</TableCell><TableCell>{user.phone}</TableCell><TableCell>{formatDateSafe(user.dob)}</TableCell><TableCell>{user.isAdmin || user.username === 'admin' ? (<Badge variant="destructive">Admin</Badge>) : (<Badge variant="secondary">User</Badge>)}</TableCell><TableCell className="text-right">{user.groups?.length || 0}</TableCell><TableCell className="text-center"><Button asChild variant="destructive" size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={(e) => e.stopPropagation()}><Link href={`/admin/collection/record?userId=${user.id}&fullname=${encodeURIComponent(user.fullname)}&username=${encodeURIComponent(user.username)}`}>Collection</Link></Button></TableCell></TableRow>
                   ))}
                 </TableBody>
               </Table>
