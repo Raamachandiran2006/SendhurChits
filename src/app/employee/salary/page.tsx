@@ -1,6 +1,6 @@
 
 "use client";
-import React, { useEffect, useState } from "react"; // Added React import
+import React, { useEffect, useState } from "react";
 import type { SalaryRecord, Employee } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query as firestoreQuery, where, orderBy } from "firebase/firestore";
@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Loader2, DollarSign, ArrowLeft, ListChecks, ChevronRight, ChevronDown } from "lucide-react"; // Added Chevron icons
+import { Loader2, DollarSign, ArrowLeft, ListChecks, ChevronRight, ChevronDown } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, parseISO } from "date-fns";
 
@@ -17,7 +17,7 @@ export default function EmployeeSalaryPage() {
   const employee = loggedInEntity as Employee | null; 
   const [salaryHistory, setSalaryHistory] = useState<SalaryRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({}); // State for expanded rows
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   const toggleRowExpansion = (recordId: string) => {
     setExpandedRows(prev => ({ ...prev, [recordId]: !prev[recordId] }));
@@ -106,7 +106,7 @@ export default function EmployeeSalaryPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>S.No</TableHead> {/* Added S.No column */}
+                    <TableHead>S.No</TableHead>
                     <TableHead className="text-right">Amount (₹)</TableHead>
                     <TableHead>Payment Date</TableHead>
                     <TableHead>Remarks</TableHead>
@@ -116,8 +116,7 @@ export default function EmployeeSalaryPage() {
                   {salaryHistory.map((record, index) => {
                     const isExpanded = expandedRows[record.id];
                     return (
-                    <React.Fragment key={record.id}>
-                      <TableRow>{/* Compacted JSX below */}
+                    <TableRow key={record.id}>{/* Key moved here, React.Fragment removed */}
                         <TableCell>
                           <div className="flex items-center">
                             <Button
@@ -136,9 +135,8 @@ export default function EmployeeSalaryPage() {
                             </div>
                           )}
                         </TableCell><TableCell className="text-right font-mono">₹{record.amount.toLocaleString()}</TableCell><TableCell>{formatDateSafe(record.paymentDate)}</TableCell><TableCell className="max-w-xs truncate">{record.remarks || "N/A"}</TableCell>
-                      </TableRow>
-                    </React.Fragment>
-                  )})}
+                    </TableRow>
+                  );})}
                 </TableBody>
               </Table>
             </div>
@@ -148,4 +146,3 @@ export default function EmployeeSalaryPage() {
     </div>
   );
 }
-
