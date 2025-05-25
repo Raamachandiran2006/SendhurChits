@@ -1,11 +1,11 @@
 
 "use client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Layers, Briefcase, TrendingUp, Loader2 } from "lucide-react"; // Added TrendingUp and Loader2
+import { Users, Layers, Briefcase, TrendingUp, Loader2, AlertTriangle } from "lucide-react"; // Added AlertTriangle
 import { useEffect, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore"; 
 import { db } from "@/lib/firebase";
-import type { Group, CollectionRecord } from "@/types"; // Added CollectionRecord
+import type { Group, CollectionRecord } from "@/types";
 
 export default function AdminOverviewPage() {
   const [userCount, setUserCount] = useState(0);
@@ -14,6 +14,7 @@ export default function AdminOverviewPage() {
   const [closedGroupCount, setClosedGroupCount] = useState(0);
   const [employeeCount, setEmployeeCount] = useState(0);
   const [totalCollectionAmount, setTotalCollectionAmount] = useState(0);
+  const [totalPenaltyAmount, setTotalPenaltyAmount] = useState(0); // Placeholder for penalty
   const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
@@ -63,6 +64,9 @@ export default function AdminOverviewPage() {
         });
         setTotalCollectionAmount(totalCollected);
 
+        // Placeholder for total penalty - set to 0 for now
+        setTotalPenaltyAmount(0);
+
       } catch (error) {
         console.error("Error fetching admin overview data:", error);
       } finally {
@@ -80,7 +84,7 @@ export default function AdminOverviewPage() {
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold text-foreground mb-8">Admin Overview</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"> {/* Changed to lg:grid-cols-4 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card className="shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -138,6 +142,20 @@ export default function AdminOverviewPage() {
               <div className="text-2xl font-bold">{formatCurrency(totalCollectionAmount)}</div>
             )}
             <p className="text-xs text-muted-foreground">From customer collections</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Overall Penalty</CardTitle>
+            <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {loadingStats ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-2xl font-bold">{formatCurrency(totalPenaltyAmount)}</div>
+            )}
+            <p className="text-xs text-muted-foreground">Total penalties collected (Placeholder)</p>
           </CardContent>
         </Card>
       </div>
