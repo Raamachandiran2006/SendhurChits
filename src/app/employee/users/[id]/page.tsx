@@ -29,7 +29,8 @@ import {
   ChevronRight,
   ChevronDown,
   Sheet,
-  Contact
+  Contact,
+  ArchiveRestore // Added ArchiveRestore
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO, subDays, isAfter, addDays } from "date-fns";
@@ -190,7 +191,7 @@ export default function EmployeeViewUserDetailPage() {
         }
       }
       setUserGroups(fetchedGroups);
-      setLoadingUser(false); // User and basic groups loaded
+      setLoadingUser(false); 
 
       // Fetch Payment Transactions
       let combinedTransactions: EmployeeUserTransaction[] = [];
@@ -347,12 +348,23 @@ export default function EmployeeViewUserDetailPage() {
     return <div className="container mx-auto py-8 text-center text-muted-foreground">User data not available.</div>;
   }
 
-  const isAdminUser = user.isAdmin || user.username === 'admin'; // Though employees shouldn't see admins via user list
+  const isAdminUser = user.isAdmin || user.username === 'admin'; 
 
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
-        <Button variant="outline" onClick={() => router.push("/employee/users")} className="mb-6"><ArrowLeft className="mr-2 h-4 w-4" /> Back to All Users</Button>
+        <Button variant="outline" onClick={() => router.push("/employee/users")} className="mb-6"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Users</Button>
+        <div className="flex gap-2 mb-6">
+          <Button 
+            asChild 
+            variant="destructive" 
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            <Link href={`/employee/collection/record?userId=${user.id}&fullname=${encodeURIComponent(user.fullname)}&username=${encodeURIComponent(user.username)}`}>
+              <ArchiveRestore className="mr-2 h-4 w-4" /> Record Collection
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card className="shadow-xl overflow-hidden">
@@ -543,3 +555,4 @@ export default function EmployeeViewUserDetailPage() {
     </div>
   );
 }
+
