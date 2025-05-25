@@ -87,7 +87,6 @@ export interface AuctionRecord {
   netDiscount?: number | null;
   dividendPerMember?: number | null;
   finalAmountToBePaid?: number | null; // This is the installment paid by all members (including winner)
-  amountPaidToWinner?: number | null; // DEPRECATED - To be removed manually from Firestore
   recordedAt: import('firebase/firestore').Timestamp;
   virtualTransactionId?: string;
 }
@@ -106,12 +105,12 @@ export interface ExpenseRecord {
   virtualTransactionId?: string;
 }
 
-export interface CollectionRecord { // For payments RECEIVED FROM CUSTOMERS
+export interface CollectionRecord { 
   id: string; // Firestore document ID
   groupId: string;
   groupName: string;
-  auctionId?: string | null;     // New field
-  auctionNumber?: number | null; // New field
+  auctionId?: string | null;
+  auctionNumber?: number | null;
   userId: string;
   userUsername: string;
   userFullname: string;
@@ -128,8 +127,7 @@ export interface CollectionRecord { // For payments RECEIVED FROM CUSTOMERS
   virtualTransactionId?: string;
 }
 
-// For payments MADE BY THE COMPANY (e.g., to auction winners, other payouts recorded by admin)
-export interface PaymentRecord {
+export interface PaymentRecord { // For payments MADE BY THE COMPANY (e.g., to auction winners, other payouts recorded by admin)
   id: string; // Firestore document ID
   groupId?: string | null;
   groupName?: string | null;
@@ -154,4 +152,16 @@ export interface PaymentRecord {
   guarantorAadhaarNumber?: string;
   guarantorPanCardNumber?: string;
   guarantorAuthDocUrl?: string;
+}
+
+export interface CreditRecord {
+  id: string; // Firestore document ID
+  fromName: string;
+  creditNumber?: string; // Optional credit/loan agreement number
+  paymentDate: string; // YYYY-MM-DD
+  paymentMode: "Cash" | "UPI" | "Netbanking";
+  amount: number;
+  remarks: "Credit"; // Fixed remark
+  recordedAt: import('firebase/firestore').Timestamp;
+  virtualTransactionId?: string;
 }

@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BookOpenCheck, Landmark, Receipt, Globe, ArrowLeft, CreditCard } from "lucide-react";
+import { BookOpenCheck, Landmark, Receipt, Globe, ArrowLeft, CreditCard, Banknote } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminPaymentsPage() {
@@ -25,7 +25,7 @@ export default function AdminPaymentsPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card className="shadow-lg hover:shadow-xl transition-shadow">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -72,6 +72,23 @@ export default function AdminPaymentsPage() {
             <Button asChild variant="outline" className="w-full">
               <Link href="/admin/payments/expenses">
                 Manage Expenses
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+        
+        <Card className="shadow-lg hover:shadow-xl transition-shadow">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Banknote className="h-6 w-6 text-accent" />
+              <CardTitle>Credit</CardTitle>
+            </div>
+            <CardDescription>Record and manage credit transactions.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/admin/payments/credit">
+                Manage Credit
               </Link>
             </Button>
           </CardContent>
