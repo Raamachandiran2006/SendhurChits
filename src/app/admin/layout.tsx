@@ -9,8 +9,6 @@ import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-// Removed: import { LanguageProvider } from "@/contexts/LanguageContext";
-
 
 export default function AdminLayout({
   children,
@@ -25,10 +23,10 @@ export default function AdminLayout({
       if (!loggedInEntity) {
         router.replace("/login");
       } else if (userType !== 'admin') {
-        // If logged in but not an admin, redirect appropriately
+        
         if (userType === 'employee') {
           router.replace("/employee/dashboard");
-        } else { // 'user'
+        } else { 
           router.replace("/dashboard");
         }
       }
@@ -44,7 +42,6 @@ export default function AdminLayout({
   }
 
   return (
-    // Removed: <LanguageProvider>
       <SidebarProvider>
         <div className="flex min-h-screen flex-col">
           <AppHeader />
@@ -60,10 +57,9 @@ export default function AdminLayout({
             </SidebarInset>
           </div>
           <footer className="py-4 text-center text-sm text-muted-foreground border-t md:ml-[var(--sidebar-width-icon)] peer-data-[state=expanded]:md:ml-[var(--sidebar-width)] transition-[margin-left] duration-300 ease-in-out">
-            © {new Date().getFullYear()} ChitConnect Admin Panel.
+            © {new Date().getFullYear()} Sendhur Chits Admin Panel.
           </footer>
         </div>
       </SidebarProvider>
-    // Removed: </LanguageProvider>
   );
 }

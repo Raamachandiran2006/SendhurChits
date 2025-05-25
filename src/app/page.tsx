@@ -19,7 +19,7 @@ export default function HomePage() {
           router.replace("/employee/dashboard");
         } else if (userType === 'user') {
           router.replace("/dashboard");
-        } else { // Should not happen if loggedInEntity is true
+        } else { 
           router.replace("/login");
         }
       } else {
@@ -31,9 +31,7 @@ export default function HomePage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
       <Loader2 className="h-16 w-16 animate-spin text-primary" />
-      <p className="ml-4 text-lg text-foreground">Loading ChitConnect...</p>
+      <p className="ml-4 text-lg text-foreground">Loading Sendhur Chits...</p>
     </div>
   );
 }
-
-    

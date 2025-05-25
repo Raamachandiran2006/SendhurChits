@@ -6,9 +6,9 @@ import { Users, Layers, BarChart3, PlusCircle, Briefcase } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore"; // Added query and where
+import { collection, getDocs, query, where } from "firebase/firestore"; 
 import { db } from "@/lib/firebase";
-import type { Group } from "@/types"; // Import Group type
+import type { Group } from "@/types"; 
 
 export default function AdminOverviewPage() {
   const { loggedInEntity } = useAuth(); 
@@ -47,7 +47,7 @@ export default function AdminOverviewPage() {
               active++;
             }
           } else {
-            // If no tenure, consider it active unless other logic defines it as closed
+            
             active++; 
           }
         }
@@ -135,7 +135,7 @@ export default function AdminOverviewPage() {
         <Card className="shadow-md">
           <CardHeader>
             <CardTitle>{adminUser ? `Welcome, ${adminUser.fullname}!` : 'Welcome Admin!'}</CardTitle>
-            <CardDescription>Here are some tips for managing ChitConnect:</CardDescription>
+            <CardDescription>Here are some tips for managing Sendhur Chits:</CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">

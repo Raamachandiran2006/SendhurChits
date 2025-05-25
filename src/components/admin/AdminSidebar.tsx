@@ -44,7 +44,7 @@ export function AdminSidebar() {
                 <path d="M30 50 Q50 70 70 50" stroke="currentColor" strokeWidth="5" fill="none"/>
                 <circle cx="50" cy="50" r="10" fill="currentColor"/>
             </svg>
-            <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">ChitConnect</span>
+            <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">Sendhur Chits</span>
           </Link>
         </SidebarHeader>
         <SidebarContent className="p-2 flex flex-col">

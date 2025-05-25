@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ChitConnect",
+  title: "Sendhur Chits",
   description: "Chit Fund Management Software by Firebase Studio",
 };
 

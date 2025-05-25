@@ -57,7 +57,7 @@ const formSchema = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "Please upload or capture a recent photograph.",
-      path: ["recentPhotographFile"], // Or path: ["recentPhotographWebcamDataUrl"] or a common path
+      path: ["recentPhotographFile"], 
     });
   }
 });
@@ -84,6 +84,7 @@ export function SignupForm() {
       panCard: undefined,
       recentPhotographFile: null,
       recentPhotographWebcamDataUrl: null,
+      dob: subYears(new Date(), 18), // Default to 18 years ago for DOB
     },
   });
 
@@ -110,10 +111,10 @@ export function SignupForm() {
   }, []);
 
   useEffect(() => {
-    if (showCamera && hasCameraPermission === null) { // only request if not already determined
+    if (showCamera && hasCameraPermission === null) { 
       requestCameraPermission();
     }
-    // Cleanup: stop camera stream when component unmounts or camera is hidden
+    
     return () => {
       if (videoRef.current && videoRef.current.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
@@ -135,12 +136,12 @@ export function SignupForm() {
         const dataUrl = canvas.toDataURL('image/jpeg');
         setCapturedImage(dataUrl);
         setValue("recentPhotographWebcamDataUrl", dataUrl, { shouldValidate: true });
-        setValue("recentPhotographFile", null); // Clear file input if webcam used
-        setShowCamera(false); // Hide camera view after capture
+        setValue("recentPhotographFile", null); 
+        setShowCamera(false); 
          if (videoRef.current && videoRef.current.srcObject) {
             const stream = videoRef.current.srcObject as MediaStream;
             stream.getTracks().forEach(track => track.stop());
-            setHasCameraPermission(null); // Reset permission status to allow re-request if needed
+            setHasCameraPermission(null); 
         }
       }
     }
@@ -150,7 +151,7 @@ export function SignupForm() {
     setCapturedImage(null);
     setValue("recentPhotographWebcamDataUrl", null);
     setShowCamera(true);
-    setHasCameraPermission(null); // Reset to re-trigger permission request
+    setHasCameraPermission(null); 
   };
   
   const dataURLtoFile = (dataurl: string, filename: string): File => {
@@ -180,7 +181,7 @@ export function SignupForm() {
       let panCardUrl = "";
       let photoUrl = "";
 
-      // Path: userFiles/{userPhone}/aadhaar/{fileName}
+      
       if (values.aadhaarCard) {
         aadhaarCardUrl = await uploadFile(values.aadhaarCard, `userFiles/${values.phone}/aadhaar/${values.aadhaarCard.name}`);
       }
@@ -209,7 +210,7 @@ export function SignupForm() {
 
     } catch (error) {
       console.error("Signup submission error:", error);
-      // Toast is handled within signup function
+      
     } finally {
       setIsSubmitting(false);
     }
@@ -222,7 +223,7 @@ export function SignupForm() {
     <Card className="shadow-xl w-full max-w-2xl mx-auto my-8">
       <CardHeader>
         <CardTitle className="text-3xl font-bold text-center text-primary">Create an Account</CardTitle>
-        <CardDescription className="text-center">Join ChitConnect today! Fill in your details below.</CardDescription>
+        <CardDescription className="text-center">Join Sendhur Chits today! Fill in your details below.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -288,6 +289,7 @@ export function SignupForm() {
                           fromDate={hundredYearsAgo}
                           toDate={today}
                           disabled={(date) => date > new Date() || date < hundredYearsAgo}
+                          defaultMonth={subYears(new Date(), 18)}
                           initialFocus
                         />
                       </PopoverContent>
@@ -337,7 +339,7 @@ export function SignupForm() {
               )}
             />
 
-            {/* File Uploads */}
+            
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Document Uploads</CardTitle>
@@ -404,7 +406,7 @@ export function SignupForm() {
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 onChange(file || null);
-                                if (file) setValue("recentPhotographWebcamDataUrl", null); // Clear webcam if file selected
+                                if (file) setValue("recentPhotographWebcamDataUrl", null); 
                               }}
                               accept="image/jpeg,image/png"
                               {...rest} 
@@ -455,7 +457,7 @@ export function SignupForm() {
                   </div>
                 )}
                  <canvas ref={canvasRef} className="hidden"></canvas>
-                 {/* Combined form message for photo */}
+                 
                  {form.formState.errors.recentPhotographFile && !form.formState.errors.recentPhotographFile.message?.includes("Expected file, received null") && (
                     <p className="text-sm font-medium text-destructive">{form.formState.errors.recentPhotographFile.message}</p>
                  )}
@@ -481,4 +483,3 @@ export function SignupForm() {
     </Card>
   );
 }
-

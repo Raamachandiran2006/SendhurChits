@@ -34,7 +34,7 @@ export function LoginForm() {
   return (
     <Card className="shadow-xl">
       <CardHeader>
-        <CardTitle className="text-3xl font-bold text-center text-primary">ChitConnect Login</CardTitle>
+        <CardTitle className="text-3xl font-bold text-center text-primary">Sendhur Chits Login</CardTitle>
         <CardDescription className="text-center">Enter your phone number and password to access your account.</CardDescription>
       </CardHeader>
       <CardContent>
@@ -73,7 +73,6 @@ export function LoginForm() {
           </form>
         </Form>
       </CardContent>
-      {/* Footer with signup link removed */}
     </Card>
   );
 }

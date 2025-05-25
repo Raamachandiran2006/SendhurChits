@@ -14,7 +14,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
-  useSidebar, // Import useSidebar to access its state
+  useSidebar, 
 } from "@/components/ui/sidebar";
 import type { Employee } from "@/types";
 
@@ -31,7 +31,7 @@ const navItems = [
 export function EmployeeSidebar() {
   const pathname = usePathname();
   const { logout, loggedInEntity, userType } = useAuth();
-  const { state: sidebarState } = useSidebar(); // Get sidebar state (expanded/collapsed)
+  const { state: sidebarState } = useSidebar(); 
 
   const employee = userType === 'employee' ? loggedInEntity as Employee : null;
 
@@ -45,7 +45,7 @@ export function EmployeeSidebar() {
                 <path d="M30 50 Q50 70 70 50" stroke="currentColor" strokeWidth="5" fill="none"/>
                 <circle cx="50" cy="50" r="10" fill="currentColor"/>
             </svg>
-            <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">ChitConnect</span>
+            <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">Sendhur Chits</span>
           </Link>
         </SidebarHeader>
         <SidebarContent className="p-2 flex flex-col">
@@ -60,7 +60,7 @@ export function EmployeeSidebar() {
                   asChild
                   isActive={pathname === item.href || (item.href !== "/employee/dashboard" && pathname.startsWith(item.href))}
                   tooltip={item.label}
-                  className="justify-start relative" // Added relative for badge positioning
+                  className="justify-start relative" 
                 >
                   <Link href={item.href} className="flex items-center w-full">
                     <item.icon className="h-5 w-5 mr-3" />

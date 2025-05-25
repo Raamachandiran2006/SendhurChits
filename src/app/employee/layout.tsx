@@ -57,7 +57,7 @@ export default function EmployeeLayout({
           </SidebarInset>
         </div>
         <footer className="py-4 text-center text-sm text-muted-foreground border-t md:ml-[var(--sidebar-width-icon)] peer-data-[state=expanded]:md:ml-[var(--sidebar-width)] transition-[margin-left] duration-300 ease-in-out">
-           © {new Date().getFullYear()} ChitConnect Employee Portal.
+           © {new Date().getFullYear()} Sendhur Chits Employee Portal.
         </footer>
       </div>
     </SidebarProvider>

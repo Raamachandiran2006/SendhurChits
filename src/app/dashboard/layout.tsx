@@ -20,12 +20,12 @@ export default function DashboardLayout({
       if (!loggedInEntity) {
         router.replace("/login");
       } else if (userType !== 'user') {
-        // If logged in but not a regular user, redirect appropriately
+        
         if (userType === 'admin') {
           router.replace("/admin");
         } else if (userType === 'employee') {
           router.replace("/employee/dashboard");
-        } else { // Should not happen
+        } else { 
           router.replace("/login");
         }
       }
@@ -47,10 +47,8 @@ export default function DashboardLayout({
         {children}
       </main>
       <footer className="py-4 text-center text-sm text-muted-foreground border-t">
-        © {new Date().getFullYear()} ChitConnect. All rights reserved.
+        © {new Date().getFullYear()} Sendhur Chits. All rights reserved.
       </footer>
     </div>
   );
 }
-
-    

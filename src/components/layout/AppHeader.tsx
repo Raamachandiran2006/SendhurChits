@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, UserCircle, Shield, Briefcase, Landmark, Wallet } from "lucide-react"; // Removed Globe
+import { LogOut, UserCircle, Shield, Briefcase, Landmark, Wallet, Globe } from "lucide-react"; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,12 +13,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  // Removed: DropdownMenuRadioGroup,
-  // Removed: DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import type { User, Employee } from "@/types";
 import { cn } from "@/lib/utils";
-// Removed: import { useLanguage } from "@/contexts/LanguageContext";
 import React from "react";
 
 const formatCurrency = (amount: number | null | undefined) => {
@@ -31,13 +28,6 @@ const formatCurrency = (amount: number | null | undefined) => {
 export function AppHeader() {
   const { loggedInEntity, userType, logout } = useAuth();
   
-  // Removed: Language hook logic
-  // const isAdmin = userType === 'admin';
-  // const languageHook = isAdmin ? useLanguage() : null;
-  // const language = languageHook?.language;
-  // const setLanguage = languageHook?.setLanguage;
-  // const t = languageHook?.t;
-
   if (!loggedInEntity) return null;
 
   const getInitials = (name: string) => {
@@ -62,13 +52,12 @@ export function AppHeader() {
             <path d="M30 50 Q50 70 70 50" stroke="currentColor" strokeWidth="5" fill="none"/>
             <circle cx="50" cy="50" r="10" fill="currentColor"/>
           </svg>
-          <span className="text-xl font-bold text-primary">ChitConnect</span>
+          <span className="text-xl font-bold text-primary">Sendhur Chits</span>
         </Link>
         
         <div className="flex items-center gap-4">
           <div className="hidden sm:flex flex-col items-end text-right">
             <span className="text-sm text-foreground">
-              {/* Reverted: {isAdmin && t ? t('welcomeAdmin').replace('{name}', entityFullname) : `Welcome, ${entityFullname}`} */}
               Welcome, {entityFullname}
             </span>
             {userType === 'user' && userDueAmount !== undefined && (
@@ -83,9 +72,6 @@ export function AppHeader() {
               </div>
             )}
           </div>
-
-          {/* Removed: Language Switcher Dropdown */}
-          {/* {isAdmin && language && setLanguage && t && ( ... )} */}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -118,7 +104,6 @@ export function AppHeader() {
                  <DropdownMenuItem asChild>
                    <Link href="/admin" className="flex items-center">
                     <Shield className="mr-2 h-4 w-4" />
-                    {/* Reverted: {t('sidebarOverview')} */}
                     Overview
                    </Link>
                  </DropdownMenuItem>
@@ -150,7 +135,6 @@ export function AppHeader() {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive-foreground focus:bg-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
-                {/* Reverted: {isAdmin && t ? t('sidebarLogout') : 'Log out'} */}
                 Log out
               </DropdownMenuItem>
             </DropdownMenuContent>
