@@ -6,12 +6,12 @@ import type { User } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Removed CardDescription
+import { Card, CardContent, CardHeader } from "@/components/ui/card"; // Removed CardTitle, CardDescription
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Users as UsersIcon, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO } from "date-fns"; // Ensure parseISO is imported
+import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 
 export default function EmployeeViewUsersPage() {
@@ -24,9 +24,12 @@ export default function EmployeeViewUsersPage() {
       setLoading(true);
       try {
         const usersRef = collection(db, "users");
+        // Fetch all users and then filter client-side to exclude admins
         const q = query(usersRef, orderBy("fullname")); 
         const querySnapshot = await getDocs(q);
-        const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+        const fetchedUsers = querySnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as User))
+          .filter(user => !(user.isAdmin || user.username === 'admin')); // Exclude admins
         setUsers(fetchedUsers);
       } catch (error) {
         console.error("Error fetching users:", error);
@@ -42,8 +45,19 @@ export default function EmployeeViewUsersPage() {
       return "N/A";
     }
     try {
-      const date = parseISO(dateString); // Use parseISO for robust parsing
+      // Attempt to parse ISO strings first, then general date strings
+      const date = dateString.includes('T') ? parseISO(dateString) : new Date(dateString.replace(/-/g, '/'));
       if (isNaN(date.getTime())) {
+        const parts = dateString.split('-');
+        if (parts.length === 3) {
+          const year = parseInt(parts[0]);
+          const month = parseInt(parts[1]) - 1; 
+          const day = parseInt(parts[2]);
+          const directDate = new Date(year, month, day);
+          if (!isNaN(directDate.getTime())) {
+            return format(directDate, "dd MMM yyyy");
+          }
+        }
         return "N/A";
       }
       return format(date, "dd MMM yyyy");
@@ -73,7 +87,7 @@ export default function EmployeeViewUsersPage() {
             <UsersIcon className="h-8 w-8 text-primary"/>
             <div>
                 <h1 className="text-3xl font-bold text-foreground">View Users</h1>
-                <p className="text-muted-foreground">Browse registered user accounts.</p>
+                <p className="text-muted-foreground">Browse registered user accounts (excluding admins).</p>
             </div>
         </div>
         <Button variant="outline" asChild className="mt-4 sm:mt-0">
@@ -85,7 +99,7 @@ export default function EmployeeViewUsersPage() {
 
       <Card className="shadow-xl">
         <CardHeader>
-            {/* Title and description moved to page header */}
+            {/* Title and description are in the page header */}
         </CardHeader>
         <CardContent className="pt-6">
           {users.length === 0 ? (
@@ -112,7 +126,7 @@ export default function EmployeeViewUsersPage() {
                       onClick={() => handleUserRowClick(user.id)}
                       className="cursor-pointer hover:bg-muted/70 transition-colors"
                     >
-                      <TableCell className="font-medium">{user.fullname}</TableCell><TableCell>{user.username}</TableCell><TableCell>{user.phone}</TableCell><TableCell>{formatDateSafe(user.dob)}</TableCell><TableCell>{user.isAdmin || user.username === 'admin' ? (<Badge variant="destructive">Admin</Badge>) : (<Badge variant="secondary">User</Badge>)}</TableCell><TableCell className="text-right">{user.groups?.length || 0}</TableCell>
+                      <TableCell className="font-medium">{user.fullname}</TableCell><TableCell>{user.username}</TableCell><TableCell>{user.phone}</TableCell><TableCell>{formatDateSafe(user.dob)}</TableCell><TableCell><Badge variant="secondary">User</Badge></TableCell><TableCell className="text-right">{user.groups?.length || 0}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
