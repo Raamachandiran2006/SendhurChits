@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, Users as UsersIcon, Layers as LayersIcon, MapPin, LocateFixed, ListNumbers } from "lucide-react";
+import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, Users as UsersIcon, Layers as LayersIcon, MapPin, LocateFixed } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -20,7 +20,7 @@ import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, 
 import type { Group, User, Employee, CollectionRecord, AuctionRecord } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation"; // Import useSearchParams
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // Helper for time formatting
@@ -62,7 +62,7 @@ const NO_AUCTION_SELECTED_VALUE = "no-auction-specific-collection";
 
 const recordCollectionFormSchema = z.object({
   selectedGroupId: z.string().min(1, "Please select a Group."),
-  selectedAuctionId: z.string().optional(), // Optional: ID of the auction this collection is for
+  selectedAuctionId: z.string().optional(),
   selectedUserId: z.string().min(1, "Please select a User."),
   paymentDate: z.date({ required_error: "Payment date is required." }),
   paymentTime: z.string().min(1, "Payment time is required."),
@@ -80,8 +80,13 @@ const generateVirtualId = () => Math.floor(100000 + Math.random() * 900000).toSt
 export function RecordCollectionForm() {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams(); // Get search params
   const { loggedInEntity } = useAuth();
   const employee = loggedInEntity as Employee | null;
+
+  const preselectedUserIdFromQuery = searchParams.get("userId");
+  const preselectedUserFullnameFromQuery = searchParams.get("fullname");
+  const preselectedUserUsernameFromQuery = searchParams.get("username");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -114,7 +119,7 @@ export function RecordCollectionForm() {
     },
   });
 
-  const { watch, setValue } = form;
+  const { watch, setValue, reset } = form;
   const watchedGroupId = watch("selectedGroupId");
   const watchedCollectionLocationOption = watch("collectionLocationOption");
 
@@ -195,6 +200,45 @@ export function RecordCollectionForm() {
     }
   }, [watchedGroupId, groups, setValue, toast]);
 
+  // Effect to pre-select user if userId is in query params and members are loaded
+  useEffect(() => {
+    if (preselectedUserIdFromQuery && groupMembers.length > 0) {
+      const userExistsInGroup = groupMembers.some(member => member.id === preselectedUserIdFromQuery);
+      if (userExistsInGroup) {
+        setValue("selectedUserId", preselectedUserIdFromQuery, { shouldValidate: true });
+      } else {
+        // Only show toast if a group has been selected and the preselected user is not in its members
+        if (watchedGroupId && preselectedUserFullnameFromQuery && preselectedUserUsernameFromQuery) {
+          toast({
+            variant: "default",
+            title: "User Not in Selected Group",
+            description: `${preselectedUserFullnameFromQuery} (@${preselectedUserUsernameFromQuery}) is not a member of the currently selected group. Please select a different group or user.`,
+            duration: 7000,
+          });
+        }
+        setValue("selectedUserId", ""); // Clear selection if user not in group
+      }
+    } else if (preselectedUserIdFromQuery && !watchedGroupId && groupMembers.length === 0) {
+      // A user is pre-selected via query, but no group is chosen yet.
+      // The placeholder of the "User" dropdown will show the pre-selected user's name.
+      // No specific action is needed here until a group is selected.
+    } else {
+      // No pre-selected user from query, or group not selected yet.
+      // If no preselectedUserIdFromQuery, ensure selectedUserId is cleared if the group changes or has no members.
+      if (!preselectedUserIdFromQuery) {
+        setValue("selectedUserId", "");
+      }
+    }
+  }, [
+    preselectedUserIdFromQuery,
+    preselectedUserFullnameFromQuery,
+    preselectedUserUsernameFromQuery,
+    groupMembers,
+    setValue,
+    watchedGroupId, // Added watchedGroupId to re-evaluate if group changes
+    toast
+  ]);
+
   const handleFetchLocation = () => {
     if (navigator.geolocation) {
       setIsFetchingLocation(true);
@@ -205,6 +249,7 @@ export function RecordCollectionForm() {
         (position) => {
           const { latitude, longitude } = position.coords;
           setCurrentLocationDisplay(`Lat: ${latitude.toFixed(5)}, Lon: ${longitude.toFixed(5)}`);
+          // Store as Google Maps link
           setCurrentLocationValue(`https://www.google.com/maps?q=${latitude},${longitude}`);
           setIsFetchingLocation(false);
         },
@@ -294,7 +339,7 @@ export function RecordCollectionForm() {
         });
 
       toast({ title: "Collection Recorded", description: `Payment of ${formatCurrency(values.amount)} from ${selectedUser.fullname} recorded.` });
-      form.reset({
+      reset({
         selectedGroupId: "", 
         selectedAuctionId: undefined,
         selectedUserId: "",
@@ -396,7 +441,13 @@ export function RecordCollectionForm() {
                   <Select onValueChange={field.onChange} value={field.value} disabled={!watchedGroupId || loadingMembers}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={!watchedGroupId ? "Select group first" : (loadingMembers ? "Loading members..." : "Select a user")} />
+                        <SelectValue 
+                          placeholder={
+                            preselectedUserFullnameFromQuery && preselectedUserUsernameFromQuery ? 
+                            `${preselectedUserFullnameFromQuery} (@${preselectedUserUsernameFromQuery})` :
+                            (!watchedGroupId ? "Select group first" : (loadingMembers ? "Loading members..." : "Select a user"))
+                          } 
+                        />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
