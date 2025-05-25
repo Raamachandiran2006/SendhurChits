@@ -43,7 +43,7 @@ export function AddCreditRecordForm() {
     resolver: zodResolver(addCreditRecordFormSchema),
     defaultValues: {
       fromName: "",
-      creditNumber: "",
+      creditNumber: "", // Default to empty string, which Zod handles for optional
       paymentDate: new Date(),
       paymentMode: undefined,
       amount: undefined,
@@ -54,23 +54,29 @@ export function AddCreditRecordForm() {
   async function onSubmit(values: AddCreditRecordFormValues) {
     setIsSubmitting(true);
     try {
-      const dataToSave: Omit<CreditRecord, "id" | "recordedAt"> & { recordedAt?: any } = {
+      // Start with all required fields
+      const dataToSave: any = {
         fromName: values.fromName,
-        creditNumber: values.creditNumber || undefined,
         paymentDate: format(values.paymentDate, "yyyy-MM-dd"),
         paymentMode: values.paymentMode,
         amount: values.amount,
-        remarks: "Credit",
+        remarks: "Credit", // This is fixed as per schema
         virtualTransactionId: generateVirtualId(),
+        recordedAt: serverTimestamp() as Timestamp,
       };
 
-      await addDoc(collection(db, "creditRecords"), {
-        ...dataToSave,
-        recordedAt: serverTimestamp() as Timestamp,
-      });
+      // Only add creditNumber if it has a meaningful, non-empty value
+      if (values.creditNumber && values.creditNumber.trim() !== "") {
+        dataToSave.creditNumber = values.creditNumber.trim();
+      }
+      // If values.creditNumber is an empty string or undefined, 
+      // the creditNumber field will NOT be added to dataToSave, 
+      // so it won't be sent to Firestore as undefined.
+
+      await addDoc(collection(db, "creditRecords"), dataToSave);
 
       toast({ title: "Success", description: "Credit record added successfully." });
-      router.push(`/admin/payments/credit?refreshId=${Date.now()}`); // Redirect to a future list page
+      router.push(`/admin/payments/credit?refreshId=${Date.now()}`); 
     } catch (error) {
       console.error("Credit record submission error:", error);
       toast({ title: "Error", description: "Could not record credit. " + (error as Error).message, variant: "destructive" });
