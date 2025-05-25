@@ -1,15 +1,13 @@
 
 "use client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Layers, BarChart3, Briefcase, PlusCircle } from "lucide-react"; // Added PlusCircle
-import { useAuth } from "@/contexts/AuthContext";
+import { Users, Layers, Briefcase } from "lucide-react";
 import { useEffect, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore"; 
 import { db } from "@/lib/firebase";
 import type { Group } from "@/types"; 
 
 export default function AdminOverviewPage() {
-  const { loggedInEntity } = useAuth(); 
   const [userCount, setUserCount] = useState(0);
   const [groupCount, setGroupCount] = useState(0);
   const [activeGroupCount, setActiveGroupCount] = useState(0);
@@ -101,16 +99,6 @@ export default function AdminOverviewPage() {
           <CardContent>
             <div className="text-2xl font-bold">{employeeCount}</div>
             <p className="text-xs text-muted-foreground">Registered employees</p>
-          </CardContent>
-        </Card>
-         <Card className="shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">System Status</CardTitle>
-            <BarChart3 className="h-5 w-5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">Operational</div>
-            <p className="text-xs text-muted-foreground">All systems running smoothly</p>
           </CardContent>
         </Card>
       </div>
