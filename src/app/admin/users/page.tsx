@@ -6,19 +6,20 @@ import type { User } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } // Removed CardTitle, CardDescription
+from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Users, PlusCircle, Search, UserCircle as UserCircleIcon } from "lucide-react";
+import { Loader2, Users, PlusCircle, Search } from "lucide-react"; // Added Search
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/input"; // Added Input
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(""); // State for search term
   const router = useRouter();
 
   useEffect(() => {
@@ -30,7 +31,7 @@ export default function AdminUsersPage() {
         const querySnapshot = await getDocs(q);
         const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
         setUsers(fetchedUsers);
-      } catch (error) {
+      } catch (error) { // Added curly braces here
         console.error("Error fetching users:", error);
       } finally {
         setLoading(false);
@@ -44,12 +45,14 @@ export default function AdminUsersPage() {
       return "N/A";
     }
     try {
+      // Attempt to parse ISO strings first, then general date strings
       const date = dateString.includes('T') ? parseISO(dateString) : new Date(dateString.replace(/-/g, '/'));
       if (isNaN(date.getTime())) {
+        // Fallback for 'YYYY-MM-DD' if direct parsing fails
         const parts = dateString.split('-');
         if (parts.length === 3) {
           const year = parseInt(parts[0]);
-          const month = parseInt(parts[1]) - 1;
+          const month = parseInt(parts[1]) - 1; // Month is 0-indexed
           const day = parseInt(parts[2]);
           const directDate = new Date(year, month, day);
           if (!isNaN(directDate.getTime())) {
@@ -69,6 +72,7 @@ export default function AdminUsersPage() {
     router.push(`/admin/users/${userId}`);
   };
 
+  // Filter users based on search term
   const filteredUsers = useMemo(() => {
     if (!searchTerm) {
       return users;
@@ -80,6 +84,7 @@ export default function AdminUsersPage() {
       user.username.toLowerCase().includes(lowercasedSearchTerm)
     );
   }, [users, searchTerm]);
+
 
   if (loading) {
     return (
@@ -122,9 +127,9 @@ export default function AdminUsersPage() {
 
       <Card className="shadow-xl">
         <CardHeader>
-          {/* Title and description can be part of the main page heading */}
+            {/* Title and description can be part of the main page heading */}
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6"> {/* Added pt-6 for padding */}
           {filteredUsers.length === 0 ? (
             <div className="text-center py-10">
               <p className="text-muted-foreground">
@@ -135,19 +140,11 @@ export default function AdminUsersPage() {
             <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Full Name</TableHead>
-                    <TableHead>Username (ID)</TableHead>
-                    <TableHead>Phone Number</TableHead>
-                    <TableHead>Date of Birth</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead className="text-right">Groups Joined</TableHead>
-                    <TableHead className="text-center">Actions</TableHead>
-                  </TableRow>
+                  <TableRow><TableHead>Full Name</TableHead><TableHead>Username (ID)</TableHead><TableHead>Phone Number</TableHead><TableHead>Date of Birth</TableHead><TableHead>Role</TableHead><TableHead className="text-right">Groups Joined</TableHead></TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.map((user) => (
-                    <TableRow key={user.id} onClick={() => handleUserRowClick(user.id)} className="cursor-pointer hover:bg-muted/50 transition-colors"><TableCell className="font-medium">{user.fullname}</TableCell><TableCell>{user.username}</TableCell><TableCell>{user.phone}</TableCell><TableCell>{formatDateSafe(user.dob)}</TableCell><TableCell>{user.isAdmin || user.username === 'admin' ? (<Badge variant="destructive">Admin</Badge>) : (<Badge variant="secondary">User</Badge>)}</TableCell><TableCell className="text-right">{user.groups?.length || 0}</TableCell><TableCell className="text-center"><Button asChild variant="destructive" size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={(e) => e.stopPropagation()}><Link href={`/admin/collection/record?userId=${user.id}&fullname=${encodeURIComponent(user.fullname)}&username=${encodeURIComponent(user.username)}`}>Collection</Link></Button></TableCell></TableRow>
+                    <TableRow key={user.id} onClick={() => handleUserRowClick(user.id)} className="cursor-pointer hover:bg-muted/50 transition-colors"><TableCell className="font-medium">{user.fullname}</TableCell><TableCell>{user.username}</TableCell><TableCell>{user.phone}</TableCell><TableCell>{formatDateSafe(user.dob)}</TableCell><TableCell>{user.isAdmin || user.username === 'admin' ? (<Badge variant="destructive">Admin</Badge>) : (<Badge variant="secondary">User</Badge>)}</TableCell><TableCell className="text-right">{user.groups?.length || 0}</TableCell></TableRow>
                   ))}
                 </TableBody>
               </Table>
