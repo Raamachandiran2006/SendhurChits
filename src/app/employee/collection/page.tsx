@@ -1,16 +1,16 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react"; // Added useMemo
 import type { CollectionRecord, Employee } from "@/types";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, orderBy, query as firestoreQuery, Timestamp } from "firebase/firestore"; // Added Timestamp
+import { collection, getDocs, orderBy, query as firestoreQuery, Timestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Loader2, ArchiveRestore, PlusCircle, ArrowLeft, ListChecks, ChevronRight, ChevronDown, Filter, Download } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format, parseISO, subDays, isAfter } from "date-fns";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table"; // Added TableFooter
+import { format, parseISO, subDays, isAfter, startOfDay, endOfDay } from "date-fns"; // Added startOfDay, endOfDay
 import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams } from "next/navigation";
 import {
@@ -24,9 +24,9 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-type CollectionFilterType = "all" | "last7Days" | "last10Days" | "last30Days";
+type CollectionFilterType = "all" | "today" | "last7Days" | "last10Days" | "last30Days";
 
-const formatDateSafe = (dateInput: Date | string | Timestamp | undefined | null, outputFormat: string = "dd MMM yyyy") => {
+const formatDateSafe = (dateInput: Date | string | Timestamp | undefined | null, outputFormat: string = "dd MMM yy") => { // Changed default to dd MMM yy for consistency
   if (!dateInput) return "N/A";
   try {
     let date: Date;
@@ -99,7 +99,6 @@ const formatDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimesta
   return baseDate;
 };
 
-
 const formatCurrency = (amount: number | null | undefined) => {
   if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
   return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -130,16 +129,14 @@ export default function EmployeeCollectionPage() {
         const querySnapshot = await getDocs(q);
         const fetchedHistory = querySnapshot.docs.map(doc => {
           const data = doc.data() as CollectionRecord;
-          // Ensure paymentDate, paymentTime, and recordedAt are available for sorting/filtering
           const sortableDateTime = formatDateTimeForSort(data.paymentDate, data.paymentTime, data.recordedAt);
           return { 
             id: doc.id, 
             ...data,
-            // Add a processed date field for filtering if needed, or rely on recordedAt
             filterDate: sortableDateTime 
           } as CollectionRecord & { filterDate: Date };
         });
-        setRawCollectionHistory(fetchedHistory as any); // Cast if filterDate is not part of CollectionRecord
+        setRawCollectionHistory(fetchedHistory as any);
         setFilteredCollectionHistory(fetchedHistory as any);
       } catch (error) {
         console.error("Error fetching collection history:", error);
@@ -158,26 +155,40 @@ export default function EmployeeCollectionPage() {
       }
       const now = new Date();
       let startDate: Date;
-      if (selectedFilter === "last7Days") {
-        startDate = subDays(now, 7);
+      let endDate: Date | null = null; // For 'today' filter
+
+      if (selectedFilter === "today") {
+        startDate = startOfDay(now);
+        endDate = endOfDay(now);
+      } else if (selectedFilter === "last7Days") {
+        startDate = startOfDay(subDays(now, 6)); // Include today
+        endDate = endOfDay(now);
       } else if (selectedFilter === "last10Days") {
-        startDate = subDays(now, 10);
+        startDate = startOfDay(subDays(now, 9)); // Include today
+        endDate = endOfDay(now);
       } else if (selectedFilter === "last30Days") {
-        startDate = subDays(now, 30);
+        startDate = startOfDay(subDays(now, 29)); // Include today
+        endDate = endOfDay(now);
       } else {
         setFilteredCollectionHistory(rawCollectionHistory);
         return;
       }
-      startDate.setHours(0, 0, 0, 0);
+      
       const filtered = rawCollectionHistory.filter(record => {
-        // Use the filterDate field if available, otherwise parse from recordedAt
         const recordDate = (record as any).filterDate || (record.recordedAt ? record.recordedAt.toDate() : new Date(0));
+        if (endDate) {
+          return isAfter(recordDate, startDate) && recordDate <= endDate;
+        }
         return isAfter(recordDate, startDate);
       });
       setFilteredCollectionHistory(filtered);
     };
     applyFilter();
   }, [selectedFilter, rawCollectionHistory]);
+
+  const totalFilteredAmount = useMemo(() => {
+    return filteredCollectionHistory.reduce((sum, record) => sum + (record.amount || 0), 0);
+  }, [filteredCollectionHistory]);
 
   const handleDownloadPdf = () => {
     if (filteredCollectionHistory.length === 0) {
@@ -198,7 +209,7 @@ export default function EmployeeCollectionPage() {
         index + 1,
         record.groupName,
         `${record.userFullname} (${record.userUsername})`,
-        `${formatDateSafe(record.paymentDate, "dd MMM yy")} ${record.paymentTime || ''}`,
+        `${formatDateSafe(record.paymentDate)} ${record.paymentTime || ''}`,
         formatCurrencyPdf(record.amount),
         record.paymentType,
         record.paymentMode,
@@ -210,7 +221,13 @@ export default function EmployeeCollectionPage() {
       tableRows.push(recordData);
     });
     
-    const filterLabel = { all: "All Time", last7Days: "Last 7 Days", last10Days: "Last 10 Days", last30Days: "Last 30 Days" };
+    const filterLabel: Record<CollectionFilterType, string> = { 
+      all: "All Time", 
+      today: "Today",
+      last7Days: "Last 7 Days", 
+      last10Days: "Last 10 Days", 
+      last30Days: "Last 30 Days" 
+    };
 
     doc.setFontSize(18);
     doc.text(`Collection History`, 14, 15);
@@ -254,6 +271,7 @@ export default function EmployeeCollectionPage() {
                 <DropdownMenuLabel>Filter by Date</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => setSelectedFilter("all")}>All Time</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedFilter("today")}>Today</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => setSelectedFilter("last7Days")}>Last 7 Days</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => setSelectedFilter("last10Days")}>Last 10 Days</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => setSelectedFilter("last30Days")}>Last 30 Days</DropdownMenuItem>
@@ -341,7 +359,7 @@ export default function EmployeeCollectionPage() {
                           <span className="text-xs text-muted-foreground">({record.userUsername})</span>
                         </TableCell>
                         <TableCell>
-                          {formatDateSafe(record.paymentDate, "dd MMM yy")}<br/>
+                          {formatDateSafe(record.paymentDate)}<br/>
                           <span className="text-xs text-muted-foreground">{record.paymentTime}</span>
                         </TableCell>
                         <TableCell className="text-right font-mono">{formatCurrency(record.amount)}</TableCell>
@@ -362,6 +380,13 @@ export default function EmployeeCollectionPage() {
                     </React.Fragment>
                   )})}
                 </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-right font-semibold">Total Amount:</TableCell>
+                    <TableCell className="text-right font-bold font-mono">{formatCurrency(totalFilteredAmount)}</TableCell>
+                    <TableCell colSpan={5}></TableCell> 
+                  </TableRow>
+                </TableFooter>
               </Table>
             </div>
           )}
@@ -370,3 +395,5 @@ export default function EmployeeCollectionPage() {
     </div>
   );
 }
+
+    
