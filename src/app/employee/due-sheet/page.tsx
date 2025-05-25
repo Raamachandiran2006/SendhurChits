@@ -8,13 +8,13 @@ import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { useRouter } from "next/navigation"; // Import useRouter
+import { useRouter } from "next/navigation";
 import { Loader2, ArrowLeft, Sheet as SheetIcon, UserCircle, Phone, Search } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Input } from "@/components/ui/input"; 
+import { Input } from "@/components/ui/input";
 
 const formatCurrency = (amount: number | null | undefined) => {
-  if (amount === null || amount === undefined || isNaN(amount)) return "₹0.00"; 
+  if (amount === null || amount === undefined || isNaN(amount)) return "₹0.00";
   return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
@@ -22,7 +22,7 @@ export default function EmployeeDueSheetPage() {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const router = useRouter(); // Initialize useRouter
+  const router = useRouter();
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -34,8 +34,8 @@ export default function EmployeeDueSheetPage() {
         const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
         
         const relevantUsers = fetchedUsers.filter(user => 
-          !(user.isAdmin || user.username === 'admin') &&
-          (user.dueAmount && user.dueAmount > 0)
+          !(user.isAdmin || user.username === 'admin') && 
+          (user.dueAmount && user.dueAmount > 0) 
         );
         setAllUsers(relevantUsers);
 
@@ -56,12 +56,12 @@ export default function EmployeeDueSheetPage() {
     return allUsers.filter(user => 
       user.username.toLowerCase().includes(lowercasedSearchTerm) ||
       user.fullname.toLowerCase().includes(lowercasedSearchTerm) ||
-      user.phone.includes(searchTerm) 
+      user.phone.includes(searchTerm)
     );
   }, [allUsers, searchTerm]);
 
   const handleRowClick = (userId: string) => {
-    router.push(`/employee/users/${userId}`); 
+    router.push(`/employee/users/${userId}`);
   };
 
   return (
