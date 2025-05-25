@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Users, Layers, Briefcase, TrendingUp, Loader2, AlertTriangle, Banknote, Wallet, CalendarIcon, Sheet } from "lucide-react";
+import { Users, Layers, Briefcase, TrendingUp, Loader2, AlertTriangle, Banknote, Wallet, CalendarIcon, Sheet, PlusCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { collection, getDocs, query, where, Timestamp, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -131,78 +131,125 @@ export default function AdminOverviewPage() {
     const formattedTargetDate = formatDateFns(targetDate, "yyyy-MM-dd");
 
     let openingBalance = 0;
-    let todayTotalCollections = 0;
-    let todayTotalPayments = 0;
-    let todayTotalSalaries = 0;
-    let todayTotalOtherCredits = 0; // From creditRecords
-    let todayTotalExpensesSpend = 0;
-    let todayTotalExpensesReceived = 0;
+    let todayTransactions: DaySheetRow[] = [];
+    let todayTotalCredits = 0;
+    let todayTotalDebits = 0;
 
     try {
-      // Calculate Opening Balance (same logic as before)
-      const collectionsBefore = await getDocs(query(collection(db, "collectionRecords"), where("recordedAt", "<", startOfTargetDay)));
-      collectionsBefore.forEach(doc => openingBalance += (doc.data() as CollectionRecord).amount || 0);
+      // Calculate Opening Balance
+      const collectionsBeforeSnap = await getDocs(query(collection(db, "collectionRecords"), where("recordedAt", "<", startOfTargetDay)));
+      collectionsBeforeSnap.forEach(doc => openingBalance += (doc.data() as CollectionRecord).amount || 0);
       
-      const creditsBefore = await getDocs(query(collection(db, "creditRecords"), where("recordedAt", "<", startOfTargetDay)));
-      creditsBefore.forEach(doc => openingBalance += (doc.data() as CreditRecord).amount || 0);
+      const creditsBeforeSnap = await getDocs(query(collection(db, "creditRecords"), where("recordedAt", "<", startOfTargetDay)));
+      creditsBeforeSnap.forEach(doc => openingBalance += (doc.data() as CreditRecord).amount || 0);
       
-      const expensesReceivedBefore = await getDocs(query(collection(db, "expenses"), where("type", "==", "received"), where("recordedAt", "<", startOfTargetDay)));
-      expensesReceivedBefore.forEach(doc => openingBalance += (doc.data() as ExpenseRecord).amount || 0);
+      const expensesReceivedBeforeSnap = await getDocs(query(collection(db, "expenses"), where("type", "==", "received"), where("recordedAt", "<", startOfTargetDay)));
+      expensesReceivedBeforeSnap.forEach(doc => openingBalance += (doc.data() as ExpenseRecord).amount || 0);
       
-      const paymentsBefore = await getDocs(query(collection(db, "paymentRecords"), where("recordedAt", "<", startOfTargetDay)));
-      paymentsBefore.forEach(doc => openingBalance -= (doc.data() as PaymentRecord).amount || 0);
+      const paymentsBeforeSnap = await getDocs(query(collection(db, "paymentRecords"), where("recordedAt", "<", startOfTargetDay)));
+      paymentsBeforeSnap.forEach(doc => openingBalance -= (doc.data() as PaymentRecord).amount || 0);
       
-      const salariesBefore = await getDocs(query(collection(db, "salaryRecords"), where("recordedAt", "<", startOfTargetDay)));
-      salariesBefore.forEach(doc => openingBalance -= (doc.data() as SalaryRecord).amount || 0);
+      const salariesBeforeSnap = await getDocs(query(collection(db, "salaryRecords"), where("recordedAt", "<", startOfTargetDay)));
+      salariesBeforeSnap.forEach(doc => openingBalance -= (doc.data() as SalaryRecord).amount || 0);
       
-      const expensesSpendBefore = await getDocs(query(collection(db, "expenses"), where("type", "==", "spend"), where("recordedAt", "<", startOfTargetDay)));
-      expensesSpendBefore.forEach(doc => openingBalance -= (doc.data() as ExpenseRecord).amount || 0);
+      const expensesSpendBeforeSnap = await getDocs(query(collection(db, "expenses"), where("type", "==", "spend"), where("recordedAt", "<", startOfTargetDay)));
+      expensesSpendBeforeSnap.forEach(doc => openingBalance -= (doc.data() as ExpenseRecord).amount || 0);
 
-      // Fetch and Aggregate Today's Transactions by Type
+
+      // Fetch Today's Transactions
       const collectionsTodaySnap = await getDocs(query(collection(db, "collectionRecords"), where("recordedAt", ">=", startOfTargetDay), where("recordedAt", "<=", endOfTargetDay)));
-      collectionsTodaySnap.forEach(doc => todayTotalCollections += (doc.data() as CollectionRecord).amount || 0);
+      collectionsTodaySnap.forEach(doc => {
+        const data = doc.data() as CollectionRecord;
+        const transaction: DaySheetRow = {
+          sno: 0, date: formattedTargetDate, particulars: "Collection",
+          credit: data.amount || 0, debit: 0,
+          remarks: `From ${data.userFullname} (${data.groupName})`,
+          _timestamp: data.recordedAt.toDate()
+        };
+        todayTransactions.push(transaction);
+        todayTotalCredits += transaction.credit;
+      });
 
       const paymentsTodaySnap = await getDocs(query(collection(db, "paymentRecords"), where("recordedAt", ">=", startOfTargetDay), where("recordedAt", "<=", endOfTargetDay)));
-      paymentsTodaySnap.forEach(doc => todayTotalPayments += (doc.data() as PaymentRecord).amount || 0);
+      paymentsTodaySnap.forEach(doc => {
+        const data = doc.data() as PaymentRecord;
+        const transaction: DaySheetRow = {
+          sno: 0, date: formattedTargetDate, particulars: "Payment to User",
+          credit: 0, debit: data.amount || 0,
+          remarks: `To ${data.userFullname} (Auction: ${data.auctionNumber || 'N/A'})`,
+          _timestamp: data.recordedAt.toDate()
+        };
+        todayTransactions.push(transaction);
+        todayTotalDebits += transaction.debit;
+      });
 
       const salariesTodaySnap = await getDocs(query(collection(db, "salaryRecords"), where("recordedAt", ">=", startOfTargetDay), where("recordedAt", "<=", endOfTargetDay)));
-      salariesTodaySnap.forEach(doc => todayTotalSalaries += (doc.data() as SalaryRecord).amount || 0);
+      salariesTodaySnap.forEach(doc => {
+        const data = doc.data() as SalaryRecord;
+        const transaction: DaySheetRow = {
+          sno: 0, date: formattedTargetDate, particulars: "Salary Paid",
+          credit: 0, debit: data.amount || 0,
+          remarks: `To ${data.employeeName}`,
+          _timestamp: data.recordedAt.toDate()
+        };
+        todayTransactions.push(transaction);
+        todayTotalDebits += transaction.debit;
+      });
       
       const otherCreditsTodaySnap = await getDocs(query(collection(db, "creditRecords"), where("recordedAt", ">=", startOfTargetDay), where("recordedAt", "<=", endOfTargetDay)));
-      otherCreditsTodaySnap.forEach(doc => todayTotalOtherCredits += (doc.data() as CreditRecord).amount || 0);
+      otherCreditsTodaySnap.forEach(doc => {
+        const data = doc.data() as CreditRecord;
+         const transaction: DaySheetRow = {
+          sno: 0, date: formattedTargetDate, particulars: "Other Credit",
+          credit: data.amount || 0, debit: 0,
+          remarks: `From ${data.fromName} (Credit No: ${data.creditNumber || 'N/A'})`,
+          _timestamp: data.recordedAt.toDate()
+        };
+        todayTransactions.push(transaction);
+        todayTotalCredits += transaction.credit;
+      });
 
       const expensesTodaySnap = await getDocs(query(collection(db, "expenses"), where("recordedAt", ">=", startOfTargetDay), where("recordedAt", "<=", endOfTargetDay)));
       expensesTodaySnap.forEach(doc => {
         const data = doc.data() as ExpenseRecord;
         if (data.type === 'spend') {
-          todayTotalExpensesSpend += data.amount || 0;
+          const transaction: DaySheetRow = {
+            sno: 0, date: formattedTargetDate, particulars: "Expense (Spend)",
+            credit: 0, debit: data.amount || 0,
+            remarks: data.reason || "General Expense",
+            _timestamp: data.recordedAt.toDate()
+          };
+          todayTransactions.push(transaction);
+          todayTotalDebits += transaction.debit;
         } else if (data.type === 'received') {
-          todayTotalExpensesReceived += data.amount || 0;
+          const transaction: DaySheetRow = {
+            sno: 0, date: formattedTargetDate, particulars: "Expense (Received)",
+            credit: data.amount || 0, debit: 0,
+            remarks: data.fromPerson || "General Income",
+            _timestamp: data.recordedAt.toDate()
+          };
+          todayTransactions.push(transaction);
+          todayTotalCredits += transaction.credit;
         }
       });
 
+      // Sort today's transactions by time
+      todayTransactions.sort((a, b) => (a._timestamp?.getTime() || 0) - (b._timestamp?.getTime() || 0));
+
       const report: DaySheetRow[] = [];
       let currentSno = 1;
-
       report.push({ sno: currentSno++, date: formattedTargetDate, particulars: "Opening Balance", credit: openingBalance > 0 ? openingBalance : 0, debit: openingBalance < 0 ? Math.abs(openingBalance) : 0, remarks: "" });
       
-      if (todayTotalCollections > 0) report.push({ sno: currentSno++, date: formattedTargetDate, particulars: "Total Collections", credit: todayTotalCollections, debit: 0, remarks: "From users" });
-      if (todayTotalOtherCredits > 0) report.push({ sno: currentSno++, date: formattedTargetDate, particulars: "Total Other Credits", credit: todayTotalOtherCredits, debit: 0, remarks: "From credit records" });
-      if (todayTotalExpensesReceived > 0) report.push({ sno: currentSno++, date: formattedTargetDate, particulars: "Total Other Income", credit: todayTotalExpensesReceived, debit: 0, remarks: "From expenses (received)" });
+      todayTransactions.forEach(tx => {
+        report.push({ ...tx, sno: currentSno++ });
+      });
       
-      if (todayTotalPayments > 0) report.push({ sno: currentSno++, date: formattedTargetDate, particulars: "Total Payments (to Users/Auction)", credit: 0, debit: todayTotalPayments, remarks: "To users/auction winners" });
-      if (todayTotalSalaries > 0) report.push({ sno: currentSno++, date: formattedTargetDate, particulars: "Total Salaries Paid", credit: 0, debit: todayTotalSalaries, remarks: "To employees" });
-      if (todayTotalExpensesSpend > 0) report.push({ sno: currentSno++, date: formattedTargetDate, particulars: "Total Expenses (Spend)", credit: 0, debit: todayTotalExpensesSpend, remarks: "General expenses" });
-
-      const finalTodayCredits = todayTotalCollections + todayTotalOtherCredits + todayTotalExpensesReceived;
-      const finalTodayDebits = todayTotalPayments + todayTotalSalaries + todayTotalExpensesSpend;
-      
-      const closingBalance = openingBalance + finalTodayCredits - finalTodayDebits;
+      const closingBalance = openingBalance + todayTotalCredits - todayTotalDebits;
       report.push({ sno: currentSno, date: formattedTargetDate, particulars: "Closing Balance", credit: 0, debit: 0, remarks: `Final balance ${formatCurrency(closingBalance)}` });
       
       setDaySheetData(report);
-      setDaySheetTodayCredits(finalTodayCredits);
-      setDaySheetTodayDebits(finalTodayDebits);
+      setDaySheetTodayCredits(todayTotalCredits);
+      setDaySheetTodayDebits(todayTotalDebits);
 
     } catch (err) {
       console.error("Error generating day sheet:", err);
@@ -279,6 +326,7 @@ export default function AdminOverviewPage() {
           </CardHeader>
           <CardContent>
             {loadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : <div className="text-2xl font-bold">{formatCurrency(currentBalance)}</div>}
+            {/* Removed calculation display text from here */}
           </CardContent>
         </Card>
       </div>
@@ -334,13 +382,13 @@ export default function AdminOverviewPage() {
                 </TableHeader>
                 <TableBody>
                   {daySheetData.map((row) => (
-                    <TableRow key={row.sno} className={row.particulars.includes("Balance") ? "font-bold bg-secondary/50" : ""}>
+                    <TableRow key={row.sno + row.particulars + (row._timestamp?.toISOString() || '')} className={row.particulars.includes("Balance") ? "font-bold bg-secondary/50" : ""}>
                       <TableCell>{row.sno}</TableCell>
                       <TableCell>{formatDateFns(new Date(row.date.replace(/-/g, '/')), "dd-MM-yyyy")}</TableCell>
                       <TableCell>{row.particulars}</TableCell>
                       <TableCell className="text-right font-mono">{row.credit > 0 ? formatCurrency(row.credit) : "-"}</TableCell>
                       <TableCell className="text-right font-mono">{row.debit > 0 ? formatCurrency(row.debit) : "-"}</TableCell>
-                      <TableCell>{row.remarks}</TableCell>
+                      <TableCell className="max-w-xs truncate">{row.remarks}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -362,3 +410,4 @@ export default function AdminOverviewPage() {
   );
 }
 
+    
