@@ -1,11 +1,11 @@
 
 "use client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Layers, Briefcase, TrendingUp, Loader2, AlertTriangle } from "lucide-react"; // Added AlertTriangle
+import { Users, Layers, Briefcase, TrendingUp, Loader2, AlertTriangle, Banknote, Wallet } from "lucide-react"; // Added Banknote, Wallet
 import { useEffect, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore"; 
 import { db } from "@/lib/firebase";
-import type { Group, CollectionRecord } from "@/types";
+import type { Group, CollectionRecord, PaymentRecord, SalaryRecord, ExpenseRecord, CreditRecord } from "@/types";
 
 export default function AdminOverviewPage() {
   const [userCount, setUserCount] = useState(0);
@@ -14,7 +14,8 @@ export default function AdminOverviewPage() {
   const [closedGroupCount, setClosedGroupCount] = useState(0);
   const [employeeCount, setEmployeeCount] = useState(0);
   const [totalCollectionAmount, setTotalCollectionAmount] = useState(0);
-  const [totalPenaltyAmount, setTotalPenaltyAmount] = useState(0); // Placeholder for penalty
+  const [totalPenaltyAmount, setTotalPenaltyAmount] = useState(0);
+  const [currentBalance, setCurrentBalance] = useState(0); // New state for current balance
   const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
@@ -53,22 +54,69 @@ export default function AdminOverviewPage() {
         const employeesSnapshot = await getDocs(collection(db, "employees"));
         setEmployeeCount(employeesSnapshot.size);
 
-        // Fetch Total Collections
+        let totalReceived = 0;
+        let totalSent = 0;
+
+        // Fetch Total Collections (Received)
         const collectionsSnapshot = await getDocs(collection(db, "collectionRecords"));
-        let totalCollected = 0;
+        let collectedSum = 0;
         collectionsSnapshot.forEach(doc => {
           const data = doc.data() as CollectionRecord;
           if (data.amount && typeof data.amount === 'number') {
-            totalCollected += data.amount;
+            collectedSum += data.amount;
+            totalReceived += data.amount;
           }
         });
-        setTotalCollectionAmount(totalCollected);
+        setTotalCollectionAmount(collectedSum);
+
+        // Fetch Credit Records (Received)
+        const creditSnapshot = await getDocs(collection(db, "creditRecords"));
+        creditSnapshot.forEach(doc => {
+          const data = doc.data() as CreditRecord;
+          if (data.amount && typeof data.amount === 'number') {
+            totalReceived += data.amount;
+          }
+        });
+
+        // Fetch Payment Records (Sent)
+        const paymentsSnapshot = await getDocs(collection(db, "paymentRecords"));
+        paymentsSnapshot.forEach(doc => {
+          const data = doc.data() as PaymentRecord;
+          if (data.amount && typeof data.amount === 'number') {
+            totalSent += data.amount;
+          }
+        });
+
+        // Fetch Salary Records (Sent)
+        const salarySnapshot = await getDocs(collection(db, "salaryRecords"));
+        salarySnapshot.forEach(doc => {
+          const data = doc.data() as SalaryRecord;
+          if (data.amount && typeof data.amount === 'number') {
+            totalSent += data.amount;
+          }
+        });
+
+        // Fetch Expenses (Sent or Received)
+        const expensesSnapshot = await getDocs(collection(db, "expenses"));
+        expensesSnapshot.forEach(doc => {
+          const data = doc.data() as ExpenseRecord;
+          if (data.amount && typeof data.amount === 'number') {
+            if (data.type === 'spend') {
+              totalSent += data.amount;
+            } else if (data.type === 'received') {
+              totalReceived += data.amount;
+            }
+          }
+        });
+        
+        setCurrentBalance(totalReceived - totalSent);
 
         // Placeholder for total penalty - set to 0 for now
         setTotalPenaltyAmount(0);
 
       } catch (error) {
         console.error("Error fetching admin overview data:", error);
+        // Optionally set error states for specific cards if needed
       } finally {
         setLoadingStats(false);
       }
@@ -84,7 +132,7 @@ export default function AdminOverviewPage() {
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold text-foreground mb-8">Admin Overview</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8"> 
         <Card className="shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -156,6 +204,20 @@ export default function AdminOverviewPage() {
               <div className="text-2xl font-bold">{formatCurrency(totalPenaltyAmount)}</div>
             )}
             <p className="text-xs text-muted-foreground">Total penalties collected</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Current Balance</CardTitle>
+            <Wallet className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {loadingStats ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-2xl font-bold">{formatCurrency(currentBalance)}</div>
+            )}
+            <p className="text-xs text-muted-foreground">(Total Received - Total Sent)</p>
           </CardContent>
         </Card>
       </div>
