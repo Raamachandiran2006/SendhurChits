@@ -155,7 +155,7 @@ export default function AdminOverviewPage() {
             ) : (
               <div className="text-2xl font-bold">{formatCurrency(totalPenaltyAmount)}</div>
             )}
-            <p className="text-xs text-muted-foreground">Total penalties collected (Placeholder)</p>
+            <p className="text-xs text-muted-foreground">Total penalties collected</p>
           </CardContent>
         </Card>
       </div>
