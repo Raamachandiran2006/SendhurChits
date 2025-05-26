@@ -82,14 +82,14 @@ export interface AuctionRecord {
   winnerFullname: string;
   winnerUsername: string; // The user00X style ID of the winner
   winningBidAmount: number;
-  commissionAmount?: number | null;
   discount?: number | null;
+  commissionAmount?: number | null;
   netDiscount?: number | null;
   dividendPerMember?: number | null;
   finalAmountToBePaid?: number | null; // This is the installment paid by all members (including winner)
+  amountPaidToWinner?: number | null;
   recordedAt: import('firebase/firestore').Timestamp;
   virtualTransactionId?: string;
-  amountPaidToWinner?: number | null;
 }
 
 export interface ExpenseRecord {
@@ -108,8 +108,8 @@ export interface ExpenseRecord {
 
 export interface CollectionRecord {
   id: string; // Firestore document ID
-  receiptNumber: string; // New: Unique 7-digit receipt number
-  companyName: string; // New: "Sendhur Chits"
+  receiptNumber: string;
+  companyName: string;
   groupId: string;
   groupName: string;
   auctionId?: string | null;
@@ -122,34 +122,24 @@ export interface CollectionRecord {
   paymentType: "Full Payment" | "Partial Payment";
   paymentMode: "Cash" | "UPI" | "Netbanking";
   amount: number; // This is the Paid Amount for the receipt
-  chitAmount?: number | null; // New: Amount for the specific due/installment
-  dueNumber?: number | null; // New: Auction number if applicable
-  balanceAmount?: number | null; // New: Balance for that specific due after this payment
+  chitAmount?: number | null;
+  dueNumber?: number | null;
+  balanceAmount?: number | null;
   remarks?: string | null;
   recordedAt: import('firebase/firestore').Timestamp;
   collectionLocation?: string | null;
   recordedByEmployeeId?: string | null;
   recordedByEmployeeName?: string | null;
   virtualTransactionId?: string;
+  receiptPdfUrl?: string | null; // New field for PDF URL
 }
 
-export interface PaymentRecord { // For payments MADE BY THE COMPANY (e.g., to auction winners)
-  id: string; // Firestore document ID
-  groupId?: string | null;
-  groupName?: string | null;
-  auctionId?: string | null;
-  auctionNumber?: number | null;
-  userId?: string | null;
-  userUsername?: string | null;
-  userFullname?: string | null;
-  paymentDate: string; // YYYY-MM-DD
-  paymentTime: string; // HH:MM AM/PM
-  paymentMode: "Cash" | "UPI" | "Netbanking" | "Cheque";
-  amount: number;
-  remarks?: string | null;
-  recordedAt: import('firebase/firestore').Timestamp;
-  recordedBy?: "Admin" | string; // Can be admin or employee ID
-  virtualTransactionId?: string;
+// This type is used by the Admin Payment Portal form, and saves to 'paymentRecords'
+// It currently mirrors CollectionRecord for simplicity but can be diverged if needed
+export type PaymentRecord = CollectionRecord & {
+  // Add any fields specific to 'paymentRecords' if they differ from 'CollectionRecord'
+  // For example, if admin payments need a 'paymentReason' or different 'recordedBy' logic.
+  // For now, it will use the CollectionRecord structure.
   guarantorFullName?: string;
   guarantorRelationship?: string;
   guarantorPhone?: string;
@@ -157,7 +147,7 @@ export interface PaymentRecord { // For payments MADE BY THE COMPANY (e.g., to a
   guarantorAadhaarNumber?: string;
   guarantorPanCardNumber?: string;
   guarantorAuthDocUrl?: string;
-}
+};
 
 
 export interface CreditRecord {

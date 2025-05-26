@@ -10,18 +10,20 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, Users as UsersIcon, Layers as LayersIcon, MapPin, LocateFixed } from "lucide-react";
+import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, LocateFixed } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc, orderBy, getDoc } from "firebase/firestore";
 import type { Group, User, Employee, CollectionRecord, AuctionRecord } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import jsPDF from 'jspdf';
 
 // Helper for time formatting
 const formatTimeTo12Hour = (timeStr?: string): string => {
@@ -53,10 +55,21 @@ const formatTimeTo24HourInput = (timeStr?: string): string => {
     return "";
 };
 
-const formatCurrency = (amount: number | null | undefined) => {
+const formatCurrencyLocal = (amount: number | null | undefined) => {
   if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
-  return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  return `Rs. ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
+
+const formatDateLocal = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
+  if (!dateString) return "N/A";
+  try {
+    const date = new Date(dateString.replace(/-/g, '/')); // More robust parsing
+    return format(date, outputFormat);
+  } catch (e) {
+    return "N/A";
+  }
+};
+
 
 const NO_AUCTION_SELECTED_VALUE = "no-auction-specific-collection";
 
@@ -85,12 +98,56 @@ async function generateUniqueReceiptNumber(maxRetries = 5): Promise<string> {
     const q = query(collection(db, "collectionRecords"), where("receiptNumber", "==", receiptNumber));
     const snapshot = await getDocs(q);
     if (snapshot.empty) {
-      console.log("Generated Unique Receipt Number:", receiptNumber);
       return receiptNumber;
     }
-    console.warn(`Receipt number ${receiptNumber} already exists, retrying...`);
   }
   throw new Error("Failed to generate a unique receipt number after several retries.");
+}
+
+async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Promise<Blob> {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: [80, 200] // Common thermal paper width
+  });
+  let y = 10;
+  const lineHeight = 7;
+  const margin = 5;
+
+  doc.setFontSize(12);
+  doc.text(recordData.companyName || "Sendhur Chits", margin, y); y += lineHeight * 1.5;
+  doc.setFontSize(8);
+  doc.text("----------------------------------------", margin, y); y += lineHeight;
+  
+  doc.text(`Receipt No: ${recordData.receiptNumber}`, margin, y); y += lineHeight;
+  doc.text(`Date: ${formatDateLocal(recordData.paymentDate)} ${recordData.paymentTime}`, margin, y); y += lineHeight;
+  doc.text("----------------------------------------", margin, y); y += lineHeight;
+  
+  doc.text(`Group: ${recordData.groupName} (ID: ${recordData.groupId})`, margin, y); y += lineHeight;
+  doc.text(`Member: ${recordData.userFullname} (@${recordData.userUsername})`, margin, y); y += lineHeight;
+  if (recordData.dueNumber) {
+       doc.text(`Due No: ${recordData.dueNumber}`, margin, y); y += lineHeight;
+  }
+  if (recordData.chitAmount !== null && recordData.chitAmount !== undefined) {
+      doc.text(`Installment Amount: ${formatCurrencyLocal(recordData.chitAmount)}`, margin, y); y += lineHeight;
+  }
+  doc.setFontSize(10);
+  doc.text(`Paid Amount: ${formatCurrencyLocal(recordData.amount)}`, margin, y, {fontStyle: 'bold'}); y += lineHeight;
+  doc.setFontSize(8);
+  if (recordData.balanceAmount !== null && recordData.balanceAmount !== undefined) {
+      doc.text(`Balance Due (this inst.): ${formatCurrencyLocal(recordData.balanceAmount)}`, margin, y); y += lineHeight;
+  }
+  doc.text(`Payment Mode: ${recordData.paymentMode}`, margin, y); y += lineHeight;
+  doc.text("----------------------------------------", margin, y); y += lineHeight;
+  doc.text(`Collected By: ${recordData.recordedByEmployeeName}`, margin, y); y += lineHeight;
+  if(recordData.remarks) {
+      doc.text(`Remarks: ${recordData.remarks}`, margin, y); y += lineHeight;
+  }
+  doc.text(`Virtual ID: ${recordData.virtualTransactionId || 'N/A'}`, margin, y); y += lineHeight;
+  doc.text("----------------------------------------", margin, y); y += lineHeight;
+  doc.text("Thank You!", margin, y, {align: 'center'});
+
+  return doc.output('blob');
 }
 
 
@@ -217,12 +274,12 @@ export function RecordCollectionForm() {
     }
   }, [watchedGroupId, groups, setValue, toast]);
 
- useEffect(() => {
+  useEffect(() => {
     if (preselectedUserIdFromQuery && groupMembers.length > 0 && watchedGroupId) {
       const userExistsInGroup = groupMembers.some(member => member.id === preselectedUserIdFromQuery);
       if (userExistsInGroup) {
         setValue("selectedUserId", preselectedUserIdFromQuery, { shouldValidate: true });
-      } else if (preselectedUserFullnameFromQuery && preselectedUserUsernameFromQuery && watchedGroupId) { // Only toast if a group is selected
+      } else if (preselectedUserFullnameFromQuery && preselectedUserUsernameFromQuery) {
           toast({
             variant: "default",
             title: "User Not in Selected Group",
@@ -232,7 +289,6 @@ export function RecordCollectionForm() {
           setValue("selectedUserId", ""); 
       }
     } else if (!preselectedUserIdFromQuery && !watchedGroupId) {
-      // If no preselected user and group is cleared, clear user selection
       setValue("selectedUserId", "");
     }
   }, [
@@ -308,92 +364,83 @@ export function RecordCollectionForm() {
     
     const collectionLocationToStore = values.collectionLocationOption === "Office" ? "Office" : currentLocationValue;
     let newReceiptNumber = "";
+    let receiptPdfDownloadUrl: string | null = null;
+    let newCollectionRecordId = ""; // To store the ID of the new Firestore document for redirection
+
     try {
       newReceiptNumber = await generateUniqueReceiptNumber();
-      console.log("Generated Receipt Number:", newReceiptNumber);
-    } catch (error) {
-      console.error("Error generating receipt number:", error);
-      toast({ title: "Error", description: (error as Error).message || "Could not generate unique receipt number.", variant: "destructive" });
-      setIsSubmitting(false);
-      return;
-    }
-
-    let chitAmountForDue: number | null = null;
-    let dueNumberForRecord: number | null = null;
-    let balanceAmountAfterPayment: number | null = null;
-
-    if (selectedAuction) {
-        console.log("Selected Auction for Chit/Due Amount:", selectedAuction);
-        if (selectedAuction.finalAmountToBePaid !== null && selectedAuction.finalAmountToBePaid !== undefined) {
-            chitAmountForDue = selectedAuction.finalAmountToBePaid;
-        }
-        dueNumberForRecord = selectedAuction.auctionNumber || null;
-    } else if (selectedGroup && selectedGroup.rate !== null && selectedGroup.rate !== undefined) {
-        console.log("Using group rate for Chit/Due Amount:", selectedGroup.rate);
-        chitAmountForDue = selectedGroup.rate;
-        // dueNumberForRecord remains null as it's not for a specific auction
-    }
-    console.log("Calculated chitAmountForDue:", chitAmountForDue);
-
-
-    if (chitAmountForDue !== null && !isNaN(chitAmountForDue) && typeof values.amount === 'number' && !isNaN(values.amount)) {
-        balanceAmountAfterPayment = chitAmountForDue - values.amount;
-    } else {
-        balanceAmountAfterPayment = null; // Or some other indicator of N/A
-    }
-    console.log("Calculated balanceAmountAfterPayment:", balanceAmountAfterPayment);
-
-    let newCollectionRecordId = "";
-
-    try {
-        await runTransaction(db, async (transaction) => {
-            const userDocRef = doc(db, "users", selectedUser.id);
-            const userDoc = await transaction.get(userDocRef);
-            if (!userDoc.exists()) {
-                throw new Error("User document not found.");
-            }
-            const currentDueAmount = userDoc.data()?.dueAmount || 0;
-            const newDueAmount = currentDueAmount - values.amount;
-            transaction.update(userDocRef, { dueAmount: newDueAmount });
-
-            const collectionRecordRef = doc(collection(db, "collectionRecords")); // Generate ref once
-            newCollectionRecordId = collectionRecordRef.id; // Get ID before setting data
-
-            const collectionRecordData: Omit<CollectionRecord, "id"> & { recordedAt: Timestamp } = {
-                receiptNumber: newReceiptNumber,
-                companyName: "Sendhur Chits",
-                groupId: selectedGroup.id,
-                groupName: selectedGroup.groupName,
-                auctionId: selectedAuction ? selectedAuction.id : null,
-                auctionNumber: selectedAuction ? selectedAuction.auctionNumber : null,
-                userId: selectedUser.id,
-                userUsername: selectedUser.username,
-                userFullname: selectedUser.fullname,
-                paymentDate: format(values.paymentDate, "yyyy-MM-dd"),
-                paymentTime: values.paymentTime, 
-                paymentType: values.paymentType,
-                paymentMode: values.paymentMode,
-                amount: values.amount,
-                chitAmount: chitAmountForDue,
-                dueNumber: dueNumberForRecord,
-                balanceAmount: balanceAmountAfterPayment,
-                remarks: values.remarks || "Auction Collection",
-                collectionLocation: collectionLocationToStore,
-                recordedByEmployeeId: employee.id,
-                recordedByEmployeeName: employee.fullname,
-                virtualTransactionId: generate7DigitRandomNumber(),
-                recordedAt: serverTimestamp() as Timestamp,
-            };
-            console.log("Data being saved to Firestore:", collectionRecordData);
-            transaction.set(collectionRecordRef, collectionRecordData);
-        });
       
-      console.log("Generated Collection Record ID for redirect:", newCollectionRecordId);
+      let chitAmountForDue: number | null = null;
+      let dueNumberForRecord: number | null = null;
+      if (selectedAuction && selectedAuction.finalAmountToBePaid !== null && selectedAuction.finalAmountToBePaid !== undefined) {
+          chitAmountForDue = selectedAuction.finalAmountToBePaid;
+          dueNumberForRecord = selectedAuction.auctionNumber || null;
+      } else if (selectedGroup && selectedGroup.rate !== null && selectedGroup.rate !== undefined) {
+          chitAmountForDue = selectedGroup.rate;
+      }
+
+      let balanceAmountAfterPayment: number | null = null;
+      if (chitAmountForDue !== null && typeof values.amount === 'number') {
+          balanceAmountAfterPayment = chitAmountForDue - values.amount;
+      }
+
+      const tempCollectionRecordDataForPdf: Partial<CollectionRecord> = {
+        receiptNumber: newReceiptNumber,
+        companyName: "Sendhur Chits",
+        groupId: selectedGroup.id,
+        groupName: selectedGroup.groupName,
+        auctionId: selectedAuction ? selectedAuction.id : null,
+        auctionNumber: selectedAuction ? selectedAuction.auctionNumber : null,
+        userId: selectedUser.id,
+        userUsername: selectedUser.username,
+        userFullname: selectedUser.fullname,
+        paymentDate: format(values.paymentDate, "yyyy-MM-dd"),
+        paymentTime: values.paymentTime,
+        paymentType: values.paymentType,
+        paymentMode: values.paymentMode,
+        amount: values.amount,
+        chitAmount: chitAmountForDue,
+        dueNumber: dueNumberForRecord,
+        balanceAmount: balanceAmountAfterPayment,
+        remarks: values.remarks || "Auction Collection",
+        collectionLocation: collectionLocationToStore,
+        recordedByEmployeeId: employee.id,
+        recordedByEmployeeName: employee.fullname,
+        virtualTransactionId: generate7DigitRandomNumber(),
+      };
+
+      const pdfBlob = await generateReceiptPdfBlob(tempCollectionRecordDataForPdf);
+      const pdfFileName = `receipt_${newReceiptNumber}_${selectedGroup.id}.pdf`;
+      const pdfStorageRef = storageRef(storage, `collection_receipts/${selectedGroup.id}/${pdfFileName}`);
+      await uploadBytes(pdfStorageRef, pdfBlob);
+      receiptPdfDownloadUrl = await getDownloadURL(pdfStorageRef);
+
+      await runTransaction(db, async (transaction) => {
+          const userDocRef = doc(db, "users", selectedUser.id);
+          const userDoc = await transaction.get(userDocRef);
+          if (!userDoc.exists()) {
+              throw new Error("User document not found.");
+          }
+          const currentDueAmount = userDoc.data()?.dueAmount || 0;
+          const newDueAmount = currentDueAmount - values.amount;
+          transaction.update(userDocRef, { dueAmount: newDueAmount });
+
+          const collectionRecordRef = doc(collection(db, "collectionRecords"));
+          newCollectionRecordId = collectionRecordRef.id; 
+
+          const collectionRecordData: Omit<CollectionRecord, "id"> & { recordedAt: Timestamp } = {
+              ...(tempCollectionRecordDataForPdf as Omit<CollectionRecord, "id" | "recordedAt" | "receiptPdfUrl">), // Cast to exclude fields not yet present
+              receiptPdfUrl: receiptPdfDownloadUrl,
+              recordedAt: serverTimestamp() as Timestamp,
+          };
+          transaction.set(collectionRecordRef, collectionRecordData);
+      });
+      
       if (!newCollectionRecordId) {
         throw new Error("Failed to obtain new collection record ID for redirection.");
       }
 
-      toast({ title: "Collection Recorded", description: `Payment of ${formatCurrency(values.amount)} from ${selectedUser.fullname} recorded.` });
+      toast({ title: "Collection Recorded", description: `Payment of ${formatCurrencyLocal(values.amount)} from ${selectedUser.fullname} recorded. PDF receipt stored.` });
       reset({
         selectedGroupId: "", 
         selectedAuctionId: undefined,
@@ -413,9 +460,8 @@ export function RecordCollectionForm() {
     } catch (error) {
       console.error("Error recording collection:", error);
       toast({ title: "Error", description: "Could not record collection. " + (error as Error).message, variant: "destructive" });
-      setIsSubmitting(false); // Ensure submitting state is reset on error
-    } 
-    // Removed finally block for setIsSubmitting, as it should only be reset on success or error
+      setIsSubmitting(false); 
+    }
   }
 
   return (
@@ -477,7 +523,7 @@ export function RecordCollectionForm() {
                       <SelectItem value={NO_AUCTION_SELECTED_VALUE}>General Due / Not for Specific Auction</SelectItem>
                       {groupAuctions.map((auction) => (
                         <SelectItem key={auction.id} value={auction.id}>
-                          Auction #{auction.auctionNumber} - {auction.auctionMonth} (Due: {formatCurrency(auction.finalAmountToBePaid)})
+                          Auction #{auction.auctionNumber} - {auction.auctionMonth} (Due: {formatCurrencyLocal(auction.finalAmountToBePaid)})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -508,7 +554,7 @@ export function RecordCollectionForm() {
                     <SelectContent>
                       {groupMembers.map((member) => (
                         <SelectItem key={member.id} value={member.id}>
-                          {member.fullname} (@{member.username}) - Due: {formatCurrency(member.dueAmount)}
+                          {member.fullname} (@{member.username}) - Due: {formatCurrencyLocal(member.dueAmount)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -696,5 +742,3 @@ export function RecordCollectionForm() {
     </Card>
   );
 }
-
-    

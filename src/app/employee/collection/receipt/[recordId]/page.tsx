@@ -19,7 +19,7 @@ const formatCurrency = (amount: number | null | undefined) => {
 const formatDate = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
   if (!dateString) return "N/A";
   try {
-    const date = parseISO(dateString);
+    const date = new Date(dateString.replace(/-/g, '/')); // More robust parsing
     return format(date, outputFormat);
   } catch (e) {
     return "N/A";
@@ -65,54 +65,62 @@ export default function CollectionReceiptPage() {
 
   const handleDownloadPdf = () => {
     if (!receipt) return;
+
+    if (receipt.receiptPdfUrl) {
+      // If a stored PDF URL exists, use it for direct download
+      const link = document.createElement('a');
+      link.href = receipt.receiptPdfUrl;
+      link.download = `receipt_${receipt.receiptNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
+    // Fallback: Generate PDF on the client if no stored URL (for older records)
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: [80, 200] // Common thermal paper width (80mm), height can be auto
+      format: [80, 200] 
     });
-    const receiptContentEl = document.getElementById('receipt-content');
-    if (receiptContentEl) {
-        // Simple text based PDF for now, can be improved with html2canvas for exact replica
-        let y = 10;
-        const lineHeight = 7;
-        const margin = 5;
-        const maxWidth = 80 - 2 * margin;
+    let y = 10;
+    const lineHeight = 7;
+    const margin = 5;
 
-        doc.setFontSize(12);
-        doc.text(receipt.companyName, margin, y); y += lineHeight * 1.5;
-        doc.setFontSize(8);
-        doc.text("----------------------------------------", margin, y); y += lineHeight;
-        
-        doc.text(`Receipt No: ${receipt.receiptNumber}`, margin, y); y += lineHeight;
-        doc.text(`Date: ${formatDate(receipt.paymentDate)} ${receipt.paymentTime}`, margin, y); y += lineHeight;
-        doc.text("----------------------------------------", margin, y); y += lineHeight;
-        
-        doc.text(`Group: ${receipt.groupName} (ID: ${receipt.groupId})`, margin, y); y += lineHeight;
-        doc.text(`Member: ${receipt.userFullname} (@${receipt.userUsername})`, margin, y); y += lineHeight;
-        if (receipt.dueNumber) {
-             doc.text(`Due No: ${receipt.dueNumber}`, margin, y); y += lineHeight;
-        }
-        if (receipt.chitAmount !== null && receipt.chitAmount !== undefined) {
-            doc.text(`Installment Amount: ${formatCurrency(receipt.chitAmount)}`, margin, y); y += lineHeight;
-        }
-        doc.setFontSize(10);
-        doc.text(`Paid Amount: ${formatCurrency(receipt.amount)}`, margin, y, {fontStyle: 'bold'}); y += lineHeight;
-        doc.setFontSize(8);
-        if (receipt.balanceAmount !== null && receipt.balanceAmount !== undefined) {
-            doc.text(`Balance Due (for this installment): ${formatCurrency(receipt.balanceAmount)}`, margin, y); y += lineHeight;
-        }
-        doc.text(`Payment Mode: ${receipt.paymentMode}`, margin, y); y += lineHeight;
-        doc.text("----------------------------------------", margin, y); y += lineHeight;
-        doc.text(`Collected By: ${receipt.recordedByEmployeeName}`, margin, y); y += lineHeight;
-        if(receipt.remarks) {
-            doc.text(`Remarks: ${receipt.remarks}`, margin, y); y += lineHeight;
-        }
-
-        doc.save(`receipt_${receipt.receiptNumber}.pdf`);
-    } else {
-        alert("Receipt content not found for PDF generation.");
+    doc.setFontSize(12);
+    doc.text(receipt.companyName, margin, y); y += lineHeight * 1.5;
+    doc.setFontSize(8);
+    doc.text("----------------------------------------", margin, y); y += lineHeight;
+    
+    doc.text(`Receipt No: ${receipt.receiptNumber}`, margin, y); y += lineHeight;
+    doc.text(`Date: ${formatDate(receipt.paymentDate)} ${receipt.paymentTime}`, margin, y); y += lineHeight;
+    doc.text("----------------------------------------", margin, y); y += lineHeight;
+    
+    doc.text(`Group: ${receipt.groupName} (ID: ${receipt.groupId})`, margin, y); y += lineHeight;
+    doc.text(`Member: ${receipt.userFullname} (@${receipt.userUsername})`, margin, y); y += lineHeight;
+    if (receipt.dueNumber) {
+         doc.text(`Due No: ${receipt.dueNumber}`, margin, y); y += lineHeight;
     }
-
+    if (receipt.chitAmount !== null && receipt.chitAmount !== undefined) {
+        doc.text(`Installment Amount: ${formatCurrency(receipt.chitAmount)}`, margin, y); y += lineHeight;
+    }
+    doc.setFontSize(10);
+    doc.text(`Paid Amount: ${formatCurrency(receipt.amount)}`, margin, y, {fontStyle: 'bold'}); y += lineHeight;
+    doc.setFontSize(8);
+    if (receipt.balanceAmount !== null && receipt.balanceAmount !== undefined) {
+        doc.text(`Balance Due (this inst.): ${formatCurrency(receipt.balanceAmount)}`, margin, y); y += lineHeight;
+    }
+    doc.text(`Payment Mode: ${receipt.paymentMode}`, margin, y); y += lineHeight;
+    doc.text("----------------------------------------", margin, y); y += lineHeight;
+    doc.text(`Collected By: ${receipt.recordedByEmployeeName}`, margin, y); y += lineHeight;
+    if(receipt.remarks) {
+        doc.text(`Remarks: ${receipt.remarks}`, margin, y); y += lineHeight;
+    }
+    doc.text(`Virtual ID: ${receipt.virtualTransactionId || 'N/A'}`, margin, y); y += lineHeight;
+    doc.text("----------------------------------------", margin, y); y += lineHeight;
+    doc.text("Thank You!", margin, y, {align: 'center'});
+    
+    doc.save(`receipt_${receipt.receiptNumber}.pdf`);
   };
 
   if (loading) {
@@ -173,6 +181,7 @@ export default function CollectionReceiptPage() {
         <div className="text-xs space-y-1 border-t border-dashed border-gray-400 pt-2 mt-2">
           <p><strong>Collected By:</strong> {receipt.recordedByEmployeeName}</p>
           {receipt.remarks && <p><strong>Remarks:</strong> {receipt.remarks}</p>}
+          {receipt.virtualTransactionId && <p><strong>Virtual ID:</strong> {receipt.virtualTransactionId}</p>}
           <p className="text-center mt-2">Thank You!</p>
         </div>
       </div>
@@ -189,7 +198,6 @@ export default function CollectionReceiptPage() {
         </Button>
       </div>
 
-      {/* Basic print styles */}
       <style jsx global>{`
         @media print {
           body {
@@ -203,13 +211,12 @@ export default function CollectionReceiptPage() {
           .print\\:p-0 { padding: 0 !important; }
           .print\\:shadow-none { box-shadow: none !important; }
           .print\\:w-auto { width: auto !important; }
-          /* Attempt to make fonts clearer for thermal */
           #receipt-content {
-            font-family: 'Courier New', Courier, monospace !important; /* Common thermal printer font */
-            font-size: 9pt !important; /* Adjust as needed */
+            font-family: 'Courier New', Courier, monospace !important;
+            font-size: 9pt !important;
             line-height: 1.3 !important;
             color: black !important;
-            max-width: 80mm !important; /* Or 58mm */
+            max-width: 80mm !important;
             margin: auto;
           }
           #receipt-content p, #receipt-content h1 {
@@ -220,4 +227,3 @@ export default function CollectionReceiptPage() {
     </div>
   );
 }
-
