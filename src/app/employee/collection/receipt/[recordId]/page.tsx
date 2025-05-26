@@ -166,9 +166,9 @@ export default function CollectionReceiptPage() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-start min-h-screen bg-gray-100 p-4 print:bg-white print:p-0 print:m-0">
+    <div id="receipt-content-wrapper" className="flex flex-col items-center justify-start min-h-screen bg-gray-100 p-4 print:bg-white print:p-0 print:m-0">
       <div id="printable-receipt-area">
-        <div className="w-full max-w-xs bg-white shadow-lg print:shadow-none print:w-auto print:p-0 print:m-0 print:border-none" id="receipt-content">
+        <div className="w-full max-w-xs bg-white shadow-lg print:shadow-none print:w-auto print:m-0 print:border-none print:p-0" id="receipt-content">
           <div className="text-center mb-2 print:mb-1">
             <h1 className="text-xl font-bold print:text-lg">{receipt.companyName || "Sendhur Chits"}</h1>
             <p className="text-sm print:text-xs">Payment Receipt</p>
@@ -214,49 +214,52 @@ export default function CollectionReceiptPage() {
         @media print {
           body, html {
             width: 72mm !important;
-            height: 135mm !important;
-            min-height: 135mm !important;
+            /* height: 135mm !important; */ /* Fixed height removed */
+            /* min-height: 135mm !important; */ /* Fixed min-height removed */
+            height: auto !important; /* Allow height to be determined by content */
+            min-height: 0 !important; /* Allow height to be determined by content */
             margin: 0 !important;
             padding: 0 !important;
-            overflow: hidden !important;
+            overflow: visible !important; /* Allow content to flow if longer than one page */
             background-color: white !important;
-            -webkit-print-color-adjust: exact !important; /* For Chrome/Safari */
-            print-color-adjust: exact !important; /* Standard */
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
 
-          /* Hide everything not explicitly part of the printable area */
-          body > *:not(#printable-receipt-area) {
+          body > *:not(#receipt-content-wrapper) { /* Hide everything not explicitly part of the printable area */
             display: none !important;
             visibility: hidden !important;
           }
-           /* Ensure parent of printable-receipt-area is also hidden if it's not body directly */
-          .flex.flex-col.items-center.justify-start:not(#printable-receipt-area) {
-             display: none !important;
-             visibility: hidden !important;
-          }
-
-          #printable-receipt-area {
+          
+          #receipt-content-wrapper { /* The direct parent of printable-receipt-area */
             display: block !important;
             visibility: visible !important;
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
             width: 72mm !important;
-            height: 135mm !important; /* Fixed height */
-            min-height: 135mm !important;
-            overflow: hidden !important; /* Clip content that overflows this area */
+            height: auto !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            position: static !important; /* Changed from absolute */
+          }
+
+          #printable-receipt-area { /* The area containing the receipt content div */
+            display: block !important;
+            visibility: visible !important;
+            width: 72mm !important;
+            height: auto !important; 
+            min-height: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
             background-color: white !important;
             box-sizing: border-box !important;
-             /* border: 1px dashed #ccc; */ /* For debugging bounds */
+            /* border: 1px dashed #ccc; */ /* For debugging bounds */
           }
           
           #printable-receipt-area * {
             visibility: visible !important;
             display: revert !important;
             color: black !important;
-            background-color: transparent !important; /* Ensure no unwanted backgrounds */
+            background-color: transparent !important;
           }
 
           #printable-receipt-area #receipt-content {
@@ -265,8 +268,8 @@ export default function CollectionReceiptPage() {
             height: auto !important;
             min-height: 0 !important;
             font-family: 'Courier New', Courier, monospace !important;
-            font-size: 8pt !important; /* Adjusted font size */
-            line-height: 1.2 !important; /* Adjusted line height */
+            font-size: 8pt !important;
+            line-height: 1.2 !important;
             color: black !important;
             background-color: white !important;
             padding: 1mm 2mm !important; 
@@ -278,18 +281,17 @@ export default function CollectionReceiptPage() {
 
           #printable-receipt-area #receipt-content h1,
           #printable-receipt-area #receipt-content p,
-          #printable-receipt-area #receipt-content div { /* target divs within receipt for spacing */
+          #printable-receipt-area #receipt-content div {
             margin-top: 0.5mm !important;
             margin-bottom: 0.5mm !important;
             font-size: 8pt !important;
-            page-break-inside: avoid !important; /* Try to prevent breaking elements across pages */
+            page-break-inside: avoid !important;
           }
           #printable-receipt-area #receipt-content .border-dashed {
             padding-top: 0.5mm !important;
             padding-bottom: 0.5mm !important;
           }
           
-          /* Hide known overlays and other unwanted elements */
           .firebase-emulator-warning,
           iframe[id^="webpack-dev-server-client-overlay"],
           div[id^="__next_error"],
@@ -302,6 +304,4 @@ export default function CollectionReceiptPage() {
     </div>
   );
 }
-    
-
     
