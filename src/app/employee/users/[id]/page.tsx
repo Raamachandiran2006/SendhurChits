@@ -171,7 +171,6 @@ export default function EmployeeViewUserDetailPage() {
     setError(null); setTransactionError(null);
 
     try {
-      // Fetch User Details
       const userDocRef = doc(db, "users", userId);
       const userDocSnap = await getDoc(userDocRef);
       if (!userDocSnap.exists()) {
@@ -181,7 +180,6 @@ export default function EmployeeViewUserDetailPage() {
       const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
       setUser(userData);
 
-      // Fetch User Groups
       const fetchedGroups: Group[] = [];
       if (userData.groups && userData.groups.length > 0) {
         const groupsRef = collection(db, "groups");
@@ -195,7 +193,6 @@ export default function EmployeeViewUserDetailPage() {
       setUserGroups(fetchedGroups);
       setLoadingUser(false); 
 
-      // Fetch Payment Transactions
       let combinedTransactions: EmployeeUserTransaction[] = [];
       const collectionsRef = collection(db, "collectionRecords");
       const collectionsQuery = query(collectionsRef, where("userId", "==", userId), orderBy("recordedAt", "desc"));
@@ -226,7 +223,6 @@ export default function EmployeeViewUserDetailPage() {
       setFilteredUserTransactions(combinedTransactions); 
       setLoadingTransactions(false);
 
-      // Fetch and Process Due Sheet Items
       const processedDueSheetItems: DueSheetItem[] = [];
       if (fetchedGroups.length > 0) { 
         for (const group of fetchedGroups) {
@@ -238,7 +234,7 @@ export default function EmployeeViewUserDetailPage() {
             if (auctionRecord.auctionNumber === undefined || auctionRecord.finalAmountToBePaid === null || auctionRecord.finalAmountToBePaid === undefined) continue;
             
             const amountDueForInstallment = auctionRecord.finalAmountToBePaid;
-            const penaltyChargedForInstallment = 0; // Placeholder
+            const penaltyChargedForInstallment = 0; 
             
             let totalCollectedForThisDue = 0;
             let latestPaidDate: Date | null = null;

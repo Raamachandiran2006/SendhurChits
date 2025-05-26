@@ -8,7 +8,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import type { CollectionRecord } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Loader2, Printer, Download as DownloadIcon, ArrowLeft, Eye } from 'lucide-react';
-import { format } from 'date-fns'; // date-fns format is good
+import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 
 const formatCurrency = (amount: number | null | undefined) => {
@@ -19,10 +19,9 @@ const formatCurrency = (amount: number | null | undefined) => {
 const formatDate = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
   if (!dateString) return "N/A";
   try {
-    // Attempt to parse various common date string formats including YYYY-MM-DD
     const date = new Date(dateString.replace(/-/g, '/'));
-    if (isNaN(date.getTime())) { // Fallback for direct parsing failure
-        const isoDate = new Date(dateString); // Try ISO format
+    if (isNaN(date.getTime())) {
+        const isoDate = new Date(dateString);
         if (isNaN(isoDate.getTime())) return "N/A";
         return format(isoDate, outputFormat);
     }
@@ -128,7 +127,7 @@ export default function CollectionReceiptPage() {
     doc.save(`receipt_${receipt.receiptNumber}.pdf`);
   };
 
-  const handleDone = () => {
+  const handleViewUserDues = () => {
     if (receipt && receipt.userId) {
       router.push(`/employee/users/${receipt.userId}#due-sheet`);
     } else {
@@ -201,7 +200,7 @@ export default function CollectionReceiptPage() {
       </div>
 
       <div className="mt-6 flex space-x-3 print:hidden">
-        <Button onClick={handleDone} variant="outline">
+        <Button onClick={handleViewUserDues} variant="outline">
             <Eye className="mr-2 h-4 w-4"/> View User Dues
         </Button>
         <Button onClick={handlePrint} variant="outline">
