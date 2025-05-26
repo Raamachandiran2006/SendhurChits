@@ -5,12 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Users, Layers, Briefcase, TrendingUp, Loader2, AlertTriangle, Banknote, Wallet, CalendarIcon, Sheet, PlusCircle } from "lucide-react";
+import { Users, Layers, Briefcase, TrendingUp, Loader2, AlertTriangle, Banknote, Wallet, CalendarIcon as CalendarIconLucide, Sheet, Download } from "lucide-react"; // Added Sheet and Download
 import { useEffect, useState } from "react";
 import { collection, getDocs, query, where, Timestamp, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Group, CollectionRecord, PaymentRecord, SalaryRecord, ExpenseRecord, CreditRecord, DaySheetRow } from "@/types";
 import { format as formatDateFns, startOfDay as dateFnsStartOfDay, endOfDay as dateFnsEndOfDay } from "date-fns";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminOverviewPage() {
   const [userCount, setUserCount] = useState(0);
@@ -24,11 +27,8 @@ export default function AdminOverviewPage() {
   const [loadingStats, setLoadingStats] = useState(true);
 
   const [selectedDateForDaySheet, setSelectedDateForDaySheet] = useState<Date | undefined>(new Date());
-  const [daySheetData, setDaySheetData] = useState<DaySheetRow[]>([]);
-  const [loadingDaySheet, setLoadingDaySheet] = useState(false);
-  const [daySheetError, setDaySheetError] = useState<string | null>(null);
-  const [daySheetTodayCredits, setDaySheetTodayCredits] = useState(0);
-  const [daySheetTodayDebits, setDaySheetTodayDebits] = useState(0);
+  const [isDownloadingDaySheetPdf, setIsDownloadingDaySheetPdf] = useState(false);
+  const { toast } = useToast();
 
 
   useEffect(() => {
@@ -114,18 +114,13 @@ export default function AdminOverviewPage() {
     return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  const generateDaySheetReport = async () => {
-    if (!selectedDateForDaySheet) {
-      setDaySheetError("Please select a date.");
-      return;
-    }
-    setLoadingDaySheet(true);
-    setDaySheetData([]);
-    setDaySheetError(null);
-    setDaySheetTodayCredits(0);
-    setDaySheetTodayDebits(0);
-
-    const targetDate = selectedDateForDaySheet;
+  const generateDaySheetData = async (targetDate: Date): Promise<{ 
+    reportRows: DaySheetRow[], 
+    todayCredits: number, 
+    todayDebits: number,
+    openingBalance: number,
+    closingBalance: number
+  } | { error: string }> => {
     const startOfTargetDay = dateFnsStartOfDay(targetDate);
     const endOfTargetDay = dateFnsEndOfDay(targetDate);
     const formattedTargetDate = formatDateFns(targetDate, "yyyy-MM-dd");
@@ -154,7 +149,6 @@ export default function AdminOverviewPage() {
       
       const expensesSpendBeforeSnap = await getDocs(query(collection(db, "expenses"), where("type", "==", "spend"), where("recordedAt", "<", startOfTargetDay)));
       expensesSpendBeforeSnap.forEach(doc => openingBalance -= (doc.data() as ExpenseRecord).amount || 0);
-
 
       // Fetch Today's Transactions
       const collectionsTodaySnap = await getDocs(query(collection(db, "collectionRecords"), where("recordedAt", ">=", startOfTargetDay), where("recordedAt", "<=", endOfTargetDay)));
@@ -233,7 +227,6 @@ export default function AdminOverviewPage() {
         }
       });
 
-      // Sort today's transactions by time
       todayTransactions.sort((a, b) => (a._timestamp?.getTime() || 0) - (b._timestamp?.getTime() || 0));
 
       const report: DaySheetRow[] = [];
@@ -247,16 +240,115 @@ export default function AdminOverviewPage() {
       const closingBalance = openingBalance + todayTotalCredits - todayTotalDebits;
       report.push({ sno: currentSno, date: formattedTargetDate, particulars: "Closing Balance", credit: 0, debit: 0, remarks: `Final balance ${formatCurrency(closingBalance)}` });
       
-      setDaySheetData(report);
-      setDaySheetTodayCredits(todayTotalCredits);
-      setDaySheetTodayDebits(todayTotalDebits);
+      return { reportRows: report, todayCredits: todayTotalCredits, todayDebits: todayTotalDebits, openingBalance, closingBalance };
 
     } catch (err) {
-      console.error("Error generating day sheet:", err);
-      setDaySheetError("Failed to generate report. Check Firestore indexes and data.");
-    } finally {
-      setLoadingDaySheet(false);
+      console.error("Error generating day sheet data:", err);
+      return { error: "Failed to generate report data. Check Firestore indexes and data." };
     }
+  };
+
+  const handleDownloadDaySheetPdf = async () => {
+    if (!selectedDateForDaySheet) {
+      toast({
+        title: "Date Required",
+        description: "Please select a date for the Day Sheet report.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsDownloadingDaySheetPdf(true);
+
+    const result = await generateDaySheetData(selectedDateForDaySheet);
+
+    if ('error' in result) {
+      toast({
+        title: "Report Generation Failed",
+        description: result.error,
+        variant: "destructive",
+      });
+      setIsDownloadingDaySheetPdf(false);
+      return;
+    }
+
+    const { reportRows, todayCredits, todayDebits, openingBalance, closingBalance } = result;
+
+    if (reportRows.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No transactions found for the selected date.",
+        variant: "default"
+      });
+      setIsDownloadingDaySheetPdf(false);
+      return;
+    }
+    
+    const doc = new jsPDF();
+    const tableColumn = ["S.No", "Date", "Particulars", "Credit (Rs.)", "Debit (Rs.)", "Remarks"];
+    const tableRows: any[][] = [];
+
+    const formatCurrencyPdf = (amount: number | null | undefined) => {
+      if (amount === null || amount === undefined || isNaN(amount) || amount === 0) return "-";
+      return amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    reportRows.forEach((row) => {
+       const rowData = [
+        row.sno,
+        formatDateFns(new Date(row.date.replace(/-/g, '/')), "dd-MM-yyyy"),
+        row.particulars,
+        formatCurrencyPdf(row.credit),
+        formatCurrencyPdf(row.debit),
+        row.remarks || "",
+      ];
+      tableRows.push(rowData);
+    });
+    
+    // Add totals row for the day's transactions
+    tableRows.splice(tableRows.length -1, 0, [ // Insert before closing balance
+        {content: "Total for the Day:", colSpan: 3, styles: {halign: 'right', fontStyle: 'bold'}},
+        {content: formatCurrencyPdf(todayCredits), styles: {halign: 'right', fontStyle: 'bold'}},
+        {content: formatCurrencyPdf(todayDebits), styles: {halign: 'right', fontStyle: 'bold'}},
+        {content: "", styles: {fontStyle: 'bold'}},
+    ]);
+
+
+    doc.setFontSize(18);
+    doc.text(`Day Sheet Report for ${formatDateFns(selectedDateForDaySheet, "PPP")}`, 14, 20);
+    
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 30,
+      theme: 'grid',
+      headStyles: { fillColor: [30, 144, 255] }, 
+      styles: { fontSize: 8, cellPadding: 2 },
+      columnStyles: { 
+        0: { cellWidth: 10 }, // S.No
+        1: { cellWidth: 20 }, // Date
+        2: { cellWidth: 'auto' }, // Particulars
+        3: { halign: 'right', cellWidth: 25 }, // Credit
+        4: { halign: 'right', cellWidth: 25 }, // Debit
+        5: { cellWidth: 'auto' }, // Remarks
+      },
+      didParseCell: function (data) {
+        // Style Opening and Closing Balance rows
+        const particulars = data.row.raw[2]?.content?.toString();
+        if (particulars === "Opening Balance" || particulars === "Closing Balance") {
+          data.cell.styles.fontStyle = 'bold';
+          if (particulars === "Opening Balance") { // Opening balance amount
+            data.cell.styles.fillColor = data.column.index === 3 && openingBalance > 0 ? [230, 245, 255] : (data.column.index === 4 && openingBalance < 0 ? [255,230,230] : undefined);
+          }
+        }
+      }
+    });
+
+    doc.save(`DaySheet_${formatDateFns(selectedDateForDaySheet, "yyyy-MM-dd")}.pdf`);
+    setIsDownloadingDaySheetPdf(false);
+     toast({
+        title: "PDF Generated",
+        description: "Day Sheet report has been downloaded.",
+      });
   };
 
 
@@ -326,7 +418,6 @@ export default function AdminOverviewPage() {
           </CardHeader>
           <CardContent>
             {loadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : <div className="text-2xl font-bold">{formatCurrency(currentBalance)}</div>}
-            {/* Removed calculation display text from here */}
           </CardContent>
         </Card>
       </div>
@@ -342,9 +433,9 @@ export default function AdminOverviewPage() {
               <PopoverTrigger asChild>
                 <Button
                   variant={"outline"}
-                  className="w-[280px] justify-start text-left font-normal"
+                  className="w-full sm:w-[280px] justify-start text-left font-normal"
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  <CalendarIconLucide className="mr-2 h-4 w-4" />
                   {selectedDateForDaySheet ? formatDateFns(selectedDateForDaySheet, "PPP") : <span>Pick a date</span>}
                 </Button>
               </PopoverTrigger>
@@ -357,55 +448,13 @@ export default function AdminOverviewPage() {
                 />
               </PopoverContent>
             </Popover>
-            <Button onClick={generateDaySheetReport} disabled={loadingDaySheet || !selectedDateForDaySheet}>
-              {loadingDaySheet && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Generate Report
+            <Button onClick={handleDownloadDaySheetPdf} disabled={isDownloadingDaySheetPdf || !selectedDateForDaySheet}>
+              {isDownloadingDaySheetPdf && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Download className="mr-2 h-4 w-4" /> Download PDF
             </Button>
           </div>
-
-          {daySheetError && (
-            <div className="text-destructive p-4 border border-destructive/50 rounded-md">{daySheetError}</div>
-          )}
-
-          {daySheetData.length > 0 && (
-            <div className="overflow-x-auto rounded-md border mt-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px]">S.No</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Particulars</TableHead>
-                    <TableHead className="text-right">Credit (₹)</TableHead>
-                    <TableHead className="text-right">Debit (₹)</TableHead>
-                    <TableHead>Remarks</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {daySheetData.map((row) => (
-                    <TableRow key={row.sno + row.particulars + (row._timestamp?.toISOString() || '')} className={row.particulars.includes("Balance") ? "font-bold bg-secondary/50" : ""}>
-                      <TableCell>{row.sno}</TableCell>
-                      <TableCell>{formatDateFns(new Date(row.date.replace(/-/g, '/')), "dd-MM-yyyy")}</TableCell>
-                      <TableCell>{row.particulars}</TableCell>
-                      <TableCell className="text-right font-mono">{row.credit > 0 ? formatCurrency(row.credit) : "-"}</TableCell>
-                      <TableCell className="text-right font-mono">{row.debit > 0 ? formatCurrency(row.debit) : "-"}</TableCell>
-                      <TableCell className="max-w-xs truncate">{row.remarks}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-                <TableFooter>
-                   <TableRow className="font-bold bg-muted/80">
-                        <TableCell colSpan={3} className="text-right">Total for the Day:</TableCell>
-                        <TableCell className="text-right font-mono">{formatCurrency(daySheetTodayCredits)}</TableCell>
-                        <TableCell className="text-right font-mono">{formatCurrency(daySheetTodayDebits)}</TableCell>
-                        <TableCell></TableCell>
-                    </TableRow>
-                </TableFooter>
-              </Table>
-            </div>
-          )}
         </CardContent>
       </Card>
-
     </div>
   );
 }
