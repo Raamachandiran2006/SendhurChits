@@ -168,7 +168,7 @@ export default function AdminCollectionReceiptPage() {
   return (
     <div id="receipt-content-wrapper" className="flex flex-col items-center justify-start min-h-screen bg-gray-100 p-4 print:bg-white print:p-0 print:m-0">
       <div id="printable-receipt-area">
-        <div className="w-full max-w-xs bg-white shadow-lg print:shadow-none print:w-auto print:m-0 print:border-none print:p-0" id="receipt-content">
+        <div className="w-full max-w-xs bg-white shadow-lg print:shadow-none print:w-auto print:m-0 print:border-none print:p-0 print:p-0" id="receipt-content">
           <div className="text-center mb-2 print:mb-1">
             <h1 className="text-xl font-bold print:text-lg">{receipt.companyName || "Sendhur Chits"}</h1>
             <p className="text-sm print:text-xs">Payment Receipt</p>
@@ -214,8 +214,6 @@ export default function AdminCollectionReceiptPage() {
         @media print {
           body, html {
             width: 72mm !important;
-            /* height: 135mm !important; */ /* Fixed height removed */
-            /* min-height: 135mm !important; */ /* Fixed min-height removed */
             height: auto !important; /* Allow height to be determined by content */
             min-height: 0 !important; /* Allow height to be determined by content */
             margin: 0 !important;
@@ -239,7 +237,7 @@ export default function AdminCollectionReceiptPage() {
             min-height: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
-            position: static !important; /* Changed from absolute */
+            position: static !important; 
           }
 
           #printable-receipt-area { /* The area containing the receipt content div */
@@ -252,7 +250,6 @@ export default function AdminCollectionReceiptPage() {
             padding: 0 !important;
             background-color: white !important;
             box-sizing: border-box !important;
-            /* border: 1px dashed #ccc; */ /* For debugging bounds */
           }
           
           #printable-receipt-area * {
@@ -304,4 +301,6 @@ export default function AdminCollectionReceiptPage() {
     </div>
   );
 }
+    
+
     
