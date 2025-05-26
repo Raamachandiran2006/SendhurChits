@@ -167,9 +167,8 @@ export default function CollectionReceiptPage() {
 
   return (
     <div className="flex flex-col items-center justify-start min-h-screen bg-gray-100 p-4 print:bg-white print:p-0 print:m-0">
-      {/* This div is specifically for printing */}
       <div id="printable-receipt-area">
-        <div className="w-full max-w-xs bg-white shadow-lg print:shadow-none print:w-auto print:p-0 print:m-0" id="receipt-content">
+        <div className="w-full max-w-xs bg-white shadow-lg print:shadow-none print:w-auto print:p-0 print:m-0 print:border-none" id="receipt-content">
           <div className="text-center mb-2 print:mb-1">
             <h1 className="text-xl font-bold print:text-lg">{receipt.companyName || "Sendhur Chits"}</h1>
             <p className="text-sm print:text-xs">Payment Receipt</p>
@@ -213,66 +212,88 @@ export default function CollectionReceiptPage() {
 
       <style jsx global>{`
         @media print {
-          body {
-            visibility: hidden !important; /* Hide everything in body first */
+          body, html {
+            width: 72mm !important;
+            height: 135mm !important;
+            min-height: 135mm !important;
             margin: 0 !important;
             padding: 0 !important;
-            width: 80mm !important;
-            height: auto !important;
-            overflow: hidden !important; /* Hide scrollbars on body */
+            overflow: hidden !important;
             background-color: white !important;
+            -webkit-print-color-adjust: exact !important; /* For Chrome/Safari */
+            print-color-adjust: exact !important; /* Standard */
+          }
+
+          /* Hide everything not explicitly part of the printable area */
+          body > *:not(#printable-receipt-area) {
+            display: none !important;
+            visibility: hidden !important;
+          }
+           /* Ensure parent of printable-receipt-area is also hidden if it's not body directly */
+          .flex.flex-col.items-center.justify-start:not(#printable-receipt-area) {
+             display: none !important;
+             visibility: hidden !important;
           }
 
           #printable-receipt-area {
-            visibility: visible !important; /* Make this specific element visible */
-            display: block !important; /* Ensure it takes up space */
+            display: block !important;
+            visibility: visible !important;
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: 80mm !important;
-            height: auto !important; /* Let content define height */
+            width: 72mm !important;
+            height: 135mm !important; /* Fixed height */
+            min-height: 135mm !important;
+            overflow: hidden !important; /* Clip content that overflows this area */
             margin: 0 !important;
             padding: 0 !important;
             background-color: white !important;
-            z-index: 9999 !important; /* Ensure it's on top */
+            box-sizing: border-box !important;
+             /* border: 1px dashed #ccc; */ /* For debugging bounds */
           }
           
-          #printable-receipt-area * { /* And its children */
+          #printable-receipt-area * {
             visibility: visible !important;
-            display: revert !important; /* Revert display if set to none by body * or other rules */
-            color: black !important; /* Ensure text is black */
+            display: revert !important;
+            color: black !important;
+            background-color: transparent !important; /* Ensure no unwanted backgrounds */
           }
 
-          /* Styles for the #receipt-content div itself */
           #printable-receipt-area #receipt-content {
-            width: 100% !important; /* Full width of its 80mm parent */
+            width: 100% !important; 
             max-width: 100% !important;
+            height: auto !important;
+            min-height: 0 !important;
             font-family: 'Courier New', Courier, monospace !important;
-            font-size: 9pt !important;
-            line-height: 1.3 !important;
+            font-size: 8pt !important; /* Adjusted font size */
+            line-height: 1.2 !important; /* Adjusted line height */
             color: black !important;
             background-color: white !important;
-            padding: 1mm 2mm !important; /* Minimal internal padding */
+            padding: 1mm 2mm !important; 
             box-shadow: none !important;
             border: none !important;
-            margin: 0 !important; /* No margin for the content div itself */
+            margin: 0 !important;
+            box-sizing: border-box !important;
           }
-          /* Reduce margins for elements within the receipt for compactness */
+
           #printable-receipt-area #receipt-content h1,
           #printable-receipt-area #receipt-content p,
-          #printable-receipt-area #receipt-content .border-dashed {
+          #printable-receipt-area #receipt-content div { /* target divs within receipt for spacing */
             margin-top: 0.5mm !important;
             margin-bottom: 0.5mm !important;
+            font-size: 8pt !important;
+            page-break-inside: avoid !important; /* Try to prevent breaking elements across pages */
           }
           #printable-receipt-area #receipt-content .border-dashed {
             padding-top: 0.5mm !important;
             padding-bottom: 0.5mm !important;
           }
-           /* Attempt to hide common Next.js dev overlays / Firebase emulator warnings */
+          
+          /* Hide known overlays and other unwanted elements */
+          .firebase-emulator-warning,
           iframe[id^="webpack-dev-server-client-overlay"],
           div[id^="__next_error"],
-          div[class*="next-error-overlay"],
-          .firebase-emulator-warning {
+          div[class*="next-error-overlay"] {
             display: none !important;
             visibility: hidden !important;
           }
@@ -281,4 +302,6 @@ export default function CollectionReceiptPage() {
     </div>
   );
 }
+    
+
     
