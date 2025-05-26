@@ -85,7 +85,7 @@ export default function AdminCollectionReceiptPage() {
               padding: 0 !important;
               width: 72mm !important; /* Strict width for thermal printer */
               font-family: 'Courier New', Courier, monospace !important; /* Monospace font often works best */
-              font-size: 10pt !important; /* Slightly increased font size */
+              font-size: 15pt !important; /* Updated font size */
               line-height: 1.3 !important;
               color: black !important;
               background-color: white !important;
@@ -111,11 +111,11 @@ export default function AdminCollectionReceiptPage() {
             p, div.section-item {
               margin: 0.5mm 0 !important; /* Reduced vertical spacing */
               padding: 0 !important;
-              font-size: 10pt !important;
+              font-size: 15pt !important; /* Updated font size */
             }
             h1, h2, h3, h4, h5, h6 {
                 margin: 0.5mm 0 !important;
-                font-size: 10pt !important;
+                font-size: 15pt !important; /* Updated font size */
             }
           }
         </style>
