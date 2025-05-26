@@ -82,7 +82,6 @@ export default function CollectionReceiptPage() {
       return;
     }
 
-    // Fallback to client-side generation if URL is not available
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -117,7 +116,6 @@ export default function CollectionReceiptPage() {
     }
     doc.text(`Payment Mode: ${receipt.paymentMode}`, margin, y); y += lineHeight;
     doc.text("----------------------------------------", margin, y); y += lineHeight;
-    // Removed "Collected By"
     if(receipt.remarks) {
         doc.text(`Remarks: ${receipt.remarks}`, margin, y); y += lineHeight;
     }
@@ -168,13 +166,14 @@ export default function CollectionReceiptPage() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-start min-h-screen bg-gray-100 p-4 print:bg-white print:p-0">
+    // Added an ID to the wrapper div for more specific print targeting
+    <div id="receipt-content-wrapper" className="flex flex-col items-center justify-start min-h-screen bg-gray-100 p-4 print:bg-white print:p-0 print:m-0">
       <div className="w-full max-w-xs bg-white p-6 shadow-lg print:shadow-none print:w-auto print:p-0" id="receipt-content">
         <div className="text-center mb-2 print:mb-1">
           <h1 className="text-xl font-bold print:text-lg">{receipt.companyName}</h1>
           <p className="text-sm print:text-xs">Payment Receipt</p>
         </div>
-        <div className="text-xs space-y-1 border-t border-b border-dashed border-gray-400 py-2 my-2 print:py-1 print:my-1">
+        <div className="text-xs space-y-1 border-t border-b border-dashed border-gray-400 py-2 my-2 print:py-1 print:my-1 print:border-gray-700">
           <p><strong>Receipt No:</strong> {receipt.receiptNumber}</p>
           <p><strong>Date:</strong> {formatDate(receipt.paymentDate)} {receipt.paymentTime}</p>
         </div>
@@ -191,8 +190,7 @@ export default function CollectionReceiptPage() {
           )}
           <p><strong>Payment Mode:</strong> {receipt.paymentMode}</p>
         </div>
-        <div className="text-xs space-y-1 border-t border-dashed border-gray-400 pt-2 mt-2 print:pt-1 print:mt-1">
-          {/* Removed "Collected By" */}
+        <div className="text-xs space-y-1 border-t border-dashed border-gray-400 pt-2 mt-2 print:pt-1 print:mt-1 print:border-gray-700">
           {receipt.remarks && <p><strong>Remarks:</strong> {receipt.remarks}</p>}
           {receipt.virtualTransactionId && <p><strong>Virtual ID:</strong> {receipt.virtualTransactionId}</p>}
           <p className="text-center mt-2 print:mt-1">Thank You!</p>
@@ -213,44 +211,78 @@ export default function CollectionReceiptPage() {
 
       <style jsx global>{`
         @media print {
-          body {
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
+          body, html {
             margin: 0 !important;
             padding: 0 !important;
             background-color: white !important;
+            width: 80mm !important; /* Attempt to force body width for print */
+            height: auto !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            overflow: hidden; /* Hide scrollbars on body for print */
           }
-          .print\\:hidden { display: none !important; }
-          /* Ensure the main layout div holding the receipt also has no padding/margin */
-          .flex.flex-col.items-center.justify-start {
-             padding: 0 !important;
+          /* Hide everything except the receipt content and its specific wrapper */
+          body > *:not(#receipt-content-wrapper) {
+            display: none !important;
+            visibility: hidden !important; /* More aggressive hiding */
+          }
+          #receipt-content-wrapper { /* This is the direct parent of #receipt-content in your JSX */
+             display: block !important;
+             visibility: visible !important;
              margin: 0 !important;
+             padding: 0 !important;
              min-height: auto !important;
+             width: 80mm !important;
+             position: absolute !important; /* Isolate it */
+             left: 0 !important;
+             top: 0 !important;
+          }
+          #receipt-content-wrapper > div:first-child { /* Target the div wrapping #receipt-content */
+             display: block !important;
+             visibility: visible !important;
+             margin: 0 !important;
+             padding: 0 !important;
+             min-height: auto !important;
+             width: 100% !important; /* Take full width of its parent */
           }
           #receipt-content {
             font-family: 'Courier New', Courier, monospace !important;
             font-size: 9pt !important;
             line-height: 1.3 !important;
             color: black !important;
-            max-width: 80mm !important;
-            width: 80mm !important; /* Force width */
-            margin: 0 auto !important; /* Center receipt content if paper is wider, but should fill 80mm */
-            padding: 2mm !important; /* Minimal internal padding for the receipt content itself */
+            width: 100% !important; /* Use full width of its 80mm parent */
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 1mm 2mm !important; /* Small internal padding: top/bottom 1mm, left/right 2mm */
             box-shadow: none !important;
             background-color: white !important;
+            border: none !important; /* Remove any borders from the receipt div itself */
+            visibility: visible !important;
+            /* position: absolute, left, top are handled by the wrapper now */
           }
           #receipt-content h1 {
             font-size: 10pt !important;
-            margin-bottom: 1mm !important;
+            margin-bottom: 0.5mm !important;
+            margin-top: 0 !important;
           }
           #receipt-content p {
-            margin-bottom: 1mm !important;
+            margin-bottom: 0.5mm !important;
+            margin-top: 0 !important;
           }
           #receipt-content .border-dashed {
-             margin-top: 1mm !important;
-             margin-bottom: 1mm !important;
-             padding-top: 1mm !important;
-             padding-bottom: 1mm !important;
+             margin-top: 0.5mm !important;
+             margin-bottom: 0.5mm !important;
+             padding-top: 0.5mm !important;
+             padding-bottom: 0.5mm !important;
+          }
+          /* Hide specific Next.js development overlays if they have known selectors */
+          iframe[id^="webpack-dev-server-client-overlay"] {
+            display: none !important;
+          }
+          /* General attempt to hide overlays */
+          div[style*="z-index: 9999"], div[id^="__next_"], div[class*="next-error-overlay"], .firebase-emulator-warning {
+            display: none !important;
+            visibility: hidden !important;
           }
         }
       `}</style>
