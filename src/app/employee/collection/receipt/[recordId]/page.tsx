@@ -169,9 +169,9 @@ export default function CollectionReceiptPage() {
     <div className="flex flex-col items-center justify-start min-h-screen bg-gray-100 p-4 print:bg-white print:p-0 print:m-0">
       {/* This div is specifically for printing */}
       <div id="printable-receipt-area">
-        <div className="w-full max-w-xs bg-white p-6 shadow-lg print:shadow-none print:w-auto print:p-0" id="receipt-content">
+        <div className="w-full max-w-xs bg-white shadow-lg print:shadow-none print:w-auto print:p-0 print:m-0" id="receipt-content">
           <div className="text-center mb-2 print:mb-1">
-            <h1 className="text-xl font-bold print:text-lg">{receipt.companyName}</h1>
+            <h1 className="text-xl font-bold print:text-lg">{receipt.companyName || "Sendhur Chits"}</h1>
             <p className="text-sm print:text-xs">Payment Receipt</p>
           </div>
           <div className="text-xs space-y-1 border-t border-b border-dashed border-gray-400 py-2 my-2 print:py-1 print:my-1 print:border-gray-700">
@@ -213,21 +213,19 @@ export default function CollectionReceiptPage() {
 
       <style jsx global>{`
         @media print {
-          body * {
-            visibility: hidden !important;
-            margin: 0 !important; /* Reset margins for all elements */
-            padding: 0 !important; /* Reset padding for all elements */
-          }
           body {
-            background-color: white !important; /* Ensure body background is white for print */
+            visibility: hidden !important; /* Hide everything in body first */
+            margin: 0 !important;
+            padding: 0 !important;
             width: 80mm !important;
             height: auto !important;
-            overflow: hidden !important;
+            overflow: hidden !important; /* Hide scrollbars on body */
+            background-color: white !important;
           }
-          #printable-receipt-area, #printable-receipt-area * {
-            visibility: visible !important;
-          }
+
           #printable-receipt-area {
+            visibility: visible !important; /* Make this specific element visible */
+            display: block !important; /* Ensure it takes up space */
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
@@ -236,7 +234,15 @@ export default function CollectionReceiptPage() {
             margin: 0 !important;
             padding: 0 !important;
             background-color: white !important;
+            z-index: 9999 !important; /* Ensure it's on top */
           }
+          
+          #printable-receipt-area * { /* And its children */
+            visibility: visible !important;
+            display: revert !important; /* Revert display if set to none by body * or other rules */
+            color: black !important; /* Ensure text is black */
+          }
+
           /* Styles for the #receipt-content div itself */
           #printable-receipt-area #receipt-content {
             width: 100% !important; /* Full width of its 80mm parent */
@@ -267,11 +273,12 @@ export default function CollectionReceiptPage() {
           div[id^="__next_error"],
           div[class*="next-error-overlay"],
           .firebase-emulator-warning {
+            display: none !important;
             visibility: hidden !important;
-            display: none !important; /* Also try display none */
           }
         }
       `}</style>
     </div>
   );
 }
+    
