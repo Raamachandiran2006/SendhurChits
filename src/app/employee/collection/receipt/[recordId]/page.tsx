@@ -166,34 +166,36 @@ export default function CollectionReceiptPage() {
   }
 
   return (
-    // Added an ID to the wrapper div for more specific print targeting
-    <div id="receipt-content-wrapper" className="flex flex-col items-center justify-start min-h-screen bg-gray-100 p-4 print:bg-white print:p-0 print:m-0">
-      <div className="w-full max-w-xs bg-white p-6 shadow-lg print:shadow-none print:w-auto print:p-0" id="receipt-content">
-        <div className="text-center mb-2 print:mb-1">
-          <h1 className="text-xl font-bold print:text-lg">{receipt.companyName}</h1>
-          <p className="text-sm print:text-xs">Payment Receipt</p>
-        </div>
-        <div className="text-xs space-y-1 border-t border-b border-dashed border-gray-400 py-2 my-2 print:py-1 print:my-1 print:border-gray-700">
-          <p><strong>Receipt No:</strong> {receipt.receiptNumber}</p>
-          <p><strong>Date:</strong> {formatDate(receipt.paymentDate)} {receipt.paymentTime}</p>
-        </div>
-        <div className="text-xs space-y-1 mb-2 print:mb-1">
-          <p><strong>Group:</strong> {receipt.groupName} (ID: {receipt.groupId})</p>
-          <p><strong>Member:</strong> {receipt.userFullname} (@{receipt.userUsername})</p>
-           {receipt.dueNumber && <p><strong>Due No:</strong> {receipt.dueNumber}</p>}
-          {receipt.chitAmount !== null && receipt.chitAmount !== undefined && (
-            <p><strong>Installment Amount:</strong> {formatCurrency(receipt.chitAmount)}</p>
-          )}
-          <p className="font-bold text-sm print:text-base"><strong>Paid Amount:</strong> {formatCurrency(receipt.amount)}</p>
-          {receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined && (
-            <p><strong>Total Balance:</strong> {formatCurrency(receipt.userTotalDueBeforeThisPayment)}</p>
-          )}
-          <p><strong>Payment Mode:</strong> {receipt.paymentMode}</p>
-        </div>
-        <div className="text-xs space-y-1 border-t border-dashed border-gray-400 pt-2 mt-2 print:pt-1 print:mt-1 print:border-gray-700">
-          {receipt.remarks && <p><strong>Remarks:</strong> {receipt.remarks}</p>}
-          {receipt.virtualTransactionId && <p><strong>Virtual ID:</strong> {receipt.virtualTransactionId}</p>}
-          <p className="text-center mt-2 print:mt-1">Thank You!</p>
+    <div className="flex flex-col items-center justify-start min-h-screen bg-gray-100 p-4 print:bg-white print:p-0 print:m-0">
+      {/* This div is specifically for printing */}
+      <div id="printable-receipt-area">
+        <div className="w-full max-w-xs bg-white p-6 shadow-lg print:shadow-none print:w-auto print:p-0" id="receipt-content">
+          <div className="text-center mb-2 print:mb-1">
+            <h1 className="text-xl font-bold print:text-lg">{receipt.companyName}</h1>
+            <p className="text-sm print:text-xs">Payment Receipt</p>
+          </div>
+          <div className="text-xs space-y-1 border-t border-b border-dashed border-gray-400 py-2 my-2 print:py-1 print:my-1 print:border-gray-700">
+            <p><strong>Receipt No:</strong> {receipt.receiptNumber}</p>
+            <p><strong>Date:</strong> {formatDate(receipt.paymentDate)} {receipt.paymentTime}</p>
+          </div>
+          <div className="text-xs space-y-1 mb-2 print:mb-1">
+            <p><strong>Group:</strong> {receipt.groupName} (ID: {receipt.groupId})</p>
+            <p><strong>Member:</strong> {receipt.userFullname} (@{receipt.userUsername})</p>
+            {receipt.dueNumber && <p><strong>Due No:</strong> {receipt.dueNumber}</p>}
+            {receipt.chitAmount !== null && receipt.chitAmount !== undefined && (
+              <p><strong>Installment Amount:</strong> {formatCurrency(receipt.chitAmount)}</p>
+            )}
+            <p className="font-bold text-sm print:text-base"><strong>Paid Amount:</strong> {formatCurrency(receipt.amount)}</p>
+            {receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined && (
+              <p><strong>Total Balance:</strong> {formatCurrency(receipt.userTotalDueBeforeThisPayment)}</p>
+            )}
+            <p><strong>Payment Mode:</strong> {receipt.paymentMode}</p>
+          </div>
+          <div className="text-xs space-y-1 border-t border-dashed border-gray-400 pt-2 mt-2 print:pt-1 print:mt-1 print:border-gray-700">
+            {receipt.remarks && <p><strong>Remarks:</strong> {receipt.remarks}</p>}
+            {receipt.virtualTransactionId && <p><strong>Virtual ID:</strong> {receipt.virtualTransactionId}</p>}
+            <p className="text-center mt-2 print:mt-1">Thank You!</p>
+          </div>
         </div>
       </div>
 
@@ -211,78 +213,62 @@ export default function CollectionReceiptPage() {
 
       <style jsx global>{`
         @media print {
-          body, html {
+          body * {
+            visibility: hidden !important;
+            margin: 0 !important; /* Reset margins for all elements */
+            padding: 0 !important; /* Reset padding for all elements */
+          }
+          body {
+            background-color: white !important; /* Ensure body background is white for print */
+            width: 80mm !important;
+            height: auto !important;
+            overflow: hidden !important;
+          }
+          #printable-receipt-area, #printable-receipt-area * {
+            visibility: visible !important;
+          }
+          #printable-receipt-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 80mm !important;
+            height: auto !important; /* Let content define height */
             margin: 0 !important;
             padding: 0 !important;
             background-color: white !important;
-            width: 80mm !important; /* Attempt to force body width for print */
-            height: auto !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-            overflow: hidden; /* Hide scrollbars on body for print */
           }
-          /* Hide everything except the receipt content and its specific wrapper */
-          body > *:not(#receipt-content-wrapper) {
-            display: none !important;
-            visibility: hidden !important; /* More aggressive hiding */
-          }
-          #receipt-content-wrapper { /* This is the direct parent of #receipt-content in your JSX */
-             display: block !important;
-             visibility: visible !important;
-             margin: 0 !important;
-             padding: 0 !important;
-             min-height: auto !important;
-             width: 80mm !important;
-             position: absolute !important; /* Isolate it */
-             left: 0 !important;
-             top: 0 !important;
-          }
-          #receipt-content-wrapper > div:first-child { /* Target the div wrapping #receipt-content */
-             display: block !important;
-             visibility: visible !important;
-             margin: 0 !important;
-             padding: 0 !important;
-             min-height: auto !important;
-             width: 100% !important; /* Take full width of its parent */
-          }
-          #receipt-content {
+          /* Styles for the #receipt-content div itself */
+          #printable-receipt-area #receipt-content {
+            width: 100% !important; /* Full width of its 80mm parent */
+            max-width: 100% !important;
             font-family: 'Courier New', Courier, monospace !important;
             font-size: 9pt !important;
             line-height: 1.3 !important;
             color: black !important;
-            width: 100% !important; /* Use full width of its 80mm parent */
-            max-width: 100% !important;
-            margin: 0 !important;
-            padding: 1mm 2mm !important; /* Small internal padding: top/bottom 1mm, left/right 2mm */
-            box-shadow: none !important;
             background-color: white !important;
-            border: none !important; /* Remove any borders from the receipt div itself */
-            visibility: visible !important;
-            /* position: absolute, left, top are handled by the wrapper now */
+            padding: 1mm 2mm !important; /* Minimal internal padding */
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important; /* No margin for the content div itself */
           }
-          #receipt-content h1 {
-            font-size: 10pt !important;
+          /* Reduce margins for elements within the receipt for compactness */
+          #printable-receipt-area #receipt-content h1,
+          #printable-receipt-area #receipt-content p,
+          #printable-receipt-area #receipt-content .border-dashed {
+            margin-top: 0.5mm !important;
             margin-bottom: 0.5mm !important;
-            margin-top: 0 !important;
           }
-          #receipt-content p {
-            margin-bottom: 0.5mm !important;
-            margin-top: 0 !important;
+          #printable-receipt-area #receipt-content .border-dashed {
+            padding-top: 0.5mm !important;
+            padding-bottom: 0.5mm !important;
           }
-          #receipt-content .border-dashed {
-             margin-top: 0.5mm !important;
-             margin-bottom: 0.5mm !important;
-             padding-top: 0.5mm !important;
-             padding-bottom: 0.5mm !important;
-          }
-          /* Hide specific Next.js development overlays if they have known selectors */
-          iframe[id^="webpack-dev-server-client-overlay"] {
-            display: none !important;
-          }
-          /* General attempt to hide overlays */
-          div[style*="z-index: 9999"], div[id^="__next_"], div[class*="next-error-overlay"], .firebase-emulator-warning {
-            display: none !important;
+           /* Attempt to hide common Next.js dev overlays / Firebase emulator warnings */
+          iframe[id^="webpack-dev-server-client-overlay"],
+          div[id^="__next_error"],
+          div[class*="next-error-overlay"],
+          .firebase-emulator-warning {
             visibility: hidden !important;
+            display: none !important; /* Also try display none */
           }
         }
       `}</style>
