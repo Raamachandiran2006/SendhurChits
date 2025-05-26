@@ -115,7 +115,7 @@ async function generateUniqueReceiptNumber(maxRetries = 5): Promise<string> {
 }
 
 async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Promise<Blob | null> {
-    console.log("[PDF Generation] Generating blob with data:", recordData);
+    console.log("[PDF Generation] Admin: Generating blob with data:", recordData);
     try {
         const doc = new jsPDF({
         orientation: 'portrait',
@@ -155,7 +155,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         }
         doc.text(`Payment Mode: ${recordData.paymentMode || 'N/A'}`, margin, y); y += lineHeight;
         doc.text("----------------------------------------", margin, y); y += lineHeight;
-        // Collected By removed from PDF
+        
         if(recordData.remarks && recordData.remarks.trim() !== "") {
             doc.text(`Remarks: ${recordData.remarks}`, margin, y); y += lineHeight;
         }
@@ -165,7 +165,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         
         return doc.output('blob');
     } catch (pdfError) {
-        console.error("[PDF Generation] Error generating PDF blob:", pdfError);
+        console.error("[PDF Generation] Admin: Error generating PDF blob:", pdfError);
         return null;
     }
 }
@@ -176,26 +176,26 @@ async function generateAndUploadReceiptPdf(
   receiptNumber: string
 ): Promise<string | null> {
   if (!receiptNumber || !groupId) {
-    console.error("[PDF Upload] Critical: Missing groupId or receiptNumber for PDF upload path. Aborting PDF generation.");
+    console.error("[PDF Upload] Admin: Critical: Missing groupId or receiptNumber for PDF upload path. Aborting PDF generation.");
     return null;
   }
   try {
     const pdfBlob = await generateReceiptPdfBlob(recordData);
     if (!pdfBlob) {
-      console.error("[PDF Upload] PDF Blob generation failed for receipt:", receiptNumber);
+      console.error("[PDF Upload] Admin: PDF Blob generation failed for receipt:", receiptNumber);
       return null;
     }
-    const pdfFileName = `receipt_${receiptNumber}_${Date.now()}.pdf`;
+    const pdfFileName = `receipt_${receiptNumber}_admin_${Date.now()}.pdf`;
     const pdfStoragePath = `collection_receipts/${groupId}/${pdfFileName}`;
     const pdfRef = storageRefFB(storage, pdfStoragePath);
     await uploadBytes(pdfRef, pdfBlob);
     const downloadURL = await getDownloadURL(pdfRef);
-    console.log("[PDF Upload] PDF Download URL:", downloadURL);
+    console.log("[PDF Upload] Admin: PDF Download URL:", downloadURL);
     return downloadURL;
   } catch (error: any) {
-    console.error("[PDF Upload] Error in generateAndUploadReceiptPdf:", error);
-    if (error.code) console.error("[PDF Upload] Firebase Storage Error Code:", error.code);
-    if (error.message) console.error("[PDF Upload] Firebase Storage Error Message:", error.message);
+    console.error("[PDF Upload] Admin: Error in generateAndUploadReceiptPdf:", error);
+    if (error.code) console.error("[PDF Upload] Admin: Firebase Storage Error Code:", error.code);
+    if (error.message) console.error("[PDF Upload] Admin: Firebase Storage Error Message:", error.message);
     return null;
   }
 }
@@ -329,7 +329,7 @@ export function AdminRecordCollectionForm() {
       const userExistsInGroup = groupMembers.some(member => member.id === preselectedUserId);
       if (userExistsInGroup) {
         setValue("selectedUserId", preselectedUserId, { shouldValidate: true });
-      } else if (preselectedUserFullname && watchedGroupId) {
+      } else if (preselectedUserFullname && watchedGroupId) { // Only toast if a group is actually selected
         toast({
           variant: "default",
           title: "User Not in Selected Group",
@@ -339,6 +339,7 @@ export function AdminRecordCollectionForm() {
         setValue("selectedUserId", ""); 
       }
     } else if (!preselectedUserId && (!watchedGroupId || groupMembers.length === 0)) {
+        // If there's no preselected user and either no group is selected or the group has no members, clear selectedUserId
         setValue("selectedUserId", "");
     }
   }, [preselectedUserId, groupMembers, setValue, preselectedUserFullname, preselectedUserUsername, toast, watchedGroupId]);
@@ -377,6 +378,7 @@ export function AdminRecordCollectionForm() {
       setCurrentLocationValue(null);
       setLocationError(null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedCollectionLocationOption]);
 
 
@@ -457,7 +459,6 @@ export function AdminRecordCollectionForm() {
             paymentMode: values.paymentMode,
             remarks: values.remarks || "Auction Collection",
             virtualTransactionId: virtualId,
-            // Exclude 'recordedByEmployeeName' from PDF temp data as it's not needed for PDF content and specific to admin/employee
         };
         
         receiptPdfDownloadUrl = await generateAndUploadReceiptPdf(
@@ -512,7 +513,21 @@ export function AdminRecordCollectionForm() {
         }
 
         toast({ title: "Collection Recorded", description: `Payment from ${selectedUser.fullname} recorded. ${receiptPdfDownloadUrl ? 'Receipt PDF generated.' : 'Receipt PDF generation failed.'}` });
-        reset();
+        
+        // Clear form except for potentially preselected user if navigating back to the same user's due sheet
+        const shouldKeepPreselection = preselectedUserId === selectedUser.id;
+        reset({
+            selectedGroupId: shouldKeepPreselection ? values.selectedGroupId : "", 
+            selectedAuctionId: shouldKeepPreselection ? values.selectedAuctionId : undefined,
+            selectedUserId: shouldKeepPreselection ? values.selectedUserId : "",
+            paymentDate: new Date(),
+            paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
+            paymentType: undefined,
+            paymentMode: undefined,
+            amount: undefined,
+            collectionLocationOption: undefined,
+            remarks: "Auction Collection",
+        });
         setCurrentLocationDisplay(null);
         setCurrentLocationValue(null);
         setLocationError(null);
