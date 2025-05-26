@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -16,11 +15,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc, orderBy } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc, orderBy, getDoc, collectionGroup } from "firebase/firestore";
 import type { Group, User, Employee, CollectionRecord, AuctionRecord } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { useRouter, useSearchParams } from "next/navigation"; // Import useSearchParams
+import { useRouter, useSearchParams } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // Helper for time formatting
@@ -75,12 +74,27 @@ const recordCollectionFormSchema = z.object({
 
 type RecordCollectionFormValues = z.infer<typeof recordCollectionFormSchema>;
 
-const generateVirtualId = () => Math.floor(100000 + Math.random() * 900000).toString();
+const generate7DigitRandomNumber = () => {
+  return Math.floor(1000000 + Math.random() * 9000000).toString();
+};
+
+async function generateUniqueReceiptNumber(maxRetries = 5): Promise<string> {
+  for (let i = 0; i < maxRetries; i++) {
+    const receiptNumber = generate7DigitRandomNumber();
+    const q = query(collection(db, "collectionRecords"), where("receiptNumber", "==", receiptNumber));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) {
+      return receiptNumber;
+    }
+  }
+  throw new Error("Failed to generate a unique receipt number after several retries.");
+}
+
 
 export function RecordCollectionForm() {
   const { toast } = useToast();
   const router = useRouter();
-  const searchParams = useSearchParams(); // Get search params
+  const searchParams = useSearchParams();
   const { loggedInEntity } = useAuth();
   const employee = loggedInEntity as Employee | null;
 
@@ -200,34 +214,22 @@ export function RecordCollectionForm() {
     }
   }, [watchedGroupId, groups, setValue, toast]);
 
-  // Effect to pre-select user if userId is in query params and members are loaded
   useEffect(() => {
-    if (preselectedUserIdFromQuery && groupMembers.length > 0) {
+    if (preselectedUserIdFromQuery && groupMembers.length > 0 && watchedGroupId) {
       const userExistsInGroup = groupMembers.some(member => member.id === preselectedUserIdFromQuery);
       if (userExistsInGroup) {
         setValue("selectedUserId", preselectedUserIdFromQuery, { shouldValidate: true });
-      } else {
-        // Only show toast if a group has been selected and the preselected user is not in its members
-        if (watchedGroupId && preselectedUserFullnameFromQuery && preselectedUserUsernameFromQuery) {
+      } else if (preselectedUserFullnameFromQuery && preselectedUserUsernameFromQuery) {
           toast({
             variant: "default",
             title: "User Not in Selected Group",
             description: `${preselectedUserFullnameFromQuery} (@${preselectedUserUsernameFromQuery}) is not a member of the currently selected group. Please select a different group or user.`,
             duration: 7000,
           });
-        }
-        setValue("selectedUserId", ""); // Clear selection if user not in group
+          setValue("selectedUserId", ""); 
       }
-    } else if (preselectedUserIdFromQuery && !watchedGroupId && groupMembers.length === 0) {
-      // A user is pre-selected via query, but no group is chosen yet.
-      // The placeholder of the "User" dropdown will show the pre-selected user's name.
-      // No specific action is needed here until a group is selected.
-    } else {
-      // No pre-selected user from query, or group not selected yet.
-      // If no preselectedUserIdFromQuery, ensure selectedUserId is cleared if the group changes or has no members.
-      if (!preselectedUserIdFromQuery) {
-        setValue("selectedUserId", "");
-      }
+    } else if (!preselectedUserIdFromQuery && !watchedGroupId) {
+      setValue("selectedUserId", "");
     }
   }, [
     preselectedUserIdFromQuery,
@@ -235,7 +237,7 @@ export function RecordCollectionForm() {
     preselectedUserUsernameFromQuery,
     groupMembers,
     setValue,
-    watchedGroupId, // Added watchedGroupId to re-evaluate if group changes
+    watchedGroupId, 
     toast
   ]);
 
@@ -249,7 +251,6 @@ export function RecordCollectionForm() {
         (position) => {
           const { latitude, longitude } = position.coords;
           setCurrentLocationDisplay(`Lat: ${latitude.toFixed(5)}, Lon: ${longitude.toFixed(5)}`);
-          // Store as Google Maps link
           setCurrentLocationValue(`https://www.google.com/maps?q=${latitude},${longitude}`);
           setIsFetchingLocation(false);
         },
@@ -300,6 +301,34 @@ export function RecordCollectionForm() {
     }
     
     const collectionLocationToStore = values.collectionLocationOption === "Office" ? "Office" : currentLocationValue;
+    let newReceiptNumber = "";
+    try {
+      newReceiptNumber = await generateUniqueReceiptNumber();
+    } catch (error) {
+      console.error("Error generating receipt number:", error);
+      toast({ title: "Error", description: (error as Error).message || "Could not generate unique receipt number.", variant: "destructive" });
+      setIsSubmitting(false);
+      return;
+    }
+
+    let chitAmountForDue: number | null = null;
+    let balanceAmountAfterPayment: number | null = null;
+
+    if (selectedAuction && selectedAuction.finalAmountToBePaid !== null && selectedAuction.finalAmountToBePaid !== undefined) {
+        chitAmountForDue = selectedAuction.finalAmountToBePaid;
+        // For a more accurate balance, we'd need to sum previous payments for THIS SPECIFIC DUE
+        // Simplified balance for now:
+        balanceAmountAfterPayment = chitAmountForDue - values.amount;
+    } else if (selectedGroup.rate !== null && selectedGroup.rate !== undefined) {
+        // If no specific auction, assume payment is towards general group rate
+        chitAmountForDue = selectedGroup.rate;
+        // Simplified balance for general payment:
+        // This doesn't account for which installment it is, simply this payment vs group rate
+        balanceAmountAfterPayment = chitAmountForDue - values.amount;
+    }
+
+
+    let newCollectionRecordId = "";
 
     try {
         await runTransaction(db, async (transaction) => {
@@ -312,7 +341,9 @@ export function RecordCollectionForm() {
             const newDueAmount = currentDueAmount - values.amount;
             transaction.update(userDocRef, { dueAmount: newDueAmount });
 
-            const collectionRecordData: Omit<CollectionRecord, "id" | "recordedAt"> & { recordedAt?: any } = {
+            const collectionRecordData: Omit<CollectionRecord, "id"> & { recordedAt: Timestamp } = {
+                receiptNumber: newReceiptNumber,
+                companyName: "Sendhur Chits",
                 groupId: selectedGroup.id,
                 groupName: selectedGroup.groupName,
                 auctionId: selectedAuction ? selectedAuction.id : null,
@@ -324,18 +355,20 @@ export function RecordCollectionForm() {
                 paymentTime: values.paymentTime, 
                 paymentType: values.paymentType,
                 paymentMode: values.paymentMode,
-                amount: values.amount,
+                amount: values.amount, // This is paidAmount for the receipt
+                chitAmount: chitAmountForDue,
+                dueNumber: selectedAuction ? selectedAuction.auctionNumber : null,
+                balanceAmount: balanceAmountAfterPayment,
                 remarks: values.remarks || "Auction Collection",
                 collectionLocation: collectionLocationToStore,
                 recordedByEmployeeId: employee.id,
                 recordedByEmployeeName: employee.fullname,
-                virtualTransactionId: generateVirtualId(),
-            };
-            const collectionRecordRef = doc(collection(db, "collectionRecords")); 
-            transaction.set(collectionRecordRef, {
-                ...collectionRecordData,
+                virtualTransactionId: generate7DigitRandomNumber(), // Assuming you meant to use the unique receipt number here or generate another virtual ID
                 recordedAt: serverTimestamp() as Timestamp,
-            });
+            };
+            const collectionRecordRef = doc(collection(db, "collectionRecords"));
+            newCollectionRecordId = collectionRecordRef.id; 
+            transaction.set(collectionRecordRef, collectionRecordData);
         });
 
       toast({ title: "Collection Recorded", description: `Payment of ${formatCurrency(values.amount)} from ${selectedUser.fullname} recorded.` });
@@ -354,7 +387,7 @@ export function RecordCollectionForm() {
       setCurrentLocationDisplay(null);
       setCurrentLocationValue(null);
       setLocationError(null);
-      router.push(`/employee/collection?refreshId=${Date.now()}`);
+      router.push(`/employee/collection/receipt/${newCollectionRecordId}`);
     } catch (error) {
       console.error("Error recording collection:", error);
       toast({ title: "Error", description: "Could not record collection. " + (error as Error).message, variant: "destructive" });
@@ -422,7 +455,7 @@ export function RecordCollectionForm() {
                       <SelectItem value={NO_AUCTION_SELECTED_VALUE}>General Due / Not for Specific Auction</SelectItem>
                       {groupAuctions.map((auction) => (
                         <SelectItem key={auction.id} value={auction.id}>
-                          Auction #{auction.auctionNumber} - {auction.auctionMonth}
+                          Auction #{auction.auctionNumber} - {auction.auctionMonth} (Due: {formatCurrency(auction.finalAmountToBePaid)})
                         </SelectItem>
                       ))}
                     </SelectContent>

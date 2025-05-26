@@ -82,8 +82,8 @@ export interface AuctionRecord {
   winnerFullname: string;
   winnerUsername: string; // The user00X style ID of the winner
   winningBidAmount: number;
-  discount?: number | null;
   commissionAmount?: number | null;
+  discount?: number | null;
   netDiscount?: number | null;
   dividendPerMember?: number | null;
   finalAmountToBePaid?: number | null; // This is the installment paid by all members (including winner)
@@ -108,6 +108,8 @@ export interface ExpenseRecord {
 
 export interface CollectionRecord {
   id: string; // Firestore document ID
+  receiptNumber: string; // New: Unique 7-digit receipt number
+  companyName: string; // New: "Sendhur Chits"
   groupId: string;
   groupName: string;
   auctionId?: string | null;
@@ -119,7 +121,10 @@ export interface CollectionRecord {
   paymentTime: string; // HH:MM AM/PM
   paymentType: "Full Payment" | "Partial Payment";
   paymentMode: "Cash" | "UPI" | "Netbanking";
-  amount: number;
+  amount: number; // This is the Paid Amount for the receipt
+  chitAmount?: number | null; // New: Amount for the specific due/installment
+  dueNumber?: number | null; // New: Auction number if applicable
+  balanceAmount?: number | null; // New: Balance for that specific due after this payment
   remarks?: string | null;
   recordedAt: import('firebase/firestore').Timestamp;
   collectionLocation?: string | null;
@@ -128,7 +133,7 @@ export interface CollectionRecord {
   virtualTransactionId?: string;
 }
 
-export interface PaymentRecord { // For payments MADE BY THE COMPANY (e.g., to auction winners, other payouts recorded by admin)
+export interface PaymentRecord { // For payments MADE BY THE COMPANY (e.g., to auction winners)
   id: string; // Firestore document ID
   groupId?: string | null;
   groupName?: string | null;
@@ -145,7 +150,6 @@ export interface PaymentRecord { // For payments MADE BY THE COMPANY (e.g., to a
   recordedAt: import('firebase/firestore').Timestamp;
   recordedBy?: "Admin" | string; // Can be admin or employee ID
   virtualTransactionId?: string;
-  // Guarantor fields
   guarantorFullName?: string;
   guarantorRelationship?: string;
   guarantorPhone?: string;
@@ -154,6 +158,7 @@ export interface PaymentRecord { // For payments MADE BY THE COMPANY (e.g., to a
   guarantorPanCardNumber?: string;
   guarantorAuthDocUrl?: string;
 }
+
 
 export interface CreditRecord {
   id: string; // Firestore document ID
