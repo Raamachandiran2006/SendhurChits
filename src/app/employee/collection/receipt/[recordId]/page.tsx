@@ -169,33 +169,33 @@ export default function CollectionReceiptPage() {
 
   return (
     <div className="flex flex-col items-center justify-start min-h-screen bg-gray-100 p-4 print:bg-white print:p-0">
-      <div className="w-full max-w-xs bg-white p-6 shadow-lg print:shadow-none print:w-auto" id="receipt-content">
-        <div className="text-center mb-4">
-          <h1 className="text-xl font-bold">{receipt.companyName}</h1>
-          <p className="text-sm">Payment Receipt</p>
+      <div className="w-full max-w-xs bg-white p-6 shadow-lg print:shadow-none print:w-auto print:p-0" id="receipt-content">
+        <div className="text-center mb-2 print:mb-1">
+          <h1 className="text-xl font-bold print:text-lg">{receipt.companyName}</h1>
+          <p className="text-sm print:text-xs">Payment Receipt</p>
         </div>
-        <div className="text-xs space-y-1 border-t border-b border-dashed border-gray-400 py-2 my-2">
+        <div className="text-xs space-y-1 border-t border-b border-dashed border-gray-400 py-2 my-2 print:py-1 print:my-1">
           <p><strong>Receipt No:</strong> {receipt.receiptNumber}</p>
           <p><strong>Date:</strong> {formatDate(receipt.paymentDate)} {receipt.paymentTime}</p>
         </div>
-        <div className="text-xs space-y-1 mb-2">
+        <div className="text-xs space-y-1 mb-2 print:mb-1">
           <p><strong>Group:</strong> {receipt.groupName} (ID: {receipt.groupId})</p>
           <p><strong>Member:</strong> {receipt.userFullname} (@{receipt.userUsername})</p>
            {receipt.dueNumber && <p><strong>Due No:</strong> {receipt.dueNumber}</p>}
           {receipt.chitAmount !== null && receipt.chitAmount !== undefined && (
             <p><strong>Installment Amount:</strong> {formatCurrency(receipt.chitAmount)}</p>
           )}
-          <p className="font-bold text-sm"><strong>Paid Amount:</strong> {formatCurrency(receipt.amount)}</p>
+          <p className="font-bold text-sm print:text-base"><strong>Paid Amount:</strong> {formatCurrency(receipt.amount)}</p>
           {receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined && (
             <p><strong>Total Balance:</strong> {formatCurrency(receipt.userTotalDueBeforeThisPayment)}</p>
           )}
           <p><strong>Payment Mode:</strong> {receipt.paymentMode}</p>
         </div>
-        <div className="text-xs space-y-1 border-t border-dashed border-gray-400 pt-2 mt-2">
+        <div className="text-xs space-y-1 border-t border-dashed border-gray-400 pt-2 mt-2 print:pt-1 print:mt-1">
           {/* Removed "Collected By" */}
           {receipt.remarks && <p><strong>Remarks:</strong> {receipt.remarks}</p>}
           {receipt.virtualTransactionId && <p><strong>Virtual ID:</strong> {receipt.virtualTransactionId}</p>}
-          <p className="text-center mt-2">Thank You!</p>
+          <p className="text-center mt-2 print:mt-1">Thank You!</p>
         </div>
       </div>
 
@@ -216,24 +216,41 @@ export default function CollectionReceiptPage() {
           body {
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
-            margin: 0;
-            padding: 0;
+            margin: 0 !important;
+            padding: 0 !important;
+            background-color: white !important;
           }
           .print\\:hidden { display: none !important; }
-          .print\\:bg-white { background-color: white !important; }
-          .print\\:p-0 { padding: 0 !important; }
-          .print\\:shadow-none { box-shadow: none !important; }
-          .print\\:w-auto { width: auto !important; }
+          /* Ensure the main layout div holding the receipt also has no padding/margin */
+          .flex.flex-col.items-center.justify-start {
+             padding: 0 !important;
+             margin: 0 !important;
+             min-height: auto !important;
+          }
           #receipt-content {
             font-family: 'Courier New', Courier, monospace !important;
             font-size: 9pt !important;
             line-height: 1.3 !important;
             color: black !important;
             max-width: 80mm !important;
-            margin: auto;
+            width: 80mm !important; /* Force width */
+            margin: 0 auto !important; /* Center receipt content if paper is wider, but should fill 80mm */
+            padding: 2mm !important; /* Minimal internal padding for the receipt content itself */
+            box-shadow: none !important;
+            background-color: white !important;
           }
-          #receipt-content p, #receipt-content h1 {
-            margin-bottom: 2px !important;
+          #receipt-content h1 {
+            font-size: 10pt !important;
+            margin-bottom: 1mm !important;
+          }
+          #receipt-content p {
+            margin-bottom: 1mm !important;
+          }
+          #receipt-content .border-dashed {
+             margin-top: 1mm !important;
+             margin-bottom: 1mm !important;
+             padding-top: 1mm !important;
+             padding-bottom: 1mm !important;
           }
         }
       `}</style>
