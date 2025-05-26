@@ -87,7 +87,6 @@ export interface AuctionRecord {
   netDiscount?: number | null;
   dividendPerMember?: number | null;
   finalAmountToBePaid?: number | null; // This is the installment paid by all members (including winner)
-  amountPaidToWinner?: number | null;
   recordedAt: import('firebase/firestore').Timestamp;
   virtualTransactionId?: string;
 }
@@ -122,24 +121,37 @@ export interface CollectionRecord {
   paymentType: "Full Payment" | "Partial Payment";
   paymentMode: "Cash" | "UPI" | "Netbanking";
   amount: number; // This is the Paid Amount for the receipt
-  chitAmount?: number | null;
-  dueNumber?: number | null;
-  balanceAmount?: number | null;
+  chitAmount?: number | null; // The installment amount for this specific due
+  dueNumber?: number | null; // The due number (e.g., auction number) this payment is for
+  balanceAmount?: number | null; // Balance for the specific due installment (chitAmount - amount paid for this due)
+  userTotalDueBeforeThisPayment?: number | null; // User's total due amount *before* this payment
   remarks?: string | null;
   recordedAt: import('firebase/firestore').Timestamp;
   collectionLocation?: string | null;
   recordedByEmployeeId?: string | null;
   recordedByEmployeeName?: string | null;
   virtualTransactionId?: string;
-  receiptPdfUrl?: string | null; // New field for PDF URL
+  receiptPdfUrl?: string | null;
 }
 
 // This type is used by the Admin Payment Portal form, and saves to 'paymentRecords'
-// It currently mirrors CollectionRecord for simplicity but can be diverged if needed
-export type PaymentRecord = CollectionRecord & {
-  // Add any fields specific to 'paymentRecords' if they differ from 'CollectionRecord'
-  // For example, if admin payments need a 'paymentReason' or different 'recordedBy' logic.
-  // For now, it will use the CollectionRecord structure.
+export interface PaymentRecord { // Renamed from CollectionRecord to avoid confusion
+  id: string; // Firestore document ID
+  groupId: string;
+  groupName: string;
+  auctionId?: string | null;
+  auctionNumber?: number | null;
+  userId: string;
+  userUsername: string;
+  userFullname: string;
+  paymentDate: string; // YYYY-MM-DD
+  paymentTime: string; // HH:MM AM/PM
+  paymentMode: "Cash" | "UPI" | "Netbanking" | "Cheque";
+  amount: number;
+  remarks?: string | null;
+  recordedAt: import('firebase/firestore').Timestamp;
+  virtualTransactionId?: string;
+  recordedBy?: "Admin" | string; // Could be admin's name or ID
   guarantorFullName?: string;
   guarantorRelationship?: string;
   guarantorPhone?: string;
@@ -147,7 +159,7 @@ export type PaymentRecord = CollectionRecord & {
   guarantorAadhaarNumber?: string;
   guarantorPanCardNumber?: string;
   guarantorAuthDocUrl?: string;
-};
+}
 
 
 export interface CreditRecord {

@@ -112,12 +112,12 @@ export default function AdminCollectionReceiptPage() {
     doc.setFontSize(10);
     doc.text(`Paid Amount: ${formatCurrency(receipt.amount)}`, margin, y, {fontStyle: 'bold'}); y += lineHeight;
     doc.setFontSize(8);
-    if (receipt.balanceAmount !== null && receipt.balanceAmount !== undefined) {
-        doc.text(`Balance Due (this inst.): ${formatCurrency(receipt.balanceAmount)}`, margin, y); y += lineHeight;
+    if (receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) {
+        doc.text(`Total Balance: ${formatCurrency(receipt.userTotalDueBeforeThisPayment)}`, margin, y); y += lineHeight;
     }
     doc.text(`Payment Mode: ${receipt.paymentMode}`, margin, y); y += lineHeight;
     doc.text("----------------------------------------", margin, y); y += lineHeight;
-    doc.text(`Collected By: ${receipt.recordedByEmployeeName}`, margin, y); y += lineHeight;
+    // Removed "Collected By"
     if(receipt.remarks) {
         doc.text(`Remarks: ${receipt.remarks}`, margin, y); y += lineHeight;
     }
@@ -186,13 +186,13 @@ export default function AdminCollectionReceiptPage() {
             <p><strong>Installment Amount:</strong> {formatCurrency(receipt.chitAmount)}</p>
           )}
           <p className="font-bold text-sm"><strong>Paid Amount:</strong> {formatCurrency(receipt.amount)}</p>
-          {receipt.balanceAmount !== null && receipt.balanceAmount !== undefined && (
-            <p><strong>Balance Due (this inst.):</strong> {formatCurrency(receipt.balanceAmount)}</p>
+          {receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined && (
+            <p><strong>Total Balance:</strong> {formatCurrency(receipt.userTotalDueBeforeThisPayment)}</p>
           )}
           <p><strong>Payment Mode:</strong> {receipt.paymentMode}</p>
         </div>
         <div className="text-xs space-y-1 border-t border-dashed border-gray-400 pt-2 mt-2">
-          <p><strong>Collected By:</strong> {receipt.recordedByEmployeeName}</p>
+          {/* Removed "Collected By" */}
           {receipt.remarks && <p><strong>Remarks:</strong> {receipt.remarks}</p>}
           {receipt.virtualTransactionId && <p><strong>Virtual ID:</strong> {receipt.virtualTransactionId}</p>}
           <p className="text-center mt-2">Thank You!</p>

@@ -63,9 +63,9 @@ const formatCurrencyLocal = (amount: number | null | undefined) => {
 const formatDateLocal = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
   if (!dateString) return "N/A";
   try {
-    const date = new Date(dateString.replace(/-/g, '/')); // More robust parsing
+    const date = new Date(dateString.replace(/-/g, '/'));
     if (isNaN(date.getTime())) {
-        const isoDate = new Date(dateString); // Try parsing as ISO if direct replace fails
+        const isoDate = new Date(dateString);
         if (isNaN(isoDate.getTime())) return "N/A";
         return format(isoDate, outputFormat);
     }
@@ -118,7 +118,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
       format: [80, 200] 
     });
     let y = 10;
-    const lineHeight = 6; // Adjusted for potentially more lines
+    const lineHeight = 6;
     const margin = 5;
 
     doc.setFontSize(12);
@@ -131,7 +131,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     doc.text("----------------------------------------", margin, y); y += lineHeight;
     
     doc.text(`Group: ${recordData.groupName || 'N/A'}`, margin, y); y += lineHeight;
-    if (recordData.groupId) { doc.text(`(ID: ${recordData.groupId})`, margin + 10, y); } // Indent Group ID
+    if (recordData.groupId) { doc.text(`(ID: ${recordData.groupId})`, margin + 10, y); }
     
     doc.text(`Member: ${recordData.userFullname || 'N/A'}`, margin, y); y += lineHeight;
     if (recordData.userUsername) { doc.text(`(@${recordData.userUsername})`, margin + 10, y); }
@@ -145,12 +145,13 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     doc.setFontSize(10);
     doc.text(`Paid Amount: ${formatCurrencyLocal(recordData.amount)}`, margin, y, {fontStyle: 'bold'}); y += lineHeight;
     doc.setFontSize(8);
-    if (recordData.balanceAmount !== null && recordData.balanceAmount !== undefined) {
-        doc.text(`Balance (this due): ${formatCurrencyLocal(recordData.balanceAmount)}`, margin, y); y += lineHeight;
+    // Display user's total due before this payment for "Total Balance"
+    if (recordData.userTotalDueBeforeThisPayment !== null && recordData.userTotalDueBeforeThisPayment !== undefined) {
+        doc.text(`Total Balance: ${formatCurrencyLocal(recordData.userTotalDueBeforeThisPayment)}`, margin, y); y += lineHeight;
     }
     doc.text(`Payment Mode: ${recordData.paymentMode || 'N/A'}`, margin, y); y += lineHeight;
     doc.text("----------------------------------------", margin, y); y += lineHeight;
-    doc.text(`Collected By: ${recordData.recordedByEmployeeName || 'N/A'}`, margin, y); y += lineHeight;
+    // "Collected By" is removed as per request
     if(recordData.remarks && recordData.remarks.trim() !== "") {
         doc.text(`Remarks: ${recordData.remarks}`, margin, y); y += lineHeight;
     }
@@ -171,39 +172,29 @@ async function generateAndUploadReceiptPdf(
   receiptNumber: string
 ): Promise<string | null> {
   if (!receiptNumber || !groupId) {
-    console.error("Critical: Missing groupId or receiptNumber for PDF upload path. Aborting PDF generation.");
+    console.error("[PDF Upload] Critical: Missing groupId or receiptNumber for PDF upload path. Aborting PDF generation.");
     return null;
   }
   try {
-    console.log("[PDF] Attempting to generate PDF blob for receipt:", receiptNumber);
     const pdfBlob = await generateReceiptPdfBlob(recordData);
     if (!pdfBlob) {
-      console.error("[PDF] PDF Blob generation failed for receipt:", receiptNumber);
+      console.error("[PDF Upload] PDF Blob generation failed for receipt:", receiptNumber);
       return null;
     }
-    console.log("[PDF] PDF Blob generated, size:", pdfBlob.size);
-
-    const pdfFileName = `receipt_${receiptNumber}_${Date.now()}.pdf`; // Added timestamp for uniqueness
+    const pdfFileName = `receipt_${receiptNumber}_${Date.now()}.pdf`;
     const pdfStoragePath = `collection_receipts/${groupId}/${pdfFileName}`;
     const pdfRef = storageRefFB(storage, pdfStoragePath);
-
-    console.log("[PDF] Attempting to upload PDF to Firebase Storage at:", pdfStoragePath);
     await uploadBytes(pdfRef, pdfBlob);
-    console.log("[PDF] PDF Uploaded successfully to Firebase Storage.");
-
     const downloadURL = await getDownloadURL(pdfRef);
-    console.log("[PDF] PDF Download URL from Firebase Storage:", downloadURL);
     return downloadURL;
-  } catch (error) {
-    console.error("[PDF] Error in generateAndUploadReceiptPdf:", error);
-    // More detailed error logging if available
-    if (error instanceof Error && 'code' in error) {
-        console.error("[PDF] Firebase Storage Error Code:", (error as any).code);
-        console.error("[PDF] Firebase Storage Error Message:", (error as any).message);
-    }
+  } catch (error: any) {
+    console.error("[PDF Upload] Error in generateAndUploadReceiptPdf:", error);
+    if (error.code) console.error("[PDF Upload] Firebase Storage Error Code:", error.code);
+    if (error.message) console.error("[PDF Upload] Firebase Storage Error Message:", error.message);
     return null;
   }
 }
+
 
 export function RecordCollectionForm() {
   const { toast } = useToast();
@@ -334,7 +325,7 @@ export function RecordCollectionForm() {
       if (userExistsInGroup) {
         setValue("selectedUserId", preselectedUserIdFromQuery, { shouldValidate: true });
       } else if (preselectedUserFullnameFromQuery && preselectedUserUsernameFromQuery) {
-          if (watchedGroupId) { // Only toast if a group is actually selected
+          if (watchedGroupId) {
             toast({
                 variant: "default",
                 title: "User Not in Selected Group",
@@ -406,8 +397,6 @@ export function RecordCollectionForm() {
     }
 
     setIsSubmitting(true);
-    console.log("[Submit] Form values submitted:", values);
-
     const selectedGroup = groups.find(g => g.id === values.selectedGroupId);
     const selectedUser = groupMembers.find(m => m.id === values.selectedUserId);
 
@@ -420,16 +409,15 @@ export function RecordCollectionForm() {
     let newReceiptNumber = "";
     let receiptPdfDownloadUrl: string | null = null;
     let newCollectionRecordId = ""; 
+    let userDueBeforePayment: number | null = null;
 
     try {
       newReceiptNumber = await generateUniqueReceiptNumber();
-      console.log("[Submit] Generated Unique Receipt Number:", newReceiptNumber);
       if (!newReceiptNumber) throw new Error("Failed to generate unique receipt number.");
 
       const selectedAuction = values.selectedAuctionId && values.selectedAuctionId !== NO_AUCTION_SELECTED_VALUE
                               ? groupAuctions.find(a => a.id === values.selectedAuctionId)
                               : null;
-      console.log("[Submit] Selected Auction:", selectedAuction);
 
       let chitAmountForDue: number | null = null;
       let dueNumberForRecord: number | null = null;
@@ -439,17 +427,24 @@ export function RecordCollectionForm() {
       } else if (selectedGroup && selectedGroup.rate !== null && selectedGroup.rate !== undefined) {
           chitAmountForDue = selectedGroup.rate;
       }
-      console.log("[Submit] Calculated chitAmountForDue:", chitAmountForDue);
-      console.log("[Submit] Calculated dueNumberForRecord:", dueNumberForRecord);
 
       let balanceAmountAfterPayment: number | null = null;
       if (chitAmountForDue !== null && typeof values.amount === 'number') {
           balanceAmountAfterPayment = chitAmountForDue - values.amount;
       }
-      console.log("[Submit] Calculated balanceAmountAfterPayment:", balanceAmountAfterPayment);
 
       const collectionLocationToStore = values.collectionLocationOption === "Office" ? "Office" : currentLocationValue;
       const virtualId = generate7DigitRandomNumber();
+
+      // Fetch user's current due amount BEFORE the transaction
+      const userDocRefForDueRead = doc(db, "users", selectedUser.id);
+      const userDocSnapshot = await getDoc(userDocRefForDueRead);
+      if (userDocSnapshot.exists()) {
+        userDueBeforePayment = userDocSnapshot.data()?.dueAmount || 0;
+      } else {
+        throw new Error("User document not found when trying to read current due amount.");
+      }
+
 
       const tempRecordDataForPdf: Partial<CollectionRecord> = {
         companyName: "Sendhur Chits",
@@ -464,24 +459,18 @@ export function RecordCollectionForm() {
         dueNumber: dueNumberForRecord,
         chitAmount: chitAmountForDue,
         amount: values.amount,
+        userTotalDueBeforeThisPayment: userDueBeforePayment, // Use fetched due amount
         balanceAmount: balanceAmountAfterPayment,
         paymentMode: values.paymentMode,
-        recordedByEmployeeName: employee.fullname,
         remarks: values.remarks || "Auction Collection",
         virtualTransactionId: virtualId,
       };
       
-      console.log("[Submit] Data prepared for PDF generation:", tempRecordDataForPdf);
       receiptPdfDownloadUrl = await generateAndUploadReceiptPdf(
         tempRecordDataForPdf,
         selectedGroup.id,
         newReceiptNumber
       );
-      console.log("[Submit] Received PDF Download URL:", receiptPdfDownloadUrl);
-      // No longer conditional, field will exist even if null
-      // if (receiptPdfDownloadUrl === null) {
-      //   toast({ title: "PDF Warning", description: "Could not generate or upload PDF receipt. Record saved without PDF link.", variant: "default" });
-      // }
 
       const finalCollectionRecordData: Omit<CollectionRecord, "id"> & { recordedAt?: any } = {
         receiptNumber: newReceiptNumber,
@@ -500,30 +489,27 @@ export function RecordCollectionForm() {
         amount: values.amount,
         chitAmount: chitAmountForDue,
         dueNumber: dueNumberForRecord,
+        userTotalDueBeforeThisPayment: userDueBeforePayment,
         balanceAmount: balanceAmountAfterPayment,
         remarks: values.remarks || "Auction Collection",
         collectionLocation: collectionLocationToStore,
         recordedByEmployeeId: employee.id,
         recordedByEmployeeName: employee.fullname,
         virtualTransactionId: virtualId,
-        receiptPdfUrl: receiptPdfDownloadUrl, // Save the URL (can be null if upload failed)
+        receiptPdfUrl: receiptPdfDownloadUrl,
       };
-
-      console.log("[Submit] Final data for Firestore:", finalCollectionRecordData);
 
       await runTransaction(db, async (transaction) => {
           const userDocRef = doc(db, "users", selectedUser.id);
-          const userDoc = await transaction.get(userDocRef);
-          if (!userDoc.exists()) {
-              throw new Error("User document not found in transaction.");
-          }
-          const currentDueAmount = userDoc.data()?.dueAmount || 0;
+          // Note: userDocSnapshot was already fetched for userDueBeforePayment
+          // We can re-use it if we trust it's still the latest, or re-fetch within transaction for absolute latest.
+          // For simplicity here, we assume userDueBeforePayment is accurate enough for this transaction.
+          const currentDueAmount = userDueBeforePayment !== null ? userDueBeforePayment : (userDocSnapshot.data()?.dueAmount || 0);
           const newDueAmount = currentDueAmount - values.amount;
           transaction.update(userDocRef, { dueAmount: newDueAmount });
 
           const collectionRecordRef = doc(collection(db, "collectionRecords"));
           newCollectionRecordId = collectionRecordRef.id; 
-          console.log("[Submit] Firestore Document ID for new collection record:", newCollectionRecordId);
 
           transaction.set(collectionRecordRef, {
             ...finalCollectionRecordData,
@@ -838,4 +824,3 @@ export function RecordCollectionForm() {
     </Card>
   );
 }
-

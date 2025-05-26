@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db, storage } from "@/lib/firebase";
 import { ref as storageRefFB, uploadBytes, getDownloadURL } from "firebase/storage"; // Aliased
-import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc, orderBy } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc, orderBy, getDoc } from "firebase/firestore";
 import type { Group, User, CollectionRecord, Admin, AuctionRecord } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -150,12 +150,12 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         doc.setFontSize(10);
         doc.text(`Paid Amount: ${formatCurrencyLocal(recordData.amount)}`, margin, y, {fontStyle: 'bold'}); y += lineHeight;
         doc.setFontSize(8);
-        if (recordData.balanceAmount !== null && recordData.balanceAmount !== undefined) {
-            doc.text(`Balance (this due): ${formatCurrencyLocal(recordData.balanceAmount)}`, margin, y); y += lineHeight;
+        if (recordData.userTotalDueBeforeThisPayment !== null && recordData.userTotalDueBeforeThisPayment !== undefined) {
+            doc.text(`Total Balance: ${formatCurrencyLocal(recordData.userTotalDueBeforeThisPayment)}`, margin, y); y += lineHeight;
         }
         doc.text(`Payment Mode: ${recordData.paymentMode || 'N/A'}`, margin, y); y += lineHeight;
         doc.text("----------------------------------------", margin, y); y += lineHeight;
-        doc.text(`Collected By: ${recordData.recordedByEmployeeName || 'N/A'}`, margin, y); y += lineHeight;
+        // Collected By removed from PDF
         if(recordData.remarks && recordData.remarks.trim() !== "") {
             doc.text(`Remarks: ${recordData.remarks}`, margin, y); y += lineHeight;
         }
@@ -403,6 +403,7 @@ export function AdminRecordCollectionForm() {
     let newReceiptNumber = "";
     let receiptPdfDownloadUrl: string | null = null;
     let newCollectionRecordId = "";
+    let userDueBeforePayment: number | null = null;
 
     try {
         newReceiptNumber = await generateUniqueReceiptNumber();
@@ -429,6 +430,15 @@ export function AdminRecordCollectionForm() {
         const collectionLocationToStore = values.collectionLocationOption === "Office" ? "Office" : currentLocationValue;
         const virtualId = generate7DigitRandomNumber();
 
+        const userDocRefForDueRead = doc(db, "users", selectedUser.id);
+        const userDocSnapshot = await getDoc(userDocRefForDueRead);
+        if (userDocSnapshot.exists()) {
+          userDueBeforePayment = userDocSnapshot.data()?.dueAmount || 0;
+        } else {
+          throw new Error("User document not found when trying to read current due amount.");
+        }
+
+
         const tempRecordDataForPdf: Partial<CollectionRecord> = {
             companyName: "Sendhur Chits",
             receiptNumber: newReceiptNumber,
@@ -442,11 +452,12 @@ export function AdminRecordCollectionForm() {
             dueNumber: dueNumberForRecord,
             chitAmount: chitAmountForDue,
             amount: values.amount,
+            userTotalDueBeforeThisPayment: userDueBeforePayment,
             balanceAmount: balanceAmountAfterPayment,
             paymentMode: values.paymentMode,
-            recordedByEmployeeName: `Admin: ${admin.fullname}`,
             remarks: values.remarks || "Auction Collection",
             virtualTransactionId: virtualId,
+            // Exclude 'recordedByEmployeeName' from PDF temp data as it's not needed for PDF content and specific to admin/employee
         };
         
         receiptPdfDownloadUrl = await generateAndUploadReceiptPdf(
@@ -472,6 +483,7 @@ export function AdminRecordCollectionForm() {
             amount: values.amount,
             chitAmount: chitAmountForDue,
             dueNumber: dueNumberForRecord,
+            userTotalDueBeforeThisPayment: userDueBeforePayment,
             balanceAmount: balanceAmountAfterPayment,
             remarks: values.remarks || "Auction Collection",
             collectionLocation: collectionLocationToStore,
@@ -483,11 +495,7 @@ export function AdminRecordCollectionForm() {
 
         await runTransaction(db, async (transaction) => {
             const userDocRef = doc(db, "users", selectedUser.id);
-            const userDoc = await transaction.get(userDocRef);
-            if (!userDoc.exists()) {
-                throw new Error("User document not found in transaction.");
-            }
-            const currentDueAmount = userDoc.data()?.dueAmount || 0;
+            const currentDueAmount = userDueBeforePayment !== null ? userDueBeforePayment : (userDocSnapshot.data()?.dueAmount || 0);
             const newDueAmount = currentDueAmount - values.amount;
             transaction.update(userDocRef, { dueAmount: newDueAmount });
 
