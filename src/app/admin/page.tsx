@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Users, Layers, Briefcase, TrendingUp, Loader2, AlertTriangle, Banknote, Wallet, CalendarIcon as CalendarIconLucide, Sheet, Download } from "lucide-react"; // Added Sheet and Download
+import { Users, Layers, Briefcase, TrendingUp, Loader2, AlertTriangle, Banknote, Wallet, CalendarIcon as CalendarIconLucide, Sheet, Download, PlayCircle } from "lucide-react"; // Added PlayCircle for Generate
 import { useEffect, useState } from "react";
 import { collection, getDocs, query, where, Timestamp, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -14,6 +14,7 @@ import { format as formatDateFns, startOfDay as dateFnsStartOfDay, endOfDay as d
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 export default function AdminOverviewPage() {
   const [userCount, setUserCount] = useState(0);
@@ -28,6 +29,11 @@ export default function AdminOverviewPage() {
 
   const [selectedDateForDaySheet, setSelectedDateForDaySheet] = useState<Date | undefined>(new Date());
   const [isDownloadingDaySheetPdf, setIsDownloadingDaySheetPdf] = useState(false);
+  const [isGeneratingDaySheet, setIsGeneratingDaySheet] = useState(false);
+  const [daySheetData, setDaySheetData] = useState<DaySheetRow[]>([]);
+  const [daySheetTodayCredits, setDaySheetTodayCredits] = useState(0);
+  const [daySheetTodayDebits, setDaySheetTodayDebits] = useState(0);
+  const [daySheetError, setDaySheetError] = useState<string | null>(null);
   const { toast } = useToast();
 
 
@@ -248,7 +254,7 @@ export default function AdminOverviewPage() {
     }
   };
 
-  const handleDownloadDaySheetPdf = async () => {
+  const handleGenerateDaySheetReport = async () => {
     if (!selectedDateForDaySheet) {
       toast({
         title: "Date Required",
@@ -257,29 +263,67 @@ export default function AdminOverviewPage() {
       });
       return;
     }
-    setIsDownloadingDaySheetPdf(true);
+    setIsGeneratingDaySheet(true);
+    setDaySheetError(null);
+    setDaySheetData([]);
 
     const result = await generateDaySheetData(selectedDateForDaySheet);
 
     if ('error' in result) {
+      setDaySheetError(result.error);
       toast({
         title: "Report Generation Failed",
         description: result.error,
         variant: "destructive",
       });
-      setIsDownloadingDaySheetPdf(false);
+    } else {
+      setDaySheetData(result.reportRows);
+      setDaySheetTodayCredits(result.todayCredits);
+      setDaySheetTodayDebits(result.todayDebits);
+      toast({
+        title: "Report Generated",
+        description: `Day Sheet for ${formatDateFns(selectedDateForDaySheet, "PPP")} is ready.`,
+      });
+    }
+    setIsGeneratingDaySheet(false);
+  };
+
+
+  const handleDownloadDaySheetPdf = async () => {
+    if (!selectedDateForDaySheet) {
+      toast({
+        title: "Date Required",
+        description: "Please select a date first to generate and download the Day Sheet.",
+        variant: "destructive",
+      });
       return;
     }
+    
+    let dataToDownload = daySheetData;
+    let creditsForDay = daySheetTodayCredits;
+    let debitsForDay = daySheetTodayDebits;
 
-    const { reportRows, todayCredits, todayDebits, openingBalance, closingBalance } = result;
+    if (dataToDownload.length === 0) { // Data not yet generated for display, generate it now
+        setIsDownloadingDaySheetPdf(true); // Show general loading
+        const result = await generateDaySheetData(selectedDateForDaySheet);
+        setIsDownloadingDaySheetPdf(false);
 
-    if (reportRows.length === 0) {
+        if ('error' in result) {
+            toast({ title: "Report Generation Failed", description: result.error, variant: "destructive" });
+            return;
+        }
+        dataToDownload = result.reportRows;
+        creditsForDay = result.todayCredits;
+        debitsForDay = result.todayDebits;
+    }
+
+
+    if (dataToDownload.length === 0) {
       toast({
         title: "No Data",
-        description: "No transactions found for the selected date.",
+        description: "No transactions found for the selected date to download.",
         variant: "default"
       });
-      setIsDownloadingDaySheetPdf(false);
       return;
     }
     
@@ -292,7 +336,7 @@ export default function AdminOverviewPage() {
       return amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
-    reportRows.forEach((row) => {
+    dataToDownload.forEach((row) => {
        const rowData = [
         row.sno,
         formatDateFns(new Date(row.date.replace(/-/g, '/')), "dd-MM-yyyy"),
@@ -304,11 +348,15 @@ export default function AdminOverviewPage() {
       tableRows.push(rowData);
     });
     
+    const openingBalanceRow = dataToDownload.find(row => row.particulars === "Opening Balance");
+    const openingBalanceValue = openingBalanceRow ? (openingBalanceRow.credit > 0 ? openingBalanceRow.credit : -openingBalanceRow.debit) : 0;
+
+
     // Add totals row for the day's transactions
     tableRows.splice(tableRows.length -1, 0, [ // Insert before closing balance
         {content: "Total for the Day:", colSpan: 3, styles: {halign: 'right', fontStyle: 'bold'}},
-        {content: formatCurrencyPdf(todayCredits), styles: {halign: 'right', fontStyle: 'bold'}},
-        {content: formatCurrencyPdf(todayDebits), styles: {halign: 'right', fontStyle: 'bold'}},
+        {content: formatCurrencyPdf(creditsForDay), styles: {halign: 'right', fontStyle: 'bold'}},
+        {content: formatCurrencyPdf(debitsForDay), styles: {halign: 'right', fontStyle: 'bold'}},
         {content: "", styles: {fontStyle: 'bold'}},
     ]);
 
@@ -324,31 +372,22 @@ export default function AdminOverviewPage() {
       headStyles: { fillColor: [30, 144, 255] }, 
       styles: { fontSize: 8, cellPadding: 2 },
       columnStyles: { 
-        0: { cellWidth: 10 }, // S.No
-        1: { cellWidth: 20 }, // Date
-        2: { cellWidth: 'auto' }, // Particulars
-        3: { halign: 'right', cellWidth: 25 }, // Credit
-        4: { halign: 'right', cellWidth: 25 }, // Debit
-        5: { cellWidth: 'auto' }, // Remarks
+        0: { cellWidth: 10 }, 1: { cellWidth: 20 }, 2: { cellWidth: 'auto' }, 
+        3: { halign: 'right', cellWidth: 25 }, 4: { halign: 'right', cellWidth: 25 }, 5: { cellWidth: 'auto' },
       },
       didParseCell: function (data) {
-        // Style Opening and Closing Balance rows
         const particulars = data.row.raw[2]?.content?.toString();
         if (particulars === "Opening Balance" || particulars === "Closing Balance") {
           data.cell.styles.fontStyle = 'bold';
-          if (particulars === "Opening Balance") { // Opening balance amount
-            data.cell.styles.fillColor = data.column.index === 3 && openingBalance > 0 ? [230, 245, 255] : (data.column.index === 4 && openingBalance < 0 ? [255,230,230] : undefined);
+           if (particulars === "Opening Balance") { 
+            data.cell.styles.fillColor = data.column.index === 3 && openingBalanceValue > 0 ? [230, 245, 255] : (data.column.index === 4 && openingBalanceValue < 0 ? [255,230,230] : undefined);
           }
         }
       }
     });
 
     doc.save(`DaySheet_${formatDateFns(selectedDateForDaySheet, "yyyy-MM-dd")}.pdf`);
-    setIsDownloadingDaySheetPdf(false);
-     toast({
-        title: "PDF Generated",
-        description: "Day Sheet report has been downloaded.",
-      });
+     toast({ title: "PDF Generated", description: "Day Sheet report has been downloaded." });
   };
 
 
@@ -418,6 +457,7 @@ export default function AdminOverviewPage() {
           </CardHeader>
           <CardContent>
             {loadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : <div className="text-2xl font-bold">{formatCurrency(currentBalance)}</div>}
+            
           </CardContent>
         </Card>
       </div>
@@ -443,16 +483,74 @@ export default function AdminOverviewPage() {
                 <Calendar
                   mode="single"
                   selected={selectedDateForDaySheet}
-                  onSelect={setSelectedDateForDaySheet}
+                  onSelect={(date) => {
+                    setSelectedDateForDaySheet(date);
+                    setDaySheetData([]); // Clear previous report data when date changes
+                    setDaySheetError(null);
+                  }}
                   initialFocus
                 />
               </PopoverContent>
             </Popover>
+            <Button onClick={handleGenerateDaySheetReport} disabled={isGeneratingDaySheet || !selectedDateForDaySheet}>
+              {isGeneratingDaySheet && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <PlayCircle className="mr-2 h-4 w-4" /> Generate Report
+            </Button>
             <Button onClick={handleDownloadDaySheetPdf} disabled={isDownloadingDaySheetPdf || !selectedDateForDaySheet}>
               {isDownloadingDaySheetPdf && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               <Download className="mr-2 h-4 w-4" /> Download PDF
             </Button>
           </div>
+
+          {daySheetError && (
+            <div className="mt-4 p-4 border border-destructive bg-destructive/10 rounded-md">
+              <p className="text-destructive text-sm font-medium">Error generating report:</p>
+              <p className="text-destructive/80 text-xs">{daySheetError}</p>
+            </div>
+          )}
+
+          {daySheetData.length > 0 && !daySheetError && (
+            <div className="mt-6 overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">S.No</TableHead>
+                    <TableHead className="w-[120px]">Date</TableHead>
+                    <TableHead>Particulars</TableHead>
+                    <TableHead className="text-right w-[120px]">Credit (₹)</TableHead>
+                    <TableHead className="text-right w-[120px]">Debit (₹)</TableHead>
+                    <TableHead>Remarks</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {daySheetData.map((row) => (
+                    <TableRow key={row.sno} className={cn(
+                      (row.particulars === "Opening Balance" || row.particulars === "Closing Balance") && "font-bold bg-muted/50"
+                    )}>
+                      <TableCell>{row.sno}</TableCell>
+                      <TableCell>{formatDateFns(new Date(row.date.replace(/-/g, '/')), "dd-MM-yyyy")}</TableCell>
+                      <TableCell>{row.particulars}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {row.credit > 0 ? formatCurrency(row.credit) : "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {row.debit > 0 ? formatCurrency(row.debit) : "-"}
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate">{row.remarks}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+                <TableFooter>
+                  <TableRow className="font-bold bg-secondary">
+                    <TableCell colSpan={3} className="text-right">Total for the Day:</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(daySheetTodayCredits)}</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(daySheetTodayDebits)}</TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
