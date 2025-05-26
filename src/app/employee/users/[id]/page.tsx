@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { User, Group, CollectionRecord, PaymentRecord as AdminPaymentRecordType, AuctionRecord } from "@/types";
 import { db } from "@/lib/firebase";
@@ -30,7 +30,7 @@ import {
   ChevronDown,
   Sheet,
   Contact,
-  ArchiveRestore // Added ArchiveRestore
+  ArchiveRestore 
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO, subDays, isAfter, addDays } from "date-fns";
@@ -158,6 +158,8 @@ export default function EmployeeViewUserDetailPage() {
   
   const [dueSheetItems, setDueSheetItems] = useState<DueSheetItem[]>([]);
   const [loadingDueSheet, setLoadingDueSheet] = useState(true);
+  const dueSheetRef = useRef<HTMLDivElement>(null);
+
 
   const fetchUserDetailsAndRelatedData = useCallback(async () => {
     if (!userId) {
@@ -202,7 +204,7 @@ export default function EmployeeViewUserDetailPage() {
         const data = docSnap.data() as CollectionRecord;
         combinedTransactions.push({
           id: docSnap.id, type: "Sent by User", dateTime: parseDateTimeForSort(data.paymentDate, data.paymentTime, data.recordedAt),
-          fromParty: `User: ${userData.fullname} (${userData.username})`, toParty: "ChitConnect (Company)", amount: data.amount,
+          fromParty: `User: ${userData.fullname} (${userData.username})`, toParty: "Sendhur Chits (Company)", amount: data.amount,
           mode: data.paymentMode, remarksOrSource: data.remarks || `Payment for Group: ${data.groupName}`,
           originalSource: "CollectionRecord", virtualTransactionId: data.virtualTransactionId,
         });
@@ -214,7 +216,7 @@ export default function EmployeeViewUserDetailPage() {
         const data = docSnap.data() as AdminPaymentRecordType; 
         combinedTransactions.push({
           id: docSnap.id, type: "Received by User", dateTime: parseDateTimeForSort(data.paymentDate, data.paymentTime, data.recordedAt),
-          fromParty: "ChitConnect (Company)", toParty: `User: ${userData.fullname} (${userData.username})`, amount: data.amount,
+          fromParty: "Sendhur Chits (Company)", toParty: `User: ${userData.fullname} (${userData.username})`, amount: data.amount,
           mode: data.paymentMode, remarksOrSource: data.remarks || `Payment for Group: ${data.groupName || 'N/A'}`,
           originalSource: "PaymentRecord", virtualTransactionId: data.virtualTransactionId,
         });
@@ -234,25 +236,40 @@ export default function EmployeeViewUserDetailPage() {
           for (const auctionDoc of groupAuctionRecordsSnapshot.docs) {
             const auctionRecord = { id: auctionDoc.id, ...auctionDoc.data() } as AuctionRecord;
             if (auctionRecord.auctionNumber === undefined || auctionRecord.finalAmountToBePaid === null || auctionRecord.finalAmountToBePaid === undefined) continue;
+            
             const amountDueForInstallment = auctionRecord.finalAmountToBePaid;
             const penaltyChargedForInstallment = 0; // Placeholder
+            
             let totalCollectedForThisDue = 0;
             let latestPaidDate: Date | null = null;
-            const collectionForAuctionQuery = query(collection(db, "collectionRecords"), where("userId", "==", userId), where("groupId", "==", group.id), where("auctionNumber", "==", auctionRecord.auctionNumber));
+
+            const collectionForAuctionQuery = query(collection(db, "collectionRecords"), 
+              where("userId", "==", userId), 
+              where("groupId", "==", group.id), 
+              where("auctionNumber", "==", auctionRecord.auctionNumber)
+            );
             const collectionsForAuctionSnapshot = await getDocs(collectionForAuctionQuery);
             collectionsForAuctionSnapshot.docs.forEach(colDoc => {
               const colData = colDoc.data() as CollectionRecord;
               totalCollectedForThisDue += colData.amount;
-              const paymentDateTime = parseDateTimeForSort(colData.paymentDate, colData.paymentTime, colData.recordedAt);
-              if (paymentDateTime && (!latestPaidDate || paymentDateTime > latestPaidDate)) latestPaidDate = paymentDateTime;
+               const paymentDateTime = parseDateTimeForSort(colData.paymentDate, colData.paymentTime, colData.recordedAt);
+               if (paymentDateTime && (!latestPaidDate || paymentDateTime > latestPaidDate) ) {
+                   latestPaidDate = paymentDateTime;
+               }
             });
+            
             let paidTowardsPenalty = Math.min(totalCollectedForThisDue, penaltyChargedForInstallment);
             let remainingCollectedAfterPenalty = totalCollectedForThisDue - paidTowardsPenalty;
             let paidTowardsPrincipal = Math.min(remainingCollectedAfterPenalty, amountDueForInstallment);
             const balanceOnPrincipal = amountDueForInstallment - paidTowardsPrincipal;
+            
             let status: DueSheetItem['status'] = 'Not Paid';
-            if (balanceOnPrincipal <= 0 && amountDueForInstallment > 0) status = 'Paid';
-            else if (paidTowardsPrincipal > 0 && balanceOnPrincipal > 0) status = 'Partially Paid';
+            if (balanceOnPrincipal <= 0 && amountDueForInstallment > 0) { 
+              status = 'Paid';
+            } else if (paidTowardsPrincipal > 0 && balanceOnPrincipal > 0) {
+              status = 'Partially Paid';
+            }
+            
             processedDueSheetItems.push({
               dueNo: auctionRecord.auctionNumber, groupId: group.id, groupName: group.groupName, auctionId: auctionRecord.id,
               dueDate: formatDateSafe(addDays(parseISO(auctionRecord.auctionDate), 5), "dd MMM yyyy"), amount: amountDueForInstallment,
@@ -281,6 +298,12 @@ export default function EmployeeViewUserDetailPage() {
   useEffect(() => {
     fetchUserDetailsAndRelatedData();
   }, [fetchUserDetailsAndRelatedData]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash === "#due-sheet" && dueSheetRef.current && !loadingDueSheet) {
+      dueSheetRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [loadingDueSheet]); 
 
   useEffect(() => {
     const applyFilter = () => {
@@ -435,7 +458,7 @@ export default function EmployeeViewUserDetailPage() {
             ) : ( <p className="text-sm text-muted-foreground">This user has not joined any groups yet.</p>)}
           </section>
           <Separator />
-            <section>
+            <section ref={dueSheetRef}>
               <Card className="shadow-md">
                 <CardHeader>
                   <div className="flex items-center gap-3">

@@ -7,8 +7,8 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import type { CollectionRecord } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Loader2, Printer, Download as DownloadIcon, ArrowLeft } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { Loader2, Printer, Download as DownloadIcon, ArrowLeft, Eye } from 'lucide-react';
+import { format } from 'date-fns'; // date-fns format is good
 import jsPDF from 'jspdf';
 
 const formatCurrency = (amount: number | null | undefined) => {
@@ -19,9 +19,16 @@ const formatCurrency = (amount: number | null | undefined) => {
 const formatDate = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
   if (!dateString) return "N/A";
   try {
-    const date = new Date(dateString.replace(/-/g, '/')); // More robust parsing
+    // Attempt to parse various common date string formats including YYYY-MM-DD
+    const date = new Date(dateString.replace(/-/g, '/'));
+    if (isNaN(date.getTime())) { // Fallback for direct parsing failure
+        const isoDate = new Date(dateString); // Try ISO format
+        if (isNaN(isoDate.getTime())) return "N/A";
+        return format(isoDate, outputFormat);
+    }
     return format(date, outputFormat);
   } catch (e) {
+    console.error("Error formatting date:", dateString, e);
     return "N/A";
   }
 };
@@ -67,7 +74,6 @@ export default function CollectionReceiptPage() {
     if (!receipt) return;
 
     if (receipt.receiptPdfUrl) {
-      // If a stored PDF URL exists, use it for direct download
       const link = document.createElement('a');
       link.href = receipt.receiptPdfUrl;
       link.download = `receipt_${receipt.receiptNumber}.pdf`;
@@ -77,7 +83,6 @@ export default function CollectionReceiptPage() {
       return;
     }
 
-    // Fallback: Generate PDF on the client if no stored URL (for older records)
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -88,7 +93,7 @@ export default function CollectionReceiptPage() {
     const margin = 5;
 
     doc.setFontSize(12);
-    doc.text(receipt.companyName, margin, y); y += lineHeight * 1.5;
+    doc.text(receipt.companyName || "Sendhur Chits", margin, y); y += lineHeight * 1.5;
     doc.setFontSize(8);
     doc.text("----------------------------------------", margin, y); y += lineHeight;
     
@@ -121,6 +126,15 @@ export default function CollectionReceiptPage() {
     doc.text("Thank You!", margin, y, {align: 'center'});
     
     doc.save(`receipt_${receipt.receiptNumber}.pdf`);
+  };
+
+  const handleDone = () => {
+    if (receipt && receipt.userId) {
+      router.push(`/employee/users/${receipt.userId}#due-sheet`);
+    } else {
+      // Fallback if userId is not available on receipt for some reason
+      router.push('/employee/collection'); 
+    }
   };
 
   if (loading) {
@@ -187,8 +201,8 @@ export default function CollectionReceiptPage() {
       </div>
 
       <div className="mt-6 flex space-x-3 print:hidden">
-        <Button onClick={() => router.back()} variant="outline">
-            <ArrowLeft className="mr-2 h-4 w-4"/> Back to Form
+        <Button onClick={handleDone} variant="outline">
+            <Eye className="mr-2 h-4 w-4"/> View User Dues
         </Button>
         <Button onClick={handlePrint} variant="outline">
           <Printer className="mr-2 h-4 w-4" /> Print
