@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import type { Group, User, AuctionRecord, CollectionRecord } from "@/types";
+import type { Group, User, AuctionRecord, CollectionRecord, PaymentRecord as AdminPaymentRecordType } from "@/types";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, arrayRemove, updateDoc, orderBy, Timestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -54,7 +54,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO, subDays, isAfter } from "date-fns";
+import { format, parseISO, subDays, isAfter, addDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { useForm, Controller } from "react-hook-form";
@@ -223,7 +223,7 @@ interface CombinedPaymentHistoryTransaction {
   amount: number;
   mode: string | null;
   remarks: string | null;
-  originalSource: "CollectionRecord" | "PaymentRecord";
+  originalSource: "Payment Record" | "Collection Record";
   virtualTransactionId?: string;
 }
 
@@ -309,12 +309,13 @@ export default function AdminGroupDetailPage() {
       }
 
       const auctionRecordsRef = collection(db, "auctionRecords");
-      const qAuction = query(auctionRecordsRef, where("groupId", "==", groupId), orderBy("auctionDate", "desc"));
+      const qAuction = query(auctionRecordsRef, where("groupId", "==", groupId), orderBy("auctionDate", "asc"));
       const auctionSnapshot = await getDocs(qAuction);
       const fetchedAuctionHistory = auctionSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as AuctionRecord));
       setAuctionHistory(fetchedAuctionHistory);
       setLoadingAuctionHistory(false);
 
+      // Fetch for collectionRecords (Received by company)
       const collectionRecordsRef = collection(db, "collectionRecords");
       const qCollection = query(collectionRecordsRef, where("groupId", "==", groupId));
       const collectionSnapshot = await getDocs(qCollection);
@@ -325,30 +326,31 @@ export default function AdminGroupDetailPage() {
           type: "Received" as const,
           dateTime: parseDateTimeForSort(data.paymentDate, data.paymentTime, data.recordedAt),
           fromParty: `User: ${data.userFullname} (${data.userUsername})`,
-          toParty: "ChitConnect (Company)",
+          toParty: "Sendhur Chits (Company)",
           amount: data.amount,
           mode: data.paymentMode,
           remarks: data.remarks || "User Collection",
-          originalSource: "CollectionRecord" as const,
+          originalSource: "Collection Record" as const,
           virtualTransactionId: data.virtualTransactionId,
         } as CombinedPaymentHistoryTransaction;
       });
 
+      // Fetch for paymentRecords (Sent by company)
       const paymentRecordsRef = collection(db, "paymentRecords");
       const qPayment = query(paymentRecordsRef, where("groupId", "==", groupId));
       const paymentSnapshot = await getDocs(qPayment);
       const fetchedPayments = paymentSnapshot.docs.map(docSnap => {
-        const data = docSnap.data() as PaymentRecord; // Assuming PaymentRecord type for admin payments
+        const data = docSnap.data() as AdminPaymentRecordType;
         return {
           id: docSnap.id,
           type: "Sent" as const,
           dateTime: parseDateTimeForSort(data.paymentDate, data.paymentTime, data.recordedAt),
-          fromParty: "ChitConnect (Company)",
+          fromParty: "Sendhur Chits (Company)",
           toParty: `User: ${data.userFullname} (${data.userUsername})`,
           amount: data.amount,
           mode: data.paymentMode,
           remarks: data.remarks || "Company Payment",
-          originalSource: "PaymentRecord" as const,
+          originalSource: "Payment Record" as const,
           virtualTransactionId: data.virtualTransactionId,
         } as CombinedPaymentHistoryTransaction;
       });
@@ -444,21 +446,16 @@ export default function AdminGroupDetailPage() {
       headStyles: { fillColor: [30, 144, 255] },
       styles: { fontSize: 8, cellPadding: 1.5 },
       columnStyles: {
-        0: { cellWidth: 8 },  // S.No
-        1: { cellWidth: 15 }, // Type
-        2: { cellWidth: 23 }, // Date & Time
-        3: { cellWidth: 'auto' }, // From (auto)
-        4: { cellWidth: 'auto' }, // To (auto)
-        5: { cellWidth: 20, halign: 'right' }, // Amount
-        6: { cellWidth: 15 }, // Mode
-        7: { cellWidth: 'auto' }, // Remarks (auto)
-        8: { cellWidth: 18 }  // Virtual ID
+        0: { cellWidth: 8 },
+        1: { cellWidth: 15 },
+        2: { cellWidth: 23 },
+        3: { cellWidth: 'auto' },
+        4: { cellWidth: 'auto' },
+        5: { cellWidth: 20, halign: 'right' },
+        6: { cellWidth: 15 },
+        7: { cellWidth: 'auto' },
+        8: { cellWidth: 18 }
       },
-      didParseCell: function (data) {
-        // For the Rupee symbol, jsPDF might require specific font handling
-        // or a simpler representation if the default font doesn't support '₹'.
-        // The formatCurrencyPdf helper function now uses "Rs. ".
-      }
     });
     doc.save(`payment_history_${group.groupName.replace(/\s+/g, '_')}_${selectedPaymentFilter}.pdf`);
   };
@@ -595,6 +592,8 @@ export default function AdminGroupDetailPage() {
     </div>
   );
 
+  const pastWinnerUserIds = auctionHistory.map(ah => ah.winnerUserId);
+
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -726,11 +725,14 @@ export default function AdminGroupDetailPage() {
                   <TableRow><TableHead>Full Name</TableHead><TableHead>Username</TableHead><TableHead>Phone Number</TableHead><TableHead className="text-right">Due Amount (₹)</TableHead></TableRow>
                 </TableHeader>
                 <TableBody>
-                  {membersDetails.map((member) => (
-                    <TableRow key={member.id} className="hover:bg-muted/50 transition-colors">
-                      <TableCell className="font-medium">{member.fullname}</TableCell><TableCell>{member.username}</TableCell><TableCell><div className="flex items-center"><Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}</div></TableCell><TableCell className="text-right">{formatCurrency(member.dueAmount)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {membersDetails.map((member) => {
+                    const hasWon = pastWinnerUserIds.includes(member.id);
+                    return (
+                      <TableRow key={member.id} className={cn("transition-colors", hasWon ? "bg-green-100 dark:bg-green-900/50 hover:bg-green-200/80 dark:hover:bg-green-800/70" : "hover:bg-muted/50")}>
+                        <TableCell className="font-medium">{member.fullname}</TableCell><TableCell>{member.username}</TableCell><TableCell><div className="flex items-center"><Phone className="mr-2 h-3 w-3 text-muted-foreground" /> {member.phone || "N/A"}</div></TableCell><TableCell className="text-right">{formatCurrency(member.dueAmount)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -877,7 +879,7 @@ export default function AdminGroupDetailPage() {
                   <Card className="bg-secondary/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
                     <CardHeader className="pb-3 pt-4">
                       <CardTitle className="text-md font-semibold text-primary">
-                         Auction #{auction.auctionNumber ? auction.auctionNumber : (auctionHistory.length - index)}
+                         Auction #{auction.auctionNumber ? auction.auctionNumber : (index + 1)}
                       </CardTitle>
                       <CardDescription>Group: {auction.groupName}</CardDescription>
                     </CardHeader>
@@ -1003,3 +1005,4 @@ export default function AdminGroupDetailPage() {
     </div>
   );
 }
+
