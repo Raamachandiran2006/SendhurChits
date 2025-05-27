@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db, storage } from "@/lib/firebase";
-import { ref as storageRefFB, uploadBytes, getDownloadURL } from "firebase/storage"; // Aliased
+import { ref as storageRefFB, uploadBytes, getDownloadURL } from "firebase/storage"; 
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc, orderBy, getDoc } from "firebase/firestore";
 import type { Group, User, CollectionRecord, Admin, AuctionRecord } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -75,11 +75,9 @@ const formatDateLocal = (dateString: string | undefined | null, outputFormat: st
   }
 };
 
-const NO_AUCTION_SELECTED_VALUE = "no-auction-specific-collection";
-
 const recordCollectionFormSchema = z.object({
   selectedGroupId: z.string().min(1, "Please select a Group."),
-  selectedAuctionId: z.string().optional(),
+  selectedAuctionId: z.string().min(1, "Auction number is required."), // Made compulsory
   selectedUserId: z.string().min(1, "Please select a User."),
   paymentDate: z.date({ required_error: "Payment date is required." }),
   paymentTime: z.string().min(1, "Payment time is required."),
@@ -115,36 +113,39 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
-        format: [80, 200]
+        format: [72, 'auto'] 
         });
         let y = 10;
-        const lineHeight = 6;
-        const margin = 5;
+        const lineHeight = 5; 
+        const margin = 3; 
 
-        doc.setFont('Times-Roman', 'bold');
-        doc.setFontSize(14);
+        doc.setFont('Times-Roman', 'bold'); 
+        doc.setFontSize(12); 
         doc.text(recordData.companyName || "Sendhur Chits", doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight * 1.5;
-
-        doc.setFont('Times-Roman', 'normal');
-        doc.setFontSize(14);
+        
+        doc.setFont('Times-Roman', 'normal'); 
+        doc.setFontSize(10); 
         doc.text(`Receipt No: ${recordData.receiptNumber || 'N/A'}`, doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight;
         doc.text(`Date: ${formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy")} ${recordData.paymentTime || ''}`, doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight;
         
-        doc.setLineDashPattern([1, 1], 0);
-        doc.line(margin, y, doc.internal.pageSize.getWidth() - margin, y); y += lineHeight * 0.5;
-        doc.setLineDashPattern([], 0);
+        doc.setLineDashPattern([1, 1], 0); 
+        doc.line(margin, y, doc.internal.pageSize.getWidth() - margin, y); y += lineHeight * 0.5; 
+        doc.setLineDashPattern([], 0); 
         
         y += lineHeight * 0.5;
-        doc.setFontSize(14);
+        doc.setFontSize(10); 
+        const wrapText = (text: string, x: number, yPos: number, maxWidth: number, lHeight: number): number => {
+            const lines = doc.splitTextToSize(text, maxWidth);
+            doc.text(lines, x, yPos);
+            return yPos + (lines.length * lHeight);
+        };
 
         const printLine = (label: string, value: string | number | null | undefined, yPos: number, isBoldValue: boolean = false): number => {
             doc.setFont('Times-Roman', 'bold');
             doc.text(label, margin, yPos);
             const labelWidth = doc.getTextWidth(label);
             doc.setFont('Times-Roman', isBoldValue ? 'bold' : 'normal');
-            const lines = doc.splitTextToSize(value?.toString() || 'N/A', doc.internal.pageSize.getWidth() - margin - (margin + labelWidth + 2) );
-            doc.text(lines, margin + labelWidth + 2, yPos);
-            return yPos + (lines.length * lineHeight);
+            return wrapText(value?.toString() || 'N/A', margin + labelWidth + 2, yPos, 66 - labelWidth - 2, lineHeight);
         };
         
         y = printLine("Group:", recordData.groupName || 'N/A', y);
@@ -159,7 +160,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         if (recordData.chitAmount !== null && recordData.chitAmount !== undefined) {
             y = printLine("Due Amount:", formatCurrencyLocal(recordData.chitAmount), y);
         }
-        y = printLine("Paid:", formatCurrencyLocal(recordData.amount), y, true);
+        y = printLine("Paid:", formatCurrencyLocal(recordData.amount), y, true); 
         
         if (recordData.userTotalDueBeforeThisPayment !== null && recordData.userTotalDueBeforeThisPayment !== undefined) {
             y = printLine("Total Balance:", formatCurrencyLocal(recordData.userTotalDueBeforeThisPayment), y);
@@ -171,7 +172,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         doc.setLineDashPattern([], 0);
         
         y += lineHeight;
-        doc.setFontSize(14);
+        doc.setFontSize(10);
         doc.setFont('Times-Roman', 'normal');
         doc.text("Thank You!", doc.internal.pageSize.getWidth() / 2, y, { align: 'center' });
         
@@ -247,14 +248,14 @@ export function AdminRecordCollectionForm() {
     resolver: zodResolver(recordCollectionFormSchema),
     defaultValues: {
       selectedGroupId: "",
-      selectedAuctionId: undefined,
+      selectedAuctionId: "", // Required
       selectedUserId: "",
       paymentDate: new Date(),
       paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
       paymentType: undefined,
       paymentMode: undefined,
       amount: undefined,
-      collectionLocationOption: "User Location", // Default to User Location
+      collectionLocationOption: "User Location", 
       remarks: "Auction Collection",
     },
   });
@@ -286,7 +287,7 @@ export function AdminRecordCollectionForm() {
       setGroupMembers([]);
       setGroupAuctions([]);
       setValue("selectedUserId", "");
-      setValue("selectedAuctionId", undefined);
+      setValue("selectedAuctionId", ""); // Reset to empty for required validation
       return;
     }
 
@@ -383,7 +384,7 @@ export function AdminRecordCollectionForm() {
     } else {
       setLocationError("Geolocation is not supported by this browser.");
     }
-  },[]); // Added empty dependency array
+  },[]); 
 
   useEffect(() => {
     if (watchedCollectionLocationOption === "User Location") { 
@@ -417,6 +418,13 @@ export function AdminRecordCollectionForm() {
       return;
     }
     
+    const selectedAuction = groupAuctions.find(a => a.id === values.selectedAuctionId);
+    if (!selectedAuction) {
+      toast({ title: "Error", description: "Selected auction not found.", variant: "destructive" });
+      setIsSubmitting(false);
+      return;
+    }
+    
     let newReceiptNumber = "";
     let receiptPdfDownloadUrl: string | null = null;
     let newCollectionRecordId = "";
@@ -428,9 +436,6 @@ export function AdminRecordCollectionForm() {
         if (!newReceiptNumber) throw new Error("Failed to generate unique receipt number.");
         console.log("Generated Receipt Number:", newReceiptNumber);
 
-        const selectedAuction = values.selectedAuctionId && values.selectedAuctionId !== NO_AUCTION_SELECTED_VALUE 
-                                ? groupAuctions.find(a => a.id === values.selectedAuctionId) 
-                                : null;
         console.log("Selected Auction for Chit/Due Amount:", selectedAuction);
 
         let chitAmountForDue: number | null = null;
@@ -449,7 +454,7 @@ export function AdminRecordCollectionForm() {
         }
         console.log("Calculated balanceAmountAfterPayment:", balanceAmountAfterPayment);
 
-        const collectionLocationToStore = currentLocationValue; // Since "Office" option is removed
+        const collectionLocationToStore = currentLocationValue;
         const virtualId = generate7DigitRandomNumber();
 
         const userDocRefForDueRead = doc(db, "users", selectedUser.id);
@@ -596,19 +601,18 @@ export function AdminRecordCollectionForm() {
               name="selectedAuctionId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>For Auction No. (Optional)</FormLabel>
+                  <FormLabel>For Auction No.</FormLabel>
                   <Select 
                     onValueChange={field.onChange} 
-                    value={field.value === NO_AUCTION_SELECTED_VALUE ? undefined : field.value} 
+                    value={field.value} 
                     disabled={!watchedGroupId || loadingAuctions}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={!watchedGroupId ? "Select group first" : (loadingAuctions ? "Loading auctions..." : "Select an auction (or general due)")} />
+                        <SelectValue placeholder={!watchedGroupId ? "Select group first" : (loadingAuctions ? "Loading auctions..." : "Select an auction")} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value={NO_AUCTION_SELECTED_VALUE}>General Due / Not for Specific Auction</SelectItem>
                       {groupAuctions.map((auction) => (
                         <SelectItem key={auction.id} value={auction.id}>
                           Auction #{auction.auctionNumber} - {auction.auctionMonth} (Due: {formatCurrencyLocal(auction.finalAmountToBePaid)})
@@ -829,4 +833,3 @@ export function AdminRecordCollectionForm() {
     </Card>
   );
 }
-
