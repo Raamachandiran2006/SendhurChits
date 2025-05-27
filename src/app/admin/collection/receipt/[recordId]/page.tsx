@@ -19,10 +19,12 @@ const formatCurrency = (amount: number | null | undefined) => {
 const formatDate = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
   if (!dateString) return "N/A";
   try {
-    const date = new Date(dateString.replace(/-/g, '/'));
+    // Try to parse date strings like "YYYY-MM-DD" or "MM/DD/YYYY"
+    const date = new Date(dateString.replace(/-/g, '/')); 
     if (isNaN(date.getTime())) {
+        // Fallback for ISO-like strings if direct parsing failed
         const isoDate = new Date(dateString);
-        if (isNaN(isoDate.getTime())) return "N/A";
+        if (isNaN(isoDate.getTime())) return "N/A"; // Truly unparsable
         return format(isoDate, outputFormat);
     }
     return format(date, outputFormat);
@@ -67,6 +69,22 @@ export default function AdminCollectionReceiptPage() {
 
   const handlePrint = () => {
     if (!receipt) return;
+
+    const companyName = receipt.companyName || "Sendhur Chits";
+    const receiptNumber = receipt.receiptNumber || 'N/A';
+    const paymentDate = formatDate(receipt.paymentDate, "dd-MMM-yyyy");
+    const paymentTime = receipt.paymentTime || '';
+    const groupName = receipt.groupName || 'N/A';
+    const groupId = receipt.groupId ? `(ID: ${receipt.groupId})` : '';
+    const userFullname = receipt.userFullname || 'N/A';
+    const userUsername = receipt.userUsername ? `(@${receipt.userUsername})` : '';
+    const dueNumberHtml = receipt.dueNumber ? `<div class="section-item"><span class="field-label">Due No.:</span><span class="field-value"> ${receipt.dueNumber}</span></div>` : '';
+    const chitAmountHtml = (receipt.chitAmount !== null && receipt.chitAmount !== undefined) ? `<div class="section-item"><span class="field-label">Installment:</span><span class="field-value"> ${formatCurrency(receipt.chitAmount)}</span></div>` : '';
+    const paidAmount = formatCurrency(receipt.amount);
+    const totalBalanceHtml = (receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) ? `<div class="section-item"><span class="field-label">Total Balance:</span><span class="field-value"> ${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</span></div>` : '';
+    const paymentMode = receipt.paymentMode || 'N/A';
+    const remarksHtml = (receipt.remarks && receipt.remarks.trim() !== "") ? `<div class="section-item"><span class="field-label">Remarks:</span><span class="field-value"> ${receipt.remarks}</span></div>` : '';
+
 
     const receiptHTML = `
       <!DOCTYPE html>
@@ -126,7 +144,7 @@ export default function AdminCollectionReceiptPage() {
               font-size: 11pt !important;
               line-height: 1.3 !important;
               color: black !important;
-              font-weight: normal !important;
+              font-weight: normal !important; /* Base font weight */
               margin: 0 auto; 
             }
             .center { text-align: center !important; }
@@ -158,18 +176,18 @@ export default function AdminCollectionReceiptPage() {
       <body>
         <div id="printable-receipt-area">
           <div class="receipt-print-content" id="receipt-content">
-            <div class="company-name">${receipt.companyName || "Sendhur Chits"}</div>
-            <div class="receipt-info">Receipt No: ${receipt.receiptNumber || 'N/A'}</div>
-            <div class="receipt-info">Date: ${formatDate(receipt.paymentDate, "dd-MMM-yyyy")} ${receipt.paymentTime || ''}</div>
+            <div class="company-name">${companyName}</div>
+            <div class="receipt-info">Receipt No: ${receiptNumber}</div>
+            <div class="receipt-info">Date: ${paymentDate} ${paymentTime}</div>
             <hr>
-            <div class="section-item"><span class="field-label">Group:</span><span class="field-value"> ${receipt.groupName || 'N/A'} ${receipt.groupId ? `(ID: ${receipt.groupId})` : ''}</span></div>
-            <div class="section-item"><span class="field-label">Member:</span><span class="field-value"> ${receipt.userFullname || 'N/A'} ${receipt.userUsername ? `(@${receipt.userUsername})` : ''}</span></div>
-            ${receipt.dueNumber ? `<div class="section-item"><span class="field-label">Due No.:</span><span class="field-value"> ${receipt.dueNumber}</span></div>` : ''}
-            ${receipt.chitAmount !== null && receipt.chitAmount !== undefined ? `<div class="section-item"><span class="field-label">Installment:</span><span class="field-value"> ${formatCurrency(receipt.chitAmount)}</span></div>` : ''}
-            <div class="section-item"><span class="field-label">Paid:</span><span class="field-value"> ${formatCurrency(receipt.amount)}</span></div>
-            ${receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined ? `<div class="section-item"><span class="field-label">Total Balance:</span><span class="field-value"> ${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</span></div>` : ''}
-            <div class="section-item"><span class="field-label">Mode:</span><span class="field-value"> ${receipt.paymentMode || 'N/A'}</span></div>
-            ${receipt.remarks && receipt.remarks.trim() !== "" ? `<div class="section-item"><span class="field-label">Remarks:</span><span class="field-value"> ${receipt.remarks}</span></div>` : ''}
+            <div class="section-item"><span class="field-label">Group:</span><span class="field-value"> ${groupName} ${groupId}</span></div>
+            <div class="section-item"><span class="field-label">Member:</span><span class="field-value"> ${userFullname} ${userUsername}</span></div>
+            ${dueNumberHtml}
+            ${chitAmountHtml}
+            <div class="section-item"><span class="field-label">Paid:</span><span class="field-value"> ${paidAmount}</span></div>
+            ${totalBalanceHtml}
+            <div class="section-item"><span class="field-label">Mode:</span><span class="field-value"> ${paymentMode}</span></div>
+            ${remarksHtml}
             <hr>
             <div class="thank-you">Thank You!</div>
           </div>
@@ -190,12 +208,13 @@ export default function AdminCollectionReceiptPage() {
       frameDoc.open();
       frameDoc.write(receiptHTML);
       frameDoc.close();
-      printFrame.contentWindow?.focus();
+      printFrame.contentWindow?.focus(); // Focus is important for some browsers
       printFrame.contentWindow?.print();
     }
+    // Optional: remove the iframe after printing (can sometimes cause issues if removed too soon)
     setTimeout(() => {
       document.body.removeChild(printFrame);
-    }, 1000);
+    }, 1000); // Delay removal
   };
 
   const handleDownloadPdf = () => {
@@ -210,7 +229,7 @@ export default function AdminCollectionReceiptPage() {
       document.body.removeChild(link);
       return;
     }
-
+    // Fallback: generate PDF client-side if URL not available
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -301,49 +320,47 @@ export default function AdminCollectionReceiptPage() {
     );
   }
 
+  // On-screen display (not for thermal printing)
   return (
     <div id="receipt-content-wrapper" className="flex flex-col items-center justify-start min-h-screen bg-background p-4 print:bg-white print:p-0">
-      <div id="printable-receipt-area">
-        <div id="receipt-content" className="w-full max-w-xs bg-white p-6 shadow-lg print:shadow-none print:p-0 print:border-none">
+      <div id="printable-receipt-area" className="print:block"> {/* printable-receipt-area is mostly for print CSS */}
+        <div id="receipt-content" className="w-full max-w-md bg-card p-6 shadow-lg print:shadow-none print:p-0 print:border-none"> {/* Adjusted max-w-md for better screen view */}
             <div className="text-center mb-4">
             <h1 className="text-xl font-bold">{receipt.companyName || "Sendhur Chits"}</h1>
             <p className="text-sm">Payment Receipt</p>
             </div>
             <div className="text-xs space-y-1 border-t border-b border-dashed border-gray-400 py-2 my-2">
-            <p><strong>Receipt No:</strong> ${receipt.receiptNumber}</p>
-            <p><strong>Date:</strong> ${formatDate(receipt.paymentDate)} ${receipt.paymentTime}</p>
+            <p><strong>Receipt No:</strong> {receipt.receiptNumber}</p>
+            <p><strong>Date:</strong> {formatDate(receipt.paymentDate)} {receipt.paymentTime}</p>
             </div>
             <div className="text-xs space-y-1 mb-2">
-            <p><strong>Group:</strong> ${receipt.groupName} ${receipt.groupId ? `(ID: ${receipt.groupId})` : ''}</p>
-            <p><strong>Member:</strong> ${receipt.userFullname} ${receipt.userUsername ? `(@${receipt.userUsername})` : ''}</p>
-            ${receipt.dueNumber ? `<p><strong>Due No:</strong> ${receipt.dueNumber}</p>` : ''}
-            ${receipt.chitAmount !== null && receipt.chitAmount !== undefined ? `<p><strong>Installment Amount:</strong> ${formatCurrency(receipt.chitAmount)}</p>` : ''}
-            <p className="font-bold text-sm"><strong>Paid Amount:</strong> ${formatCurrency(receipt.amount)}</p>
-            ${receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined ? `<p><strong>Total Balance:</strong> ${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</p>` : ''}
-            <p><strong>Payment Mode:</strong> ${receipt.paymentMode}</p>
+            <p><strong>Group:</strong> {receipt.groupName} {receipt.groupId ? `(ID: ${receipt.groupId})` : ''}</p>
+            <p><strong>Member:</strong> {receipt.userFullname} {receipt.userUsername ? `(@${receipt.userUsername})` : ''}</p>
+            {receipt.dueNumber ? <p><strong>Due No:</strong> {receipt.dueNumber}</p> : null}
+            {(receipt.chitAmount !== null && receipt.chitAmount !== undefined) ? <p><strong>Installment Amount:</strong> {formatCurrency(receipt.chitAmount)}</p> : null}
+            <p className="font-bold text-sm"><strong>Paid Amount:</strong> {formatCurrency(receipt.amount)}</p>
+            {(receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) ? <p><strong>Total Balance:</strong> {formatCurrency(receipt.userTotalDueBeforeThisPayment)}</p> : null}
+            <p><strong>Payment Mode:</strong> {receipt.paymentMode}</p>
             </div>
             <div className="text-xs space-y-1 border-t border-dashed border-gray-400 pt-2 mt-2">
-            ${receipt.remarks && receipt.remarks.trim() !== "" ? `<p><strong>Remarks:</strong> ${receipt.remarks}</p>` : ''}
-            ${receipt.virtualTransactionId && <p><strong>Virtual ID:</strong> ${receipt.virtualTransactionId}</p>}
+            {receipt.remarks && receipt.remarks.trim() !== "" ? <p><strong>Remarks:</strong> {receipt.remarks}</p> : null}
+            {receipt.virtualTransactionId && <p><strong>Virtual ID:</strong> {receipt.virtualTransactionId}</p>}
             <p className="text-center mt-4">Thank You!</p>
             </div>
         </div>
       </div>
 
-      <div className="mt-6 flex space-x-3 print:hidden">
-        <Button onClick={handleViewUserDues} variant="outline">
+      <div className="mt-6 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 print:hidden">
+        <Button onClick={handleViewUserDues} variant="outline" className="w-full sm:w-auto">
             <Eye className="mr-2 h-4 w-4"/> View User Dues
         </Button>
-        <Button onClick={handlePrint} variant="outline">
-          <Printer className="mr-2 h-4 w-4" /> Print
+        <Button onClick={handlePrint} variant="outline" className="w-full sm:w-auto">
+          <Printer className="mr-2 h-4 w-4" /> Print Receipt
         </Button>
-        <Button onClick={handleDownloadPdf}>
+        <Button onClick={handleDownloadPdf} className="w-full sm:w-auto">
           <DownloadIcon className="mr-2 h-4 w-4" /> Download PDF
         </Button>
       </div>
     </div>
   );
 }
-    
-
-    
