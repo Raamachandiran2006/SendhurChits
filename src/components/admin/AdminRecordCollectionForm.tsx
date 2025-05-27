@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db, storage } from "@/lib/firebase";
-import { ref as storageRefFB, uploadBytes, getDownloadURL } from "firebase/storage"; 
+import { ref as storageRefFB, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc, orderBy, getDoc } from "firebase/firestore";
 import type { Group, User, CollectionRecord, Admin, AuctionRecord } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -119,11 +119,11 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         const lineHeight = 5; 
         const margin = 3; 
 
-        doc.setFont('Times New Roman', 'bold'); 
+        doc.setFont('Times-Bold'); 
         doc.setFontSize(12); 
-        doc.text(recordData.companyName || "Sendhur Chits", doc.internal.pageSize.width / 2, y, { align: 'center' }); y += lineHeight * 1.5;
+        doc.text(String(recordData.companyName || "Sendhur Chits"), doc.internal.pageSize.width / 2, y, { align: 'center' }); y += lineHeight * 1.5;
         
-        doc.setFont('Times New Roman', 'normal'); 
+        doc.setFont('Times-Roman'); 
         doc.setFontSize(12); 
         doc.text(`Receipt No: ${recordData.receiptNumber || 'N/A'}`, doc.internal.pageSize.width / 2, y, { align: 'center' }); y += lineHeight;
         doc.text(`Date: ${formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy")} ${recordData.paymentTime || ''}`, doc.internal.pageSize.width / 2, y, { align: 'center' }); y += lineHeight;
@@ -133,7 +133,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         doc.setLineDashPattern([], 0); 
         
         y += lineHeight * 0.5;
-        doc.setFontSize(12); 
+        
         const wrapText = (text: string, x: number, yPos: number, maxWidth: number, lHeight: number): number => {
             const lines = doc.splitTextToSize(text, maxWidth);
             doc.text(lines, x, yPos);
@@ -141,11 +141,14 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         };
 
         const printLine = (label: string, value: string | number | null | undefined, yPos: number, isBoldValue: boolean = false): number => {
-            doc.setFont('Times New Roman', 'bold');
+            doc.setFont('Times-Bold');
+            doc.setFontSize(12);
             doc.text(label, margin, yPos);
             const labelWidth = doc.getTextWidth(label);
-            doc.setFont('Times New Roman', isBoldValue ? 'bold' : 'normal');
-            return wrapText(value?.toString() || 'N/A', margin + labelWidth + 2, yPos, 66 - labelWidth - 2, lineHeight);
+            
+            doc.setFont(isBoldValue ? 'Times-Bold' : 'Times-Roman');
+            doc.setFontSize(12);
+            return wrapText(String(value || 'N/A'), margin + labelWidth + 2, yPos, 66 - labelWidth - 2, lineHeight);
         };
         
         y = printLine("Group:", recordData.groupName || 'N/A', y);
@@ -177,8 +180,8 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         doc.setLineDashPattern([], 0);
         
         y += lineHeight;
+        doc.setFont('Times-Roman');
         doc.setFontSize(12);
-        doc.setFont('Times New Roman', 'normal');
         doc.text("Thank You!", doc.internal.pageSize.width / 2, y, { align: 'center' });
         
         return doc.output('blob');
@@ -253,7 +256,7 @@ export function AdminRecordCollectionForm() {
     resolver: zodResolver(recordCollectionFormSchema),
     defaultValues: {
       selectedGroupId: "",
-      selectedAuctionId: "", 
+      selectedAuctionId: "",
       selectedUserId: "",
       paymentDate: new Date(),
       paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
@@ -434,6 +437,8 @@ export function AdminRecordCollectionForm() {
     let receiptPdfDownloadUrl: string | null = null;
     let newCollectionRecordId = "";
     let userDueBeforePayment: number | null = null;
+    let totalPaidForThisSpecificDue: number | null = null;
+    let balanceForThisSpecificInstallment: number | null = null;
 
     try {
         console.log("Attempting to generate unique receipt number...");
@@ -450,7 +455,7 @@ export function AdminRecordCollectionForm() {
             chitAmountForDue = selectedAuction.finalAmountToBePaid;
             dueNumberForRecord = selectedAuction.auctionNumber || null;
         } else if (selectedGroup && selectedGroup.rate !== null && selectedGroup.rate !== undefined) {
-            chitAmountForDue = selectedGroup.rate;
+            chitAmountForDue = selectedGroup.rate; // Fallback if auction specific amount not found
         }
         console.log("Calculated chitAmountForDue:", chitAmountForDue, "dueNumberForRecord:", dueNumberForRecord);
 
@@ -472,6 +477,29 @@ export function AdminRecordCollectionForm() {
           throw new Error("User document not found when trying to read current due amount.");
         }
         console.log("Fetched userTotalDueBeforeThisPayment:", userDueBeforePayment);
+        
+        // Calculate total paid for THIS specific due including this transaction for PDF
+        if (selectedUser.id && selectedGroup.id && dueNumberForRecord !== null) {
+            const collectionsForDueQuery = query(
+            collection(db, "collectionRecords"),
+            where("userId", "==", selectedUser.id),
+            where("groupId", "==", selectedGroup.id),
+            where("auctionNumber", "==", dueNumberForRecord)
+            );
+            const collectionsForDueSnapshot = await getDocs(collectionsForDueQuery);
+            let sumPaidForDueAlready = 0;
+            collectionsForDueSnapshot.forEach(snap => {
+            sumPaidForDueAlready += (snap.data() as CollectionRecord).amount || 0;
+            });
+            totalPaidForThisSpecificDue = sumPaidForDueAlready + values.amount; // Add current payment
+            if(chitAmountForDue !== null) {
+              balanceForThisSpecificInstallment = chitAmountForDue - totalPaidForThisSpecificDue;
+            }
+        } else if (chitAmountForDue !== null) {
+            totalPaidForThisSpecificDue = values.amount;
+            balanceForThisSpecificInstallment = chitAmountForDue - values.amount;
+        }
+
 
         const tempRecordDataForPdf: Partial<CollectionRecord> = {
             companyName: "Sendhur Chits",
@@ -489,7 +517,9 @@ export function AdminRecordCollectionForm() {
             chitAmount: chitAmountForDue,
             amount: values.amount,
             userTotalDueBeforeThisPayment: userDueBeforePayment,
-            balanceAmount: balanceAmountAfterPayment,
+            balanceAmount: balanceAmountAfterPayment, // This is balance for *this bill* against *this due*
+            totalPaidForThisDue: totalPaidForThisSpecificDue, // For PDF Display
+            balanceForThisInstallment: balanceForThisSpecificInstallment, // For PDF Display
             paymentMode: values.paymentMode,
             remarks: values.remarks || "Auction Collection",
             virtualTransactionId: virtualId,
@@ -522,6 +552,8 @@ export function AdminRecordCollectionForm() {
             dueNumber: dueNumberForRecord,
             userTotalDueBeforeThisPayment: userDueBeforePayment,
             balanceAmount: balanceAmountAfterPayment,
+            totalPaidForThisDue: totalPaidForThisSpecificDue,
+            balanceForThisInstallment: balanceForThisSpecificInstallment,
             remarks: values.remarks || "Auction Collection",
             collectionLocation: collectionLocationToStore,
             recordedByEmployeeId: admin.id, 
@@ -558,9 +590,9 @@ export function AdminRecordCollectionForm() {
     } catch (error) {
       console.error("Error recording collection in onSubmit:", error);
       toast({ title: "Error", description: "Could not record collection. " + (error as Error).message, variant: "destructive" });
-    } finally {
-      setIsSubmitting(false);
-    }
+      setIsSubmitting(false); // Re-enable button on error
+    } 
+    // No finally for setIsSubmitting here, as redirect handles it on success
   }
 
   return (
@@ -839,3 +871,5 @@ export function AdminRecordCollectionForm() {
     </Card>
   );
 }
+
+    

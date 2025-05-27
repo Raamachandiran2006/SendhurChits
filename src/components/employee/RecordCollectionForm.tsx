@@ -121,11 +121,11 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     const lineHeight = 5;
     const margin = 3;
 
-    doc.setFont('Times New Roman', 'bold'); 
+    doc.setFont('Times-Bold'); 
     doc.setFontSize(12);
-    doc.text(recordData.companyName || "Sendhur Chits", doc.internal.pageSize.width / 2, y, { align: 'center' }); y += lineHeight * 1.5;
+    doc.text(String(recordData.companyName || "Sendhur Chits"), doc.internal.pageSize.width / 2, y, { align: 'center' }); y += lineHeight * 1.5;
     
-    doc.setFont('Times New Roman', 'normal'); 
+    doc.setFont('Times-Roman'); 
     doc.setFontSize(12);
     doc.text(`Receipt No: ${recordData.receiptNumber || 'N/A'}`, doc.internal.pageSize.width / 2, y, { align: 'center' }); y += lineHeight;
     doc.text(`Date: ${formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy")} ${recordData.paymentTime || ''}`, doc.internal.pageSize.width / 2, y, { align: 'center' }); y += lineHeight;
@@ -135,7 +135,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     doc.setLineDashPattern([], 0);
     
     y += lineHeight * 0.5;
-    doc.setFontSize(12);
+    
     const wrapText = (text: string, x: number, yPos: number, maxWidth: number, lHeight: number): number => {
         const lines = doc.splitTextToSize(text, maxWidth);
         doc.text(lines, x, yPos);
@@ -143,11 +143,14 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     };
     
     const printLine = (label: string, value: string | number | null | undefined, yPos: number, isBoldValue: boolean = false): number => {
-        doc.setFont('Times New Roman', 'bold');
+        doc.setFont('Times-Bold');
+        doc.setFontSize(12);
         doc.text(label, margin, yPos);
         const labelWidth = doc.getTextWidth(label);
-        doc.setFont('Times New Roman', isBoldValue ? 'bold' : 'normal');
-        return wrapText(value?.toString() || 'N/A', margin + labelWidth + 2, yPos, 66 - labelWidth - 2, lineHeight);
+        
+        doc.setFont(isBoldValue ? 'Times-Bold' : 'Times-Roman');
+        doc.setFontSize(12);
+        return wrapText(String(value || 'N/A'), margin + labelWidth + 2, yPos, 66 - labelWidth - 2, lineHeight);
     };
 
     y = printLine("Group:", recordData.groupName || 'N/A', y);
@@ -180,8 +183,8 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     doc.setLineDashPattern([], 0);
     
     y += lineHeight;
+    doc.setFont('Times-Roman');
     doc.setFontSize(12);
-    doc.setFont('Times New Roman', 'normal');
     doc.text("Thank You!", doc.internal.pageSize.width / 2, y, { align: 'center' });
     
     return doc.output('blob');
@@ -196,6 +199,7 @@ async function generateAndUploadReceiptPdf(
   groupId: string,
   receiptNumber: string
 ): Promise<string | null> {
+  console.log("[PDF Upload] Starting PDF generation for receipt:", receiptNumber, "Group ID:", groupId);
   if (!receiptNumber || !groupId) {
     console.error("[PDF Upload] Critical: Missing groupId or receiptNumber for PDF upload path. Aborting PDF generation.");
     return null;
@@ -206,11 +210,15 @@ async function generateAndUploadReceiptPdf(
       console.error("[PDF Upload] PDF Blob generation failed for receipt:", receiptNumber);
       return null;
     }
+    console.log("[PDF Upload] PDF Blob generated, size:", pdfBlob.size);
     const pdfFileName = `receipt_${receiptNumber}_${Date.now()}.pdf`;
     const pdfStoragePath = `collection_receipts/${groupId}/${pdfFileName}`;
+    console.log("[PDF Upload] Attempting to upload to storage path:", pdfStoragePath);
     const pdfRef = storageRefFB(storage, pdfStoragePath);
     await uploadBytes(pdfRef, pdfBlob);
+    console.log("[PDF Upload] PDF uploaded to storage.");
     const downloadURL = await getDownloadURL(pdfRef);
+    console.log("[PDF Upload] PDF Download URL:", downloadURL);
     return downloadURL;
   } catch (error: any) {
     console.error("[PDF Upload] Error in generateAndUploadReceiptPdf:", error);
@@ -372,7 +380,7 @@ export function RecordCollectionForm() {
   ]);
 
 
-  const handleFetchLocation = () => {
+  const handleFetchLocation = useCallback(() => {
     if (navigator.geolocation) {
       setIsFetchingLocation(true);
       setLocationError(null);
@@ -395,7 +403,7 @@ export function RecordCollectionForm() {
     } else {
       setLocationError("Geolocation is not supported by this browser.");
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (watchedCollectionLocationOption === "Your Location") {
@@ -405,8 +413,7 @@ export function RecordCollectionForm() {
       setCurrentLocationValue(null);
       setLocationError(null);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedCollectionLocationOption]);
+  }, [watchedCollectionLocationOption, handleFetchLocation]);
 
 
   async function onSubmit(values: RecordCollectionFormValues) {
@@ -420,6 +427,7 @@ export function RecordCollectionForm() {
     }
 
     setIsSubmitting(true);
+    console.log("Employee Record Collection Form onSubmit - values:", values);
     const selectedGroup = groups.find(g => g.id === values.selectedGroupId);
     const selectedUser = groupMembers.find(m => m.id === values.selectedUserId);
 
@@ -433,11 +441,11 @@ export function RecordCollectionForm() {
     let receiptPdfDownloadUrl: string | null = null;
     let newCollectionRecordId = ""; 
     let userDueBeforePayment: number | null = null;
-    let totalPaidForThisSpecificDue: number | null = null; // For PDF
-    let balanceForThisSpecificInstallment: number | null = null; // For PDF
+    let totalPaidForThisSpecificDue: number | null = null;
+    let balanceForThisSpecificInstallment: number | null = null;
 
     try {
-      console.log("Starting onSubmit. Form values:", values);
+      console.log("Attempting to generate unique receipt number...");
       newReceiptNumber = await generateUniqueReceiptNumber();
       if (!newReceiptNumber) throw new Error("Failed to generate unique receipt number.");
       console.log("Generated Receipt Number:", newReceiptNumber);
@@ -445,7 +453,7 @@ export function RecordCollectionForm() {
       const selectedAuction = values.selectedAuctionId && values.selectedAuctionId !== NO_AUCTION_SELECTED_VALUE
                               ? groupAuctions.find(a => a.id === values.selectedAuctionId)
                               : null;
-      console.log("Selected Auction:", selectedAuction);
+      console.log("Selected Auction for Chit/Due Amount:", selectedAuction);
 
       let chitAmountForDue: number | null = null;
       let dueNumberForRecord: number | null = null;
@@ -453,7 +461,7 @@ export function RecordCollectionForm() {
           chitAmountForDue = selectedAuction.finalAmountToBePaid;
           dueNumberForRecord = selectedAuction.auctionNumber || null;
       } else if (selectedGroup && selectedGroup.rate !== null && selectedGroup.rate !== undefined) {
-          chitAmountForDue = selectedGroup.rate;
+          chitAmountForDue = selectedGroup.rate; // Fallback if auction specific amount not found or "general due"
       }
       console.log("Calculated chitAmountForDue:", chitAmountForDue, "dueNumberForRecord:", dueNumberForRecord);
 
@@ -475,8 +483,8 @@ export function RecordCollectionForm() {
         throw new Error("User document not found when trying to read current due amount.");
       }
       console.log("Fetched userTotalDueBeforeThisPayment (Overall):", userDueBeforePayment);
-
-      // Calculate total paid for THIS specific due before this transaction
+      
+      // Calculate total paid for THIS specific due including this transaction for PDF
       if (selectedUser.id && selectedGroup.id && dueNumberForRecord !== null) {
         const collectionsForDueQuery = query(
           collection(db, "collectionRecords"),
@@ -489,7 +497,7 @@ export function RecordCollectionForm() {
         collectionsForDueSnapshot.forEach(snap => {
           sumPaidForDueAlready += (snap.data() as CollectionRecord).amount || 0;
         });
-        totalPaidForThisSpecificDue = sumPaidForDueAlready + values.amount; // Add current payment for PDF
+        totalPaidForThisSpecificDue = sumPaidForDueAlready + values.amount; // Add current payment
         if(chitAmountForDue !== null) {
           balanceForThisSpecificInstallment = chitAmountForDue - totalPaidForThisSpecificDue;
         }
@@ -517,8 +525,8 @@ export function RecordCollectionForm() {
         amount: values.amount, // Current bill amount
         userTotalDueBeforeThisPayment: userDueBeforePayment, // User's overall due
         balanceAmount: balanceAmountAfterCurrentPayment, // Balance for current installment after this payment
-        totalPaidForThisDue: totalPaidForThisSpecificDue, // For PDF Display
-        balanceForThisInstallment: balanceForThisSpecificInstallment, // For PDF Display
+        totalPaidForThisDue: totalPaidForThisSpecificDue,
+        balanceForThisInstallment: balanceForThisSpecificInstallment,
         paymentMode: values.paymentMode,
         remarks: values.remarks || "Auction Collection",
         virtualTransactionId: virtualId,
@@ -592,7 +600,7 @@ export function RecordCollectionForm() {
       toast({ title: "Error", description: "Could not record collection. " + (error as Error).message, variant: "destructive" });
       setIsSubmitting(false); // Ensure button is re-enabled on error
     } 
-    // Removed finally block here, as redirect happens on success, and errors are caught
+    // No finally for setIsSubmitting here, as redirect handles it on success
   }
 
   return (
@@ -873,3 +881,5 @@ export function RecordCollectionForm() {
     </Card>
   );
 }
+
+    
