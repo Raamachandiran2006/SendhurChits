@@ -78,15 +78,15 @@ export default function AdminCollectionReceiptPage() {
           @media print {
             @page {
               margin: 0;
-              size: 72mm auto; /* Attempt to control paper size, auto height */
+              size: 72mm auto; 
             }
             body {
               margin: 0 !important;
               padding: 0 !important;
-              width: 72mm !important; /* Strict width for thermal printer */
-              font-family: 'Courier New', Courier, monospace !important; /* Monospace font often works best */
-              font-size: 13pt !important; /* Updated font size */
-              font-weight: bold !important; /* Make all text bold */
+              width: 72mm !important;
+              font-family: 'Courier New', Courier, monospace !important;
+              font-size: 11pt !important; /* Adjusted font size */
+              font-weight: bold !important;
               line-height: 1.3 !important;
               color: black !important;
               background-color: white !important;
@@ -94,7 +94,7 @@ export default function AdminCollectionReceiptPage() {
               print-color-adjust: exact !important;
             }
             .receipt-print-content {
-              padding: 2mm !important; /* Minimal internal padding */
+              padding: 2mm !important;
               width: 100% !important;
               box-sizing: border-box !important;
             }
@@ -107,33 +107,69 @@ export default function AdminCollectionReceiptPage() {
               margin: 1mm 0 !important;
             }
             p, div.section-item {
-              margin: 0.5mm 0 !important; /* Reduced vertical spacing */
+              margin: 0.5mm 0 !important;
               padding: 0 !important;
-              font-size: 13pt !important; /* Ensure this font size is consistent */
+              font-size: 11pt !important; /* Adjusted font size */
             }
             h1, h2, h3, h4, h5, h6 {
                 margin: 0.5mm 0 !important;
-                font-size: 13pt !important; /* Ensure this font size is consistent */
+                font-size: 11pt !important; /* Adjusted font size */
             }
+             body > *:not(#printable-receipt-area) {
+              display: none !important;
+              visibility: hidden !important;
+            }
+            #printable-receipt-area, #printable-receipt-area * {
+              visibility: visible !important;
+              display: block !important;
+            }
+            #printable-receipt-area {
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 72mm !important;
+              height: auto !important; 
+              min-height: 0 !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: white !important;
+              overflow: visible !important;
+            }
+            #printable-receipt-area #receipt-content {
+              width: 100% !important;
+              margin: 0 !important;
+              padding: 1mm 2mm !important; 
+              box-shadow: none !important;
+              border: none !important;
+              background: white !important;
+            }
+            /* Attempt to hide common dev server overlays */
+            iframe[id^="webpack-dev-server-client-overlay"] { display: none !important; visibility: hidden !important; }
+            iframe[id^="vite-error-overlay"] { display: none !important; visibility: hidden !important; }
+            div[id^="vite-plugin-checker-error-overlay"] { display: none !important; visibility: hidden !important; }
+            div[class*="firebase-emulator-warning"] { display: none !important; visibility: hidden !important; }
+
           }
         </style>
       </head>
       <body>
-        <div class="receipt-print-content">
-          <div class="center section-item">${receipt.companyName || "Sendhur Chits"}</div>
-          <div class="center section-item">Receipt No: ${receipt.receiptNumber || 'N/A'}</div>
-          <div class="center section-item">Date: ${formatDate(receipt.paymentDate, "dd-MMM-yyyy")} ${receipt.paymentTime || ''}</div>
-          <hr>
-          <div class="section-item">Group: ${receipt.groupName || 'N/A'} ${receipt.groupId ? `(ID: ${receipt.groupId})` : ''}</div>
-          <div class="section-item">Member: ${receipt.userFullname || 'N/A'} ${receipt.userUsername ? `(@${receipt.userUsername})` : ''}</div>
-          ${receipt.dueNumber ? `<div class="section-item">Due No.: ${receipt.dueNumber}</div>` : ''}
-          ${receipt.chitAmount !== null && receipt.chitAmount !== undefined ? `<div class="section-item">Installment: ${formatCurrency(receipt.chitAmount)}</div>` : ''}
-          <div class="section-item">Paid: ${formatCurrency(receipt.amount)}</div>
-          ${receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined ? `<div class="section-item">Total Balance: ${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</div>` : ''}
-          <div class="section-item">Mode: ${receipt.paymentMode || 'N/A'}</div>
-          ${receipt.remarks && receipt.remarks.trim() !== "" ? `<div class="section-item">Remarks: ${receipt.remarks}</div>` : ''}
-          <hr>
-          <div class="center section-item">Thank You!</div>
+        <div id="printable-receipt-area"> {/* Added this wrapper ID for print CSS */}
+          <div class="receipt-print-content" id="receipt-content"> {/* Ensure this ID is used for print specific styling */}
+            <div class="center section-item">${receipt.companyName || "Sendhur Chits"}</div>
+            <div class="center section-item">Receipt No: ${receipt.receiptNumber || 'N/A'}</div>
+            <div class="center section-item">Date: ${formatDate(receipt.paymentDate, "dd-MMM-yyyy")} ${receipt.paymentTime || ''}</div>
+            <hr>
+            <div class="section-item">Group: ${receipt.groupName || 'N/A'} ${receipt.groupId ? `(ID: ${receipt.groupId})` : ''}</div>
+            <div class="section-item">Member: ${receipt.userFullname || 'N/A'} ${receipt.userUsername ? `(@${receipt.userUsername})` : ''}</div>
+            ${receipt.dueNumber ? `<div class="section-item">Due No.: ${receipt.dueNumber}</div>` : ''}
+            ${receipt.chitAmount !== null && receipt.chitAmount !== undefined ? `<div class="section-item">Installment: ${formatCurrency(receipt.chitAmount)}</div>` : ''}
+            <div class="section-item">Paid: ${formatCurrency(receipt.amount)}</div>
+            ${receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined ? `<div class="section-item">Total Balance: ${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</div>` : ''}
+            <div class="section-item">Mode: ${receipt.paymentMode || 'N/A'}</div>
+            ${receipt.remarks && receipt.remarks.trim() !== "" ? `<div class="section-item">Remarks: ${receipt.remarks}</div>` : ''}
+            <hr>
+            <div class="center section-item">Thank You!</div>
+          </div>
         </div>
       </body>
       </html>
@@ -175,13 +211,13 @@ export default function AdminCollectionReceiptPage() {
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: [72, 200]
+      format: [72, 200] // Approximate thermal printer width, height auto
     });
     let y = 10;
     const lineHeight = 6; 
     const margin = 3; 
 
-    doc.setFontSize(10); 
+    doc.setFontSize(10); // Slightly larger base font for PDF
     doc.setFont('Courier', 'bold');
     doc.text(receipt.companyName || "Sendhur Chits", doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight * 1.5;
     
@@ -190,7 +226,7 @@ export default function AdminCollectionReceiptPage() {
     doc.text(`Receipt No: ${receipt.receiptNumber || 'N/A'}`, doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight;
     doc.text(`Date: ${formatDate(receipt.paymentDate, "dd-MMM-yyyy")} ${receipt.paymentTime || ''}`, doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight;
     
-    doc.line(margin, y, doc.internal.pageSize.getWidth() - margin, y); y += lineHeight * 0.5; 
+    doc.line(margin, y, doc.internal.pageSize.getWidth() - margin, y); y += lineHeight * 0.5; // Dashed line for separation
     
     y += lineHeight * 0.5;
     doc.text(`Group: ${receipt.groupName || 'N/A'} ${receipt.groupId ? `(ID: ${receipt.groupId})` : ''}`, margin, y); y += lineHeight;
@@ -214,7 +250,7 @@ export default function AdminCollectionReceiptPage() {
       doc.text(`Remarks: ${receipt.remarks}`, margin, y); y += lineHeight;
     }
     
-    doc.line(margin, y, doc.internal.pageSize.getWidth() - margin, y); y += lineHeight * 0.5;
+    doc.line(margin, y, doc.internal.pageSize.getWidth() - margin, y); y += lineHeight * 0.5; // Dashed line
     
     y += lineHeight;
     doc.setFontSize(9);
@@ -227,6 +263,7 @@ export default function AdminCollectionReceiptPage() {
     if (receipt && receipt.userId) {
       router.push(`/admin/users/${receipt.userId}#due-sheet`);
     } else {
+      // Fallback or error if receipt or userId is missing
       router.push('/admin/collection'); 
     }
   };
@@ -262,8 +299,9 @@ export default function AdminCollectionReceiptPage() {
     );
   }
 
+  // This is the on-screen display, not for direct printing
   return (
-    <div id="printable-receipt-area" className="flex flex-col items-center justify-start min-h-screen bg-background p-4 print:bg-white print:p-0">
+    <div id="receipt-content-wrapper" className="flex flex-col items-center justify-start min-h-screen bg-background p-4 print:bg-white print:p-0">
       <div id="receipt-content" className="w-full max-w-xs bg-white p-6 shadow-lg print:shadow-none print:p-0 print:border-none">
         <div className="text-center mb-4">
           <h1 className="text-xl font-bold">{receipt.companyName || "Sendhur Chits"}</h1>
@@ -307,6 +345,4 @@ export default function AdminCollectionReceiptPage() {
     </div>
   );
 }
-    
-
     
