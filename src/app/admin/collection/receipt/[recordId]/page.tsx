@@ -82,8 +82,6 @@ export default function AdminCollectionReceiptPage() {
     const paidAmount = formatCurrency(receipt.amount);
     const totalBalanceHtml = (receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) ? `<div class="section-item"><span class="field-label">Total Balance:</span> <span class="field-value">${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</span></div>` : '';
     const paymentMode = receipt.paymentMode || 'N/A';
-    const remarksHtml = (receipt.remarks && receipt.remarks.trim() !== "") ? `<div class="section-item"><span class="field-label">Remarks:</span> <span class="field-value">${receipt.remarks}</span></div>` : '';
-
 
     const receiptHTML = `
       <!DOCTYPE html>
@@ -107,7 +105,7 @@ export default function AdminCollectionReceiptPage() {
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
-             body > *:not(#printable-receipt-area) {
+            body > *:not(#printable-receipt-area) {
               display: none !important;
               visibility: hidden !important;
             }
@@ -130,7 +128,7 @@ export default function AdminCollectionReceiptPage() {
             #printable-receipt-area #receipt-content {
               width: 100% !important;
               margin: 0 !important;
-              padding: 1mm !important; /* Reduced padding */
+              padding: 1mm !important; 
               box-shadow: none !important;
               background: white !important;
               box-sizing: border-box !important;
@@ -138,8 +136,9 @@ export default function AdminCollectionReceiptPage() {
             .receipt-print-content {
               font-family: 'Courier New', Courier, monospace !important;
               font-size: 11pt !important; 
-              line-height: 1.2 !important; /* Slightly reduced line height */
+              line-height: 1.2 !important;
               color: black !important;
+              font-weight: normal !important;
             }
             .center { text-align: center !important; }
             .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 11pt !important; }
@@ -150,11 +149,11 @@ export default function AdminCollectionReceiptPage() {
               justify-content: flex-start !important;
               align-items: baseline !important; 
               margin-bottom: 0.5mm !important;
-              white-space: nowrap; /* Force on one line - might truncate */
-              overflow: hidden; /* Hide overflow if nowrap causes it */
-              text-overflow: ellipsis; /* Add ellipsis if truncated */
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
             }
-            .field-label { display: inline !important; font-weight: bold !important; padding-right: 0.5em; /* Add padding for space instead of margin on value */ }
+            .field-label { display: inline !important; font-weight: bold !important; padding-right: 0.5em; }
             .field-value { display: inline !important; font-weight: normal !important; }
 
             .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 0.5mm !important; font-size: 11pt !important; }
@@ -184,14 +183,13 @@ export default function AdminCollectionReceiptPage() {
             <div class="receipt-info">Receipt No: ${receiptNumber}</div>
             <div class="receipt-info">Date: ${paymentDate} ${paymentTime}</div>
             <hr>
-            <div class="section-item"><span class="field-label">Group:</span><span class="field-value">${groupName} ${groupId}</span></div>
-            <div class="section-item"><span class="field-label">Member:</span><span class="field-value">${userFullname} ${userUsername}</span></div>
+            <div class="section-item"><span class="field-label">Group:</span><span class="field-value"> ${groupName} ${groupId}</span></div>
+            <div class="section-item"><span class="field-label">Member:</span><span class="field-value"> ${userFullname} ${userUsername}</span></div>
             ${dueNumberHtml}
             ${chitAmountHtml}
-            <div class="section-item"><span class="field-label">Paid:</span><span class="field-value">${paidAmount}</span></div>
+            <div class="section-item"><span class="field-label">Paid:</span><span class="field-value"> ${paidAmount}</span></div>
             ${totalBalanceHtml}
-            <div class="section-item"><span class="field-label">Mode:</span><span class="field-value">${paymentMode}</span></div>
-            ${remarksHtml}
+            <div class="section-item"><span class="field-label">Mode:</span><span class="field-value"> ${paymentMode}</span></div>
             <hr>
             <div class="thank-you">Thank You!</div>
           </div>
@@ -279,9 +277,6 @@ export default function AdminCollectionReceiptPage() {
         y = wrapText(`Total Balance: ${formatCurrency(receipt.userTotalDueBeforeThisPayment)}`, margin, y, 66, lineHeight);
     }
     y = wrapText(`Mode: ${receipt.paymentMode || 'N/A'}`, margin, y, 66, lineHeight);
-     if (receipt.remarks && receipt.remarks.trim() !== "") {
-      y = wrapText(`Remarks: ${receipt.remarks}`, margin, y, 66, lineHeight);
-    }
     
     doc.setLineDashPattern([1, 1], 0);
     doc.line(margin, y, doc.internal.pageSize.getWidth() - margin, y); y += lineHeight * 0.5;
@@ -304,7 +299,7 @@ export default function AdminCollectionReceiptPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-4">
+      <div id="printable-receipt-area" className="flex min-h-screen flex-col items-center justify-center p-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="mt-2 text-muted-foreground">Loading receipt...</p>
       </div>
@@ -313,7 +308,7 @@ export default function AdminCollectionReceiptPage() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-4 text-center">
+      <div id="printable-receipt-area" className="flex min-h-screen flex-col items-center justify-center p-4 text-center">
         <p className="text-destructive">{error}</p>
         <Button onClick={() => router.back()} variant="outline" className="mt-4">
           <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
@@ -324,7 +319,7 @@ export default function AdminCollectionReceiptPage() {
 
   if (!receipt) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-4">
+      <div id="printable-receipt-area" className="flex min-h-screen flex-col items-center justify-center p-4">
         <p>Receipt not found.</p>
          <Button onClick={() => router.back()} variant="outline" className="mt-4">
            <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
@@ -336,12 +331,7 @@ export default function AdminCollectionReceiptPage() {
   // On-screen display (not for thermal printing)
   return (
     <div id="receipt-content-wrapper" className="flex flex-col items-center justify-start min-h-screen bg-background p-4 print:bg-white print:p-0">
-      <div id="printable-receipt-area" className="print:block hidden">
-        {/* This content is structured for the dynamic HTML in handlePrint */}
-      </div>
-
-      {/* Screen Display Version */}
-      <div id="screen-receipt-content" className="w-full max-w-md bg-card p-6 shadow-lg">
+      <div id="screen-receipt-content" className="w-full max-w-md bg-card p-6 shadow-lg print:p-0">
           <div className="text-center mb-4">
           <h1 className="text-xl font-bold">{receipt.companyName || "Sendhur Chits"}</h1>
           <p className="text-sm">Payment Receipt</p>
@@ -360,7 +350,6 @@ export default function AdminCollectionReceiptPage() {
           <p><strong>Payment Mode:</strong> {receipt.paymentMode}</p>
           </div>
           <div className="text-xs space-y-1 border-t border-dashed border-gray-400 pt-2 mt-2">
-          {receipt.remarks && receipt.remarks.trim() !== "" ? <p><strong>Remarks:</strong> {receipt.remarks}</p> : null}
           {receipt.virtualTransactionId && <p><strong>Virtual ID:</strong> {receipt.virtualTransactionId}</p>}
           <p className="text-center mt-4">Thank You!</p>
           </div>
@@ -380,4 +369,3 @@ export default function AdminCollectionReceiptPage() {
     </div>
   );
 }
-
