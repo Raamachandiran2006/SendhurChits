@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import type { User, Group, CollectionRecord, PaymentRecord as AdminPaymentRecordType, AuctionRecord } from "@/types";
 import { db, storage } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, documentId, getDocs, updateDoc, runTransaction, orderBy, Timestamp, limit } from "firebase/firestore";
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { ref as storageRefFB, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -232,7 +232,7 @@ export default function AdminUserDetailPage() {
 
   const [user, setUser] = useState<User | null>(null);
   const [userGroups, setUserGroups] = useState<Group[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingUser, setLoadingUser] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -263,12 +263,10 @@ export default function AdminUserDetailPage() {
   const fetchUserDetailsAndTransactions = useCallback(async () => {
     if (!userId) {
       setError("User ID is missing or invalid.");
-      setLoading(false);
-      setLoadingTransactions(false);
-      setLoadingDueSheet(false);
+      setLoadingUser(false); setLoadingTransactions(false); setLoadingDueSheet(false);
       return;
     }
-    setLoading(true); setLoadingTransactions(true); setLoadingDueSheet(true);
+    setLoadingUser(true); setLoadingTransactions(true); setLoadingDueSheet(true);
     setError(null); setTransactionError(null);
     try {
       const userDocRef = doc(db, "users", userId);
@@ -277,7 +275,7 @@ export default function AdminUserDetailPage() {
       if (!userDocSnap.exists()) {
         setError("User not found.");
         setUser(null);
-        setLoading(false); setLoadingTransactions(false); setLoadingDueSheet(false);
+        setLoadingUser(false); setLoadingTransactions(false); setLoadingDueSheet(false);
         return;
       }
       const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
@@ -301,7 +299,6 @@ export default function AdminUserDetailPage() {
       });
       setCapturedImage(userData.photoUrl || null);
 
-      // Fetch User Groups
       const fetchedGroups: Group[] = [];
       if (userData.groups && userData.groups.length > 0) {
         const groupsRef = collection(db, "groups");
@@ -315,8 +312,8 @@ export default function AdminUserDetailPage() {
         }
       }
       setUserGroups(fetchedGroups);
+      setLoadingUser(false);
 
-      // Fetch Payment Transactions for the user
       let combinedTransactions: AdminUserTransaction[] = [];
       const collectionsRef = collection(db, "collectionRecords");
       const collectionsQuery = query(collectionsRef, where("userId", "==", userId), orderBy("recordedAt", "desc"));
@@ -328,7 +325,7 @@ export default function AdminUserDetailPage() {
           type: "Sent by User",
           dateTime: parseDateTimeForSort(data.paymentDate, data.paymentTime, data.recordedAt),
           fromParty: `User: ${userData.fullname} (${userData.username})`,
-          toParty: "ChitConnect (Company)",
+          toParty: "Sendhur Chits (Company)",
           amount: data.amount,
           mode: data.paymentMode,
           remarksOrSource: data.remarks || `Payment for Group: ${data.groupName}`,
@@ -346,7 +343,7 @@ export default function AdminUserDetailPage() {
           id: docSnap.id,
           type: "Received by User",
           dateTime: parseDateTimeForSort(data.paymentDate, data.paymentTime, data.recordedAt),
-          fromParty: "ChitConnect (Company)",
+          fromParty: "Sendhur Chits (Company)",
           toParty: `User: ${userData.fullname} (${userData.username})`,
           amount: data.amount,
           mode: data.paymentMode,
@@ -360,7 +357,6 @@ export default function AdminUserDetailPage() {
       setFilteredUserTransactions(combinedTransactions); 
       setLoadingTransactions(false);
 
-      // Fetch and Process Due Sheet Items
       const processedDueSheetItems: DueSheetItem[] = [];
       if (fetchedGroups.length > 0) { 
         for (const group of fetchedGroups) {
@@ -379,7 +375,7 @@ export default function AdminUserDetailPage() {
             }
             
             const amountDueForInstallment = auctionRecord.finalAmountToBePaid;
-            const penaltyChargedForInstallment = 0; // Placeholder: implement actual penalty fetching if needed
+            const penaltyChargedForInstallment = 0; 
 
             let totalCollectedForThisDue = 0;
             let latestPaidDate: Date | null = null;
@@ -392,26 +388,18 @@ export default function AdminUserDetailPage() {
             );
             const collectionsForAuctionSnapshot = await getDocs(collectionForAuctionQuery);
             
-            const sortedCollections = collectionsForAuctionSnapshot.docs
-              .map(doc => ({ ...doc.data(), id: doc.id } as CollectionRecord))
-              .sort((a, b) => (a.recordedAt?.toDate()?.getTime() || 0) - (b.recordedAt?.toDate()?.getTime() || 0)); // Oldest first
-
-            sortedCollections.forEach(colData => {
+            collectionsForAuctionSnapshot.docs.forEach(colDoc => {
+              const colData = colDoc.data() as CollectionRecord;
               totalCollectedForThisDue += colData.amount;
                const paymentDateTime = parseDateTimeForSort(colData.paymentDate, colData.paymentTime, colData.recordedAt);
-               if (paymentDateTime) latestPaidDate = paymentDateTime; // Keep updating to get the latest payment date for this due
+               if (paymentDateTime && (!latestPaidDate || paymentDateTime > latestPaidDate) ) {
+                   latestPaidDate = paymentDateTime;
+               }
             });
             
-            let paidTowardsPenalty = 0;
-            let paidTowardsPrincipal = 0;
-            let remainingCollectedAfterPenalty = totalCollectedForThisDue;
-
-            if (penaltyChargedForInstallment > 0) {
-              paidTowardsPenalty = Math.min(totalCollectedForThisDue, penaltyChargedForInstallment);
-              remainingCollectedAfterPenalty = totalCollectedForThisDue - paidTowardsPenalty;
-            }
-
-            paidTowardsPrincipal = Math.min(remainingCollectedAfterPenalty, amountDueForInstallment);
+            const paidTowardsPenalty = Math.min(totalCollectedForThisDue, penaltyChargedForInstallment);
+            const remainingCollectedAfterPenalty = totalCollectedForThisDue - paidTowardsPenalty;
+            const paidTowardsPrincipal = Math.min(remainingCollectedAfterPenalty, amountDueForInstallment);
             const balanceOnPrincipal = amountDueForInstallment - paidTowardsPrincipal;
             
             let status: DueSheetItem['status'] = 'Not Paid';
@@ -438,7 +426,7 @@ export default function AdminUserDetailPage() {
         }
       }
       processedDueSheetItems.sort((a,b) => {
-        const dateA = parseISO(a.dueDate.replace(/(\d{2}) (\w{3}) (\d{4})/, '$2 $1 $3')); // Reformat for parseISO if needed
+        const dateA = parseISO(a.dueDate.replace(/(\d{2}) (\w{3}) (\d{4})/, '$2 $1 $3')); 
         const dateB = parseISO(b.dueDate.replace(/(\d{2}) (\w{3}) (\d{4})/, '$2 $1 $3'));
         if (dateA.getTime() !== dateB.getTime()) {
             return dateA.getTime() - dateB.getTime();
@@ -456,7 +444,7 @@ export default function AdminUserDetailPage() {
       setTransactionError("Failed to fetch payment history.");
       setLoadingDueSheet(false);
     } finally {
-      setLoading(false);
+      // setLoadingUser is set earlier
     }
   }, [userId, form]);
 
@@ -465,7 +453,7 @@ export default function AdminUserDetailPage() {
   }, [fetchUserDetailsAndTransactions]);
 
   useEffect(() => {
-    if (window.location.hash === "#due-sheet" && dueSheetRef.current && !loadingDueSheet) {
+    if (typeof window !== 'undefined' && window.location.hash === "#due-sheet" && dueSheetRef.current && !loadingDueSheet) {
       dueSheetRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [loadingDueSheet]); 
@@ -572,7 +560,7 @@ export default function AdminUserDetailPage() {
   };
 
   const uploadFile = async (file: File, path: string): Promise<string> => {
-    const fileRef = storageRef(storage, path);
+    const fileRef = storageRefFB(storage, path);
     await uploadBytes(fileRef, file);
     return getDownloadURL(fileRef);
   };
@@ -612,20 +600,20 @@ export default function AdminUserDetailPage() {
       let oldPhotoUrl = user.photoUrl;
 
       if (values.recentPhotographFile) {
-        if (oldPhotoUrl) { try { await deleteObject(storageRef(storage, oldPhotoUrl));} catch(e) {console.warn("Old photo delete failed", e);}}
+        if (oldPhotoUrl) { try { await deleteObject(storageRefFB(storage, oldPhotoUrl));} catch(e) {console.warn("Old photo delete failed", e);}}
         updatedUserData.photoUrl = await uploadFile(values.recentPhotographFile, `userFiles/${user.phone}/photo/${values.recentPhotographFile.name}`);
       } else if (values.recentPhotographWebcamDataUrl && values.recentPhotographWebcamDataUrl !== user.photoUrl) {
-        if (oldPhotoUrl) { try { await deleteObject(storageRef(storage, oldPhotoUrl));} catch(e) {console.warn("Old photo delete failed", e);}}
+        if (oldPhotoUrl) { try { await deleteObject(storageRefFB(storage, oldPhotoUrl));} catch(e) {console.warn("Old photo delete failed", e);}}
         const photoFile = dataURLtoFile(values.recentPhotographWebcamDataUrl, `webcam_photo_${Date.now()}.jpg`);
         updatedUserData.photoUrl = await uploadFile(photoFile, `userFiles/${user.phone}/photo/${photoFile.name}`);
       }
 
       if (values.aadhaarCard) {
-        if(user.aadhaarCardUrl) {try { await deleteObject(storageRef(storage, user.aadhaarCardUrl));} catch(e) {console.warn("Old aadhaar delete failed", e);}}
+        if(user.aadhaarCardUrl) {try { await deleteObject(storageRefFB(storage, user.aadhaarCardUrl));} catch(e) {console.warn("Old aadhaar delete failed", e);}}
         updatedUserData.aadhaarCardUrl = await uploadFile(values.aadhaarCard, `userFiles/${user.phone}/aadhaar/${values.aadhaarCard.name}`);
       }
       if (values.panCard) {
-         if(user.panCardUrl) {try { await deleteObject(storageRef(storage, user.panCardUrl));} catch(e) {console.warn("Old PAN delete failed", e);}}
+         if(user.panCardUrl) {try { await deleteObject(storageRefFB(storage, user.panCardUrl));} catch(e) {console.warn("Old PAN delete failed", e);}}
         updatedUserData.panCardUrl = await uploadFile(values.panCard, `userFiles/${user.phone}/pan/${values.panCard.name}`);
       }
 
@@ -658,22 +646,17 @@ export default function AdminUserDetailPage() {
     };
 
     const tableColumn = ["S.No", "Date & Time", "From", "To", "Type", "Amount", "Mode", "Remarks/Source", "Virtual ID"];
-    const tableRows: any[][] = [];
-
-    filteredUserTransactions.forEach((tx, index) => {
-      const txData = [
-        index + 1,
-        formatDateTimeSafe(tx.dateTime, "dd MMM yy, hh:mm a"),
-        tx.fromParty,
-        tx.toParty,
-        tx.type,
-        formatCurrencyPdf(tx.amount),
-        tx.mode || "N/A",
-        tx.remarksOrSource || "N/A",
-        tx.virtualTransactionId || "N/A",
-      ];
-      tableRows.push(txData);
-    });
+    const tableRows: any[][] = filteredUserTransactions.map((tx, index) => [
+      index + 1,
+      formatDateTimeSafe(tx.dateTime, "dd MMM yy, hh:mm a"),
+      tx.fromParty,
+      tx.toParty,
+      tx.type,
+      formatCurrencyPdf(tx.amount),
+      tx.mode || "N/A",
+      tx.remarksOrSource || "N/A",
+      tx.virtualTransactionId || "N/A",
+    ]);
 
     const filterLabel: Record<TransactionFilterType, string> = {
         all: "All Time",
@@ -708,7 +691,7 @@ export default function AdminUserDetailPage() {
   const today = new Date();
   const hundredYearsAgo = subYears(today, 100);
 
-  if (loading) {
+  if (loadingUser) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -722,10 +705,7 @@ export default function AdminUserDetailPage() {
       <div className="container mx-auto py-8 text-center">
         <Card className="max-w-md mx-auto shadow-lg">
           <CardHeader><CardTitle className="text-destructive flex items-center justify-center"><AlertTriangle className="mr-2 h-6 w-6" /> Error</CardTitle></CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">{error}</p>
-            <Button onClick={() => router.push("/admin/users")} className="mt-6"><ArrowLeft className="mr-2 h-4 w-4" /> Back to All Users</Button>
-          </CardContent>
+          <CardContent><p className="text-muted-foreground">{error}</p><Button onClick={() => router.push("/admin/users")} className="mt-6"><ArrowLeft className="mr-2 h-4 w-4" /> Back to All Users</Button></CardContent>
         </Card>
       </div>
     );
@@ -1005,9 +985,9 @@ export default function AdminUserDetailPage() {
             <section>
               <h3 className="text-xl font-semibold text-primary mb-3 flex items-center"><FileText className="mr-2 h-5 w-5" />Uploaded Documents</h3>
               <div className="space-y-3 text-sm">
-                {user.aadhaarCardUrl ? (<div className="flex items-center"><strong className="text-foreground w-28">Aadhaar Card:</strong><Button variant="link" asChild className="p-0 h-auto"><a href={user.aadhaarCardUrl} target="_blank" rel="noopener noreferrer">View Document</a></Button></div>) : <p className="text-muted-foreground">Aadhaar Card: Not Uploaded</p>}
-                {user.panCardUrl ? (<div className="flex items-center"><strong className="text-foreground w-28">PAN Card:</strong><Button variant="link" asChild className="p-0 h-auto"><a href={user.panCardUrl} target="_blank" rel="noopener noreferrer">View Document</a></Button></div>) : <p className="text-muted-foreground">PAN Card: Not Uploaded</p>}
-                {user.photoUrl ? (<div className="flex items-center"><strong className="text-foreground w-28">Recent Photograph:</strong><Button variant="link" asChild className="p-0 h-auto"><a href={user.photoUrl} target="_blank" rel="noopener noreferrer">View Photo</a></Button></div>) : <p className="text-muted-foreground">Recent Photograph: Not Uploaded</p>}
+                {user.aadhaarCardUrl ? (<div className="flex items-center"><strong className="text-foreground w-32">Aadhaar Card:</strong><Button variant="link" asChild className="p-0 h-auto"><a href={user.aadhaarCardUrl} target="_blank" rel="noopener noreferrer">View Document</a></Button></div>) : <p className="text-muted-foreground">Aadhaar Card: Not Uploaded</p>}
+                {user.panCardUrl ? (<div className="flex items-center"><strong className="text-foreground w-32">PAN Card:</strong><Button variant="link" asChild className="p-0 h-auto"><a href={user.panCardUrl} target="_blank" rel="noopener noreferrer">View Document</a></Button></div>) : <p className="text-muted-foreground">PAN Card: Not Uploaded</p>}
+                {user.photoUrl ? (<div className="flex items-center"><strong className="text-foreground w-32">Photograph:</strong><Button variant="link" asChild className="p-0 h-auto"><a href={user.photoUrl} target="_blank" rel="noopener noreferrer">View Photo</a></Button></div>) : <p className="text-muted-foreground">Photograph: Not Uploaded</p>}
               </div>
             </section>
             <Separator />
@@ -1068,20 +1048,14 @@ export default function AdminUserDetailPage() {
                       <TableBody>
                         {dueSheetItems.map((item, index) => (
                           <TableRow key={`${item.auctionId}-${item.dueNo}-${index}`}>
-                            <TableCell>{item.dueNo}</TableCell>
-                            <TableCell>{item.groupName}</TableCell>
-                            <TableCell>{item.dueDate}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(item.penalty)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(item.paidAmount)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(item.balance)}</TableCell>
+                            <TableCell>{item.dueNo}</TableCell><TableCell>{item.groupName}</TableCell><TableCell>{item.dueDate}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell><TableCell className="text-right">{formatCurrency(item.penalty)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.paidAmount)}</TableCell><TableCell className="text-right">{formatCurrency(item.balance)}</TableCell>
                             <TableCell>
                               <Badge variant={item.status === 'Paid' ? 'default' : (item.status === 'Partially Paid' ? 'secondary' : 'destructive')}
                                      className={cn(item.status === 'Paid' ? 'bg-green-600 hover:bg-green-700' : item.status === 'Partially Paid' ? 'bg-yellow-500 hover:bg-yellow-600' : '')}>
                                 {item.status}
-                                {item.status === 'Paid' && item.paidDateTime && (
-                                  <span className="ml-1 text-xs opacity-80">({item.paidDateTime})</span>
-                                )}
+                                {item.status === 'Paid' && item.paidDateTime && (<span className="ml-1 text-xs opacity-80">({item.paidDateTime})</span>)}
                               </Badge>
                             </TableCell>
                           </TableRow>
@@ -1116,61 +1090,46 @@ export default function AdminUserDetailPage() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    {loadingTransactions && (
-                        <div className="flex justify-center items-center py-10">
-                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                            <p className="ml-3 text-muted-foreground">Loading payment history...</p>
-                        </div>
-                    )}
-                    {!loadingTransactions && transactionError && (
-                        <div className="text-center py-10 text-destructive">
-                            <AlertTriangle className="mx-auto h-10 w-10 mb-2" />
-                            <p>{transactionError}</p>
-                        </div>
-                    )}
+                    {loadingTransactions && (<div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-3 text-muted-foreground">Loading payment history...</p></div>)}
+                    {!loadingTransactions && transactionError && (<div className="text-center py-10 text-destructive"><AlertTriangle className="mx-auto h-10 w-10 mb-2" /><p>{transactionError}</p></div>)}
                     {!loadingTransactions && !transactionError && filteredUserTransactions.length === 0 && (<p className="text-muted-foreground text-center py-10">{`No payment history found for this user ${selectedTransactionFilter !== 'all' ? `in the selected period` : ''}`}.</p>)}
                     {!loadingTransactions && !transactionError && filteredUserTransactions.length > 0 && (
                     <div className="overflow-x-auto rounded-md border">
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>S.No</TableHead>
-                                    <TableHead>Date & Time</TableHead>
-                                    <TableHead>From</TableHead>
-                                    <TableHead>To</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead className="text-right">Amount (₹)</TableHead>
-                                    <TableHead>Mode</TableHead>
-                                    <TableHead>Remarks/Source</TableHead>
+                                    <TableHead>S.No</TableHead><TableHead>Date & Time</TableHead><TableHead>From</TableHead>
+                                    <TableHead>To</TableHead><TableHead>Type</TableHead><TableHead className="text-right">Amount (₹)</TableHead>
+                                    <TableHead>Mode</TableHead><TableHead>Remarks/Source</TableHead><TableHead>Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                             {filteredUserTransactions.map((tx, index) => {
-                                const transactionKey = tx.id + tx.originalSource;
-                                const isExpanded = expandedTransactionRows[transactionKey];
+                                const transactionKey = tx.id + tx.originalSource; const isExpanded = expandedTransactionRows[transactionKey];
                                 return (
                                 <React.Fragment key={transactionKey}>
                                     <TableRow>
                                     <TableCell>
                                         <div className="flex items-center">
-                                        <Button variant="ghost" size="sm" onClick={() => toggleTransactionRowExpansion(transactionKey)} className="mr-1 p-1 h-auto">
-                                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                        </Button>
+                                        <Button variant="ghost" size="sm" onClick={() => toggleTransactionRowExpansion(transactionKey)} className="mr-1 p-1 h-auto">{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</Button>
                                         {index + 1}
                                         </div>
                                         {isExpanded && (<div className="pl-7 mt-1 text-xs text-muted-foreground">Virtual ID: {tx.virtualTransactionId || "N/A"}</div>)}
                                     </TableCell>
                                     <TableCell>{formatDateTimeSafe(tx.dateTime, "dd MMM yy, hh:mm a")}</TableCell>
-                                    <TableCell className="max-w-[150px]">{tx.fromParty}</TableCell>
-                                    <TableCell className="max-w-[150px]">{tx.toParty}</TableCell>
-                                    <TableCell>
-                                        <span className={cn("font-semibold px-2 py-1 rounded-full text-xs", tx.type === "Sent by User" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" : "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300")}>
-                                        {tx.type}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono">{formatCurrency(tx.amount)}</TableCell>
-                                    <TableCell>{tx.mode || "N/A"}</TableCell>
+                                    <TableCell className="max-w-[150px]">{tx.fromParty}</TableCell><TableCell className="max-w-[150px]">{tx.toParty}</TableCell>
+                                    <TableCell><span className={cn("font-semibold px-2 py-1 rounded-full text-xs", tx.type === "Sent by User" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" : "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300")}>{tx.type}</span></TableCell>
+                                    <TableCell className="text-right font-mono">{formatCurrency(tx.amount)}</TableCell><TableCell>{tx.mode || "N/A"}</TableCell>
                                     <TableCell className="max-w-[200px]">{tx.remarksOrSource || "N/A"}</TableCell>
+                                    <TableCell>
+                                      {tx.originalSource === "CollectionRecord" && (
+                                        <Button asChild variant="ghost" size="icon">
+                                          <Link href={`/admin/collection/receipt/${tx.id}`} title="View Receipt">
+                                            <ReceiptText className="h-4 w-4 text-primary" />
+                                          </Link>
+                                        </Button>
+                                      )}
+                                    </TableCell>
                                     </TableRow>
                                 </React.Fragment>
                                 );
@@ -1190,4 +1149,3 @@ export default function AdminUserDetailPage() {
   );
 }
 
-    
