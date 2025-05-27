@@ -129,7 +129,7 @@ export default function EmployeeCollectionReceiptPage() {
             #printable-receipt-area #receipt-content {
               width: 100% !important;
               margin: 0 !important;
-              padding: 1mm 2mm !important; 
+              padding: 1mm !important; /* Reduced padding */
               box-shadow: none !important;
               background: white !important;
               box-sizing: border-box !important;
@@ -137,23 +137,24 @@ export default function EmployeeCollectionReceiptPage() {
             .receipt-print-content {
               font-family: 'Courier New', Courier, monospace !important;
               font-size: 11pt !important; 
-              line-height: 1.3 !important;
+              line-height: 1.2 !important; /* Slightly reduced line height */
               color: black !important;
-              font-weight: normal !important; 
             }
             .center { text-align: center !important; }
             .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 11pt !important; }
             .receipt-info { font-weight: normal !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 11pt !important; }
             
             .section-item {
-              display: flex !important; /* Use flex to keep label and value on one line */
-              justify-content: flex-start !important; /* Align items to the start */
-              align-items: baseline !important; /* Align text baselines */
+              display: flex !important; 
+              justify-content: flex-start !important;
+              align-items: baseline !important; 
               margin-bottom: 0.5mm !important;
-              font-size: 11pt !important;
+              white-space: nowrap; /* Force on one line - might truncate */
+              overflow: hidden; /* Hide overflow if nowrap causes it */
+              text-overflow: ellipsis; /* Add ellipsis if truncated */
             }
-            .field-label { display: inline !important; font-weight: bold !important; }
-            .field-value { display: inline !important; font-weight: normal !important; margin-left: 0.5em !important; } /* Added margin-left for spacing */
+            .field-label { display: inline !important; font-weight: bold !important; padding-right: 0.5em; /* Add padding for space instead of margin on value */ }
+            .field-value { display: inline !important; font-weight: normal !important; }
 
             .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 0.5mm !important; font-size: 11pt !important; }
             hr {
@@ -249,9 +250,9 @@ export default function EmployeeCollectionReceiptPage() {
     doc.text(`Receipt No: ${receipt.receiptNumber || 'N/A'}`, doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight;
     doc.text(`Date: ${formatDate(receipt.paymentDate, "dd-MMM-yyyy")} ${receipt.paymentTime || ''}`, doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight;
     
-    doc.setLineDashPattern([1, 1], 0); // Dashed line
+    doc.setLineDashPattern([1, 1], 0); 
     doc.line(margin, y, doc.internal.pageSize.getWidth() - margin, y); y += lineHeight * 0.5; 
-    doc.setLineDashPattern([], 0); // Solid line
+    doc.setLineDashPattern([], 0); 
     
     y += lineHeight * 0.5;
     doc.setFontSize(9);
@@ -333,7 +334,7 @@ export default function EmployeeCollectionReceiptPage() {
   }
 
   return (
-    <div id="receipt-content-wrapper" className="flex flex-col items-center justify-start min-h-screen bg-background p-4 print:bg-white">
+    <div id="receipt-content-wrapper" className="flex flex-col items-center justify-start min-h-screen bg-background p-4 print:bg-white print:p-0">
       <div id="printable-receipt-area" className="print:block hidden">
         {/* This content is structured for the dynamic HTML in handlePrint */}
       </div>
