@@ -154,14 +154,14 @@ export default function EmployeeCollectionReceiptPage() {
             }
             .receipt-print-content {
               font-family: 'Times New Roman', Times, serif !important;
-              font-size: 12px !important; 
+              font-size: 14pt !important; 
               line-height: 1.2 !important;
               color: black !important;
               font-weight: normal !important;
             }
             .center { text-align: center !important; }
-            .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 12px !important; }
-            .receipt-info { font-weight: normal !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 12px !important; }
+            .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 14pt !important; }
+            .receipt-info { font-weight: normal !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 14pt !important; }
             
             .section-item {
               display: flex !important; 
@@ -175,7 +175,7 @@ export default function EmployeeCollectionReceiptPage() {
             .field-label { display: inline !important; font-weight: bold !important; padding-right: 0.5em; }
             .field-value { display: inline !important; font-weight: normal !important; }
 
-            .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 0.5mm !important; font-size: 12px !important; }
+            .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 0.5mm !important; font-size: 14pt !important; }
             hr {
               border: none !important;
               border-top: 1px dashed black !important;
@@ -183,7 +183,7 @@ export default function EmployeeCollectionReceiptPage() {
             }
             h1, h2, h3, h4, h5, h6, p, div {
                 margin: 0.5mm 0 !important;
-                font-size: 12px !important; 
+                font-size: 14pt !important; 
             }
             iframe[id^="webpack-dev-server-client-overlay"],
             iframe[id^="vite-error-overlay"],
@@ -260,12 +260,12 @@ export default function EmployeeCollectionReceiptPage() {
     const lineHeight = 5; 
     const margin = 3; 
 
-    doc.setFont('Times-Roman', 'bold'); // Changed font
-    doc.setFontSize(12); // Changed font size
+    doc.setFont('Times-Roman', 'bold'); 
+    doc.setFontSize(12); 
     doc.text(receipt.companyName || "SENDHUR CHITS", doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight * 1.5;
     
-    doc.setFont('Times-Roman', 'normal'); // Changed font
-    doc.setFontSize(10); // Changed font size slightly for details
+    doc.setFont('Times-Roman', 'normal'); 
+    doc.setFontSize(10); 
     doc.text(`Receipt No: ${receipt.receiptNumber || 'N/A'}`, doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight;
     doc.text(`Date: ${formatDate(receipt.paymentDate, "dd-MMM-yyyy")} ${receipt.paymentTime || ''}`, doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight;
     
@@ -274,7 +274,7 @@ export default function EmployeeCollectionReceiptPage() {
     doc.setLineDashPattern([], 0); 
     
     y += lineHeight * 0.5;
-    doc.setFontSize(10); // Changed font size for section items
+    doc.setFontSize(10); 
      const wrapText = (text: string, x: number, yPos: number, maxWidth: number, lHeight: number): number => {
         const lines = doc.splitTextToSize(text, maxWidth);
         doc.text(lines, x, yPos);
@@ -300,7 +300,7 @@ export default function EmployeeCollectionReceiptPage() {
     if (receipt.chitAmount !== null && receipt.chitAmount !== undefined) {
         y = printLine("Due Amount:", formatCurrency(receipt.chitAmount), y);
     }
-    y = printLine("Paid:", formatCurrency(receipt.amount), y, true); // Paid amount bold
+    y = printLine("Paid:", formatCurrency(receipt.amount), y, true); 
     
     if (receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) {
         y = printLine("Total Balance:", formatCurrency(receipt.userTotalDueBeforeThisPayment), y);
