@@ -243,9 +243,9 @@ export default function AdminCollectionPage() {
     doc.text(`Filter: ${filterLabel[selectedFilter]}`, 14, 22);
     if (searchTerm.trim() !== "") {
         doc.text(`Search: "${searchTerm}"`, 14, 29);
-        autoTable(doc, { head: [tableColumn], body: tableRows, startY: 36, theme: 'grid', headStyles: { fillColor: [30, 144, 255] }, styles: { fontSize: 6, cellPadding: 1 }, columnStyles: { 0: { cellWidth: 7 }, 4: { halign: 'right' }, 7: { cellWidth: 'auto', overflow: 'linebreak' } }, });
+        autoTable(doc, { head: [tableColumn], body: tableRows, startY: 36, theme: 'grid', headStyles: { fillColor: [30, 144, 255] }, styles: { fontSize: 6, cellPadding: 1 }, columnStyles: { 0: { cellWidth: 7 }, 4: { halign: 'right' }, 7: { cellWidth: 'auto', overflow: 'linebreak' }, 11: {cellWidth: 'auto'} }, });
     } else {
-        autoTable(doc, { head: [tableColumn], body: tableRows, startY: 35, theme: 'grid', headStyles: { fillColor: [30, 144, 255] }, styles: { fontSize: 7, cellPadding: 1.5 }, columnStyles: { 0: { cellWidth: 8 }, 4: { halign: 'right' }, 7: { cellWidth: 'auto', overflow: 'linebreak' } }, });
+        autoTable(doc, { head: [tableColumn], body: tableRows, startY: 35, theme: 'grid', headStyles: { fillColor: [30, 144, 255] }, styles: { fontSize: 7, cellPadding: 1.5 }, columnStyles: { 0: { cellWidth: 8 }, 4: { halign: 'right' }, 7: { cellWidth: 'auto', overflow: 'linebreak' }, 11: {cellWidth: 'auto'} }, });
     }
     doc.save(`admin_collection_history_${selectedFilter}_search_${searchTerm || 'none'}.pdf`);
   };
@@ -413,13 +413,7 @@ export default function AdminCollectionPage() {
                     </React.Fragment>
                   )})}
                 </TableBody>
-                <TableFooter>
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-right font-semibold">Total Amount:</TableCell>
-                    <TableCell className="text-right font-bold font-mono">{formatCurrency(totalFilteredAmount)}</TableCell>
-                    <TableCell colSpan={7}></TableCell> {/* Adjusted colSpan */}
-                  </TableRow>
-                </TableFooter>
+                <TableFooter><TableRow><TableCell colSpan={4} className="text-right font-semibold">Total Amount:</TableCell><TableCell className="text-right font-bold font-mono">{formatCurrency(totalFilteredAmount)}</TableCell><TableCell colSpan={7}></TableCell></TableRow></TableFooter>
               </Table>
             </div>
           )}
