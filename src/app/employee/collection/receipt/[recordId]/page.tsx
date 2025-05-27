@@ -126,14 +126,15 @@ export default function CollectionReceiptPage() {
               font-size: 11pt !important;
               line-height: 1.3 !important;
               color: black !important;
-              font-weight: normal !important; /* Default to normal */
+              font-weight: normal !important;
               margin: 0 auto; 
             }
             .center { text-align: center !important; }
             .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 1mm !important; }
             .receipt-info { font-weight: normal !important; text-align: center !important; margin-bottom: 0.5mm !important; }
-            .field-label { font-weight: bold !important; }
-            .section-item { margin-bottom: 0.5mm !important; font-weight: normal !important; }
+            .field-label { display: inline; font-weight: bold !important; margin-right: 4px;}
+            .field-value { display: inline; font-weight: normal !important; }
+            .section-item { margin-bottom: 0.5mm !important; }
             .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 1mm !important; }
             hr {
               border: none !important;
@@ -161,14 +162,14 @@ export default function CollectionReceiptPage() {
             <div class="receipt-info">Receipt No: ${receipt.receiptNumber || 'N/A'}</div>
             <div class="receipt-info">Date: ${formatDate(receipt.paymentDate, "dd-MMM-yyyy")} ${receipt.paymentTime || ''}</div>
             <hr>
-            <div class="section-item"><span class="field-label">Group:</span> ${receipt.groupName || 'N/A'} ${receipt.groupId ? `(ID: ${receipt.groupId})` : ''}</div>
-            <div class="section-item"><span class="field-label">Member:</span> ${receipt.userFullname || 'N/A'} ${receipt.userUsername ? `(@${receipt.userUsername})` : ''}</div>
-            ${receipt.dueNumber ? `<div class="section-item"><span class="field-label">Due No.:</span> ${receipt.dueNumber}</div>` : ''}
-            ${receipt.chitAmount !== null && receipt.chitAmount !== undefined ? `<div class="section-item"><span class="field-label">Installment:</span> ${formatCurrency(receipt.chitAmount)}</div>` : ''}
-            <div class="section-item"><span class="field-label">Paid:</span> ${formatCurrency(receipt.amount)}</div>
-            ${receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined ? `<div class="section-item"><span class="field-label">Total Balance:</span> ${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</div>` : ''}
-            <div class="section-item"><span class="field-label">Mode:</span> ${receipt.paymentMode || 'N/A'}</div>
-            ${receipt.remarks && receipt.remarks.trim() !== "" ? `<div class="section-item"><span class="field-label">Remarks:</span> ${receipt.remarks}</div>` : ''}
+            <div class="section-item"><span class="field-label">Group:</span><span class="field-value"> ${receipt.groupName || 'N/A'} ${receipt.groupId ? `(ID: ${receipt.groupId})` : ''}</span></div>
+            <div class="section-item"><span class="field-label">Member:</span><span class="field-value"> ${receipt.userFullname || 'N/A'} ${receipt.userUsername ? `(@${receipt.userUsername})` : ''}</span></div>
+            ${receipt.dueNumber ? `<div class="section-item"><span class="field-label">Due No.:</span><span class="field-value"> ${receipt.dueNumber}</span></div>` : ''}
+            ${receipt.chitAmount !== null && receipt.chitAmount !== undefined ? `<div class="section-item"><span class="field-label">Installment:</span><span class="field-value"> ${formatCurrency(receipt.chitAmount)}</span></div>` : ''}
+            <div class="section-item"><span class="field-label">Paid:</span><span class="field-value"> ${formatCurrency(receipt.amount)}</span></div>
+            ${receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined ? `<div class="section-item"><span class="field-label">Total Balance:</span><span class="field-value"> ${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</span></div>` : ''}
+            <div class="section-item"><span class="field-label">Mode:</span><span class="field-value"> ${receipt.paymentMode || 'N/A'}</span></div>
+            ${receipt.remarks && receipt.remarks.trim() !== "" ? `<div class="section-item"><span class="field-label">Remarks:</span><span class="field-value"> ${receipt.remarks}</span></div>` : ''}
             <hr>
             <div class="thank-you">Thank You!</div>
           </div>
@@ -305,29 +306,25 @@ export default function CollectionReceiptPage() {
       <div id="printable-receipt-area">
         <div id="receipt-content" className="w-full max-w-xs bg-white p-6 shadow-lg print:shadow-none print:p-0 print:border-none">
             <div className="text-center mb-4">
-            <h1 className="text-xl font-bold">{receipt.companyName || "Sendhur Chits"}</h1>
+            <h1 className="text-xl font-bold">${receipt.companyName || "Sendhur Chits"}</h1>
             <p className="text-sm">Payment Receipt</p>
             </div>
             <div className="text-xs space-y-1 border-t border-b border-dashed border-gray-400 py-2 my-2">
-            <p><strong>Receipt No:</strong> {receipt.receiptNumber}</p>
-            <p><strong>Date:</strong> {formatDate(receipt.paymentDate)} {receipt.paymentTime}</p>
+            <p><strong>Receipt No:</strong> ${receipt.receiptNumber}</p>
+            <p><strong>Date:</strong> ${formatDate(receipt.paymentDate)} ${receipt.paymentTime}</p>
             </div>
             <div className="text-xs space-y-1 mb-2">
-            <p><strong>Group:</strong> {receipt.groupName} {receipt.groupId ? `(ID: ${receipt.groupId})` : ''}</p>
-            <p><strong>Member:</strong> {receipt.userFullname} {receipt.userUsername ? `(@${receipt.userUsername})` : ''}</p>
-            {receipt.dueNumber && <p><strong>Due No:</strong> {receipt.dueNumber}</p>}
-            {receipt.chitAmount !== null && receipt.chitAmount !== undefined && (
-                <p><strong>Installment Amount:</strong> {formatCurrency(receipt.chitAmount)}</p>
-            )}
-            <p className="font-bold text-sm"><strong>Paid Amount:</strong> {formatCurrency(receipt.amount)}</p>
-            {receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined && (
-                <p><strong>Total Balance:</strong> {formatCurrency(receipt.userTotalDueBeforeThisPayment)}</p>
-            )}
-            <p><strong>Payment Mode:</strong> {receipt.paymentMode}</p>
+            <p><strong>Group:</strong> ${receipt.groupName} ${receipt.groupId ? `(ID: ${receipt.groupId})` : ''}</p>
+            <p><strong>Member:</strong> ${receipt.userFullname} ${receipt.userUsername ? `(@${receipt.userUsername})` : ''}</p>
+            ${receipt.dueNumber ? `<p><strong>Due No:</strong> ${receipt.dueNumber}</p>` : ''}
+            ${receipt.chitAmount !== null && receipt.chitAmount !== undefined ? `<p><strong>Installment Amount:</strong> ${formatCurrency(receipt.chitAmount)}</p>` : ''}
+            <p className="font-bold text-sm"><strong>Paid Amount:</strong> ${formatCurrency(receipt.amount)}</p>
+            ${receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined ? `<p><strong>Total Balance:</strong> ${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</p>` : ''}
+            <p><strong>Payment Mode:</strong> ${receipt.paymentMode}</p>
             </div>
             <div className="text-xs space-y-1 border-t border-dashed border-gray-400 pt-2 mt-2">
-            {receipt.remarks && <p><strong>Remarks:</strong> {receipt.remarks}</p>}
-            {receipt.virtualTransactionId && <p><strong>Virtual ID:</strong> {receipt.virtualTransactionId}</p>}
+            ${receipt.remarks && receipt.remarks.trim() !== "" ? `<p><strong>Remarks:</strong> ${receipt.remarks}</p>` : ''}
+            ${receipt.virtualTransactionId && <p><strong>Virtual ID:</strong> ${receipt.virtualTransactionId}</p>}
             <p className="text-center mt-4">Thank You!</p>
             </div>
         </div>
@@ -347,4 +344,6 @@ export default function CollectionReceiptPage() {
     </div>
   );
 }
+    
+
     
