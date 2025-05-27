@@ -77,7 +77,7 @@ const formatDateLocal = (dateString: string | undefined | null, outputFormat: st
 
 const recordCollectionFormSchema = z.object({
   selectedGroupId: z.string().min(1, "Please select a Group."),
-  selectedAuctionId: z.string().min(1, "Auction number is required."), // Made compulsory
+  selectedAuctionId: z.string().min(1, "Auction number is required."),
   selectedUserId: z.string().min(1, "Please select a User."),
   paymentDate: z.date({ required_error: "Payment date is required." }),
   paymentTime: z.string().min(1, "Payment time is required."),
@@ -248,7 +248,7 @@ export function AdminRecordCollectionForm() {
     resolver: zodResolver(recordCollectionFormSchema),
     defaultValues: {
       selectedGroupId: "",
-      selectedAuctionId: "", // Required
+      selectedAuctionId: "", 
       selectedUserId: "",
       paymentDate: new Date(),
       paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
@@ -287,7 +287,7 @@ export function AdminRecordCollectionForm() {
       setGroupMembers([]);
       setGroupAuctions([]);
       setValue("selectedUserId", "");
-      setValue("selectedAuctionId", ""); // Reset to empty for required validation
+      setValue("selectedAuctionId", ""); 
       return;
     }
 
@@ -419,8 +419,8 @@ export function AdminRecordCollectionForm() {
     }
     
     const selectedAuction = groupAuctions.find(a => a.id === values.selectedAuctionId);
-    if (!selectedAuction) {
-      toast({ title: "Error", description: "Selected auction not found.", variant: "destructive" });
+    if (!selectedAuction) { // This check is now for a required field
+      toast({ title: "Error", description: "Selected auction not found or is invalid.", variant: "destructive" });
       setIsSubmitting(false);
       return;
     }
@@ -440,10 +440,12 @@ export function AdminRecordCollectionForm() {
 
         let chitAmountForDue: number | null = null;
         let dueNumberForRecord: number | null = null;
+        
         if (selectedAuction && selectedAuction.finalAmountToBePaid !== null && selectedAuction.finalAmountToBePaid !== undefined) {
             chitAmountForDue = selectedAuction.finalAmountToBePaid;
             dueNumberForRecord = selectedAuction.auctionNumber || null;
         } else if (selectedGroup && selectedGroup.rate !== null && selectedGroup.rate !== undefined) {
+            // This fallback might not be hit as much if auction selection is compulsory
             chitAmountForDue = selectedGroup.rate;
         }
         console.log("Calculated chitAmountForDue:", chitAmountForDue, "dueNumberForRecord:", dueNumberForRecord);
@@ -601,7 +603,7 @@ export function AdminRecordCollectionForm() {
               name="selectedAuctionId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>For Auction No.</FormLabel>
+                  <FormLabel>Auction Number</FormLabel>
                   <Select 
                     onValueChange={field.onChange} 
                     value={field.value} 
@@ -833,3 +835,5 @@ export function AdminRecordCollectionForm() {
     </Card>
   );
 }
+
+    
