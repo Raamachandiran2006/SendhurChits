@@ -1,14 +1,15 @@
+
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react"; // Added useMemo
+import React, { useEffect, useState, useMemo } from "react";
 import type { CollectionRecord } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query as firestoreQuery, Timestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Loader2, ArchiveRestore, PlusCircle, ArrowLeft, ListChecks, ChevronRight, ChevronDown, Filter, Download, ReceiptText } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table"; // Added TableFooter
+import { Loader2, ArchiveRestore, PlusCircle, ArrowLeft, ListChecks, ChevronRight, ChevronDown, Filter, Download, ReceiptText, Search } from "lucide-react"; // Added Search
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { format, parseISO, subDays, isAfter, startOfDay, endOfDay } from "date-fns";
 import { useSearchParams } from "next/navigation";
 import {
@@ -19,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input"; // Added Input
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -108,10 +110,11 @@ export default function AdminCollectionPage() {
   const [rawCollectionHistory, setRawCollectionHistory] = useState<CollectionRecord[]>([]);
   const [filteredCollectionHistory, setFilteredCollectionHistory] = useState<CollectionRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const searchParams = useSearchParams();
-  const refreshId = searchParams.get('refreshId');
+  const searchParamsHook = useSearchParams(); // Renamed to avoid conflict
+  const refreshId = searchParamsHook.get('refreshId');
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [selectedFilter, setSelectedFilter] = useState<CollectionFilterType>("all");
+  const [searchTerm, setSearchTerm] = useState(""); // New state for search term
 
   const toggleRowExpansion = (recordId: string) => {
     setExpandedRows(prev => ({ ...prev, [recordId]: !prev[recordId] }));
@@ -133,7 +136,6 @@ export default function AdminCollectionPage() {
           } as CollectionRecord & { filterDate: Date };
         });
         setRawCollectionHistory(fetchedHistory as any);
-        setFilteredCollectionHistory(fetchedHistory as any);
       } catch (error) {
         console.error("Error fetching collection history:", error);
       } finally {
@@ -144,11 +146,10 @@ export default function AdminCollectionPage() {
   }, [refreshId]);
 
   useEffect(() => {
-    const applyFilter = () => {
-      if (selectedFilter === "all") {
-        setFilteredCollectionHistory(rawCollectionHistory);
-        return;
-      }
+    let tempFiltered = [...rawCollectionHistory]; // Start with a copy of raw data
+
+    // Apply date filter
+    if (selectedFilter !== "all") {
       const now = new Date();
       let startDate: Date;
       let endDate: Date | null = null;
@@ -157,30 +158,40 @@ export default function AdminCollectionPage() {
         startDate = startOfDay(now);
         endDate = endOfDay(now);
       } else if (selectedFilter === "last7Days") {
-        startDate = startOfDay(subDays(now, 6)); // Include today
+        startDate = startOfDay(subDays(now, 6));
         endDate = endOfDay(now);
       } else if (selectedFilter === "last10Days") {
-        startDate = startOfDay(subDays(now, 9)); // Include today
+        startDate = startOfDay(subDays(now, 9));
         endDate = endOfDay(now);
       } else if (selectedFilter === "last30Days") {
-        startDate = startOfDay(subDays(now, 29)); // Include today
+        startDate = startOfDay(subDays(now, 29));
         endDate = endOfDay(now);
       } else {
-        setFilteredCollectionHistory(rawCollectionHistory);
-        return;
+        // Should not happen if selectedFilter is one of the valid types
+        startDate = new Date(0); // Effectively no start date filter
       }
       
-      const filtered = rawCollectionHistory.filter(record => {
+      tempFiltered = tempFiltered.filter(record => {
         const recordDate = (record as any).filterDate || (record.recordedAt ? record.recordedAt.toDate() : new Date(0));
         if (endDate) {
           return isAfter(recordDate, startDate) && recordDate <= endDate;
         }
         return isAfter(recordDate, startDate);
       });
-      setFilteredCollectionHistory(filtered);
-    };
-    applyFilter();
-  }, [selectedFilter, rawCollectionHistory]);
+    }
+
+    // Apply search filter
+    if (searchTerm.trim() !== "") {
+      const lowercasedSearchTerm = searchTerm.toLowerCase().trim();
+      tempFiltered = tempFiltered.filter(record =>
+        (record.virtualTransactionId?.toLowerCase().includes(lowercasedSearchTerm)) ||
+        (record.receiptNumber?.toLowerCase().includes(lowercasedSearchTerm))
+      );
+    }
+
+    setFilteredCollectionHistory(tempFiltered);
+  }, [selectedFilter, rawCollectionHistory, searchTerm]);
+
 
   const totalFilteredAmount = useMemo(() => {
     return filteredCollectionHistory.reduce((sum, record) => sum + (record.amount || 0), 0);
@@ -197,7 +208,7 @@ export default function AdminCollectionPage() {
       return `Rs. ${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     };
     
-    const tableColumn = ["S.No", "Group Name", "User", "Date & Time", "Amount (Rs.)", "Type", "Mode", "Location", "Collected By", "Remarks", "Virtual ID"];
+    const tableColumn = ["S.No", "Group Name", "User", "Date & Time", "Amount (Rs.)", "Type", "Mode", "Location", "Collected By", "Remarks", "Virtual ID", "Receipt No."];
     const tableRows: any[][] = [];
 
     filteredCollectionHistory.forEach((record, index) => {
@@ -213,6 +224,7 @@ export default function AdminCollectionPage() {
         record.recordedByEmployeeName || "N/A",
         record.remarks || "N/A",
         record.virtualTransactionId || "N/A",
+        record.receiptNumber || "N/A",
       ];
       tableRows.push(recordData);
     });
@@ -229,21 +241,13 @@ export default function AdminCollectionPage() {
     doc.text(`Admin Collection History`, 14, 15);
     doc.setFontSize(12);
     doc.text(`Filter: ${filterLabel[selectedFilter]}`, 14, 22);
-    doc.text(`Generated on: ${format(new Date(), "dd MMM yyyy, hh:mm a")}`, 14, 29);
-
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: 35,
-      theme: 'grid',
-      headStyles: { fillColor: [30, 144, 255] }, 
-      styles: { fontSize: 7, cellPadding: 1.5 },
-      columnStyles: { 
-        0: { cellWidth: 8 }, 4: { halign: 'right' },
-        7: { cellWidth: 'auto', overflow: 'linebreak' } 
-      },
-    });
-    doc.save(`admin_collection_history_${selectedFilter}.pdf`);
+    if (searchTerm.trim() !== "") {
+        doc.text(`Search: "${searchTerm}"`, 14, 29);
+        autoTable(doc, { head: [tableColumn], body: tableRows, startY: 36, theme: 'grid', headStyles: { fillColor: [30, 144, 255] }, styles: { fontSize: 6, cellPadding: 1 }, columnStyles: { 0: { cellWidth: 7 }, 4: { halign: 'right' }, 7: { cellWidth: 'auto', overflow: 'linebreak' } }, });
+    } else {
+        autoTable(doc, { head: [tableColumn], body: tableRows, startY: 35, theme: 'grid', headStyles: { fillColor: [30, 144, 255] }, styles: { fontSize: 7, cellPadding: 1.5 }, columnStyles: { 0: { cellWidth: 8 }, 4: { halign: 'right' }, 7: { cellWidth: 'auto', overflow: 'linebreak' } }, });
+    }
+    doc.save(`admin_collection_history_${selectedFilter}_search_${searchTerm || 'none'}.pdf`);
   };
 
 
@@ -291,13 +295,30 @@ export default function AdminCollectionPage() {
         </div>
       </div>
 
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search by Virtual ID or Receipt No..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 w-full max-w-md shadow-sm"
+          />
+        </div>
+      </div>
+
       <Card className="shadow-xl">
         <CardHeader>
           <div className="flex items-center gap-2">
             <ListChecks className="h-6 w-6 text-primary" />
             <CardTitle>Collection History</CardTitle>
           </div>
-          <CardDescription>Chronological record of all collected payments (latest first). Filtered by: {selectedFilter}</CardDescription>
+          <CardDescription>
+            Chronological record of all collected payments (latest first). 
+            Filtered by: {selectedFilter}.
+            {searchTerm && ` Searched for: "${searchTerm}".`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -307,7 +328,12 @@ export default function AdminCollectionPage() {
             </div>
           ) : filteredCollectionHistory.length === 0 ? (
             <div className="text-center py-10">
-              <p className="text-muted-foreground">No collection records found {selectedFilter !== 'all' ? `for the selected period` : ''}. Click "Record Collection" to add one.</p>
+              <p className="text-muted-foreground">
+                No collection records found 
+                {selectedFilter !== 'all' ? ` for the selected period` : ''}
+                {searchTerm ? ` matching "${searchTerm}"` : ''}. 
+                { !searchTerm && <>{' '}Click "Record Collection" to add one.</>}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-md border">
@@ -324,6 +350,7 @@ export default function AdminCollectionPage() {
                     <TableHead>Location</TableHead>
                     <TableHead>Collected By</TableHead>
                     <TableHead>Remarks</TableHead>
+                    <TableHead>Receipt No.</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -374,6 +401,7 @@ export default function AdminCollectionPage() {
                         </TableCell>
                         <TableCell>{record.recordedByEmployeeName || "N/A"}</TableCell>
                         <TableCell className="max-w-xs truncate">{record.remarks || "N/A"}</TableCell>
+                        <TableCell>{record.receiptNumber || "N/A"}</TableCell>
                         <TableCell>
                           <Button asChild variant="ghost" size="icon">
                             <Link href={`/admin/collection/receipt/${record.id}`} title="View Receipt">
@@ -389,7 +417,7 @@ export default function AdminCollectionPage() {
                   <TableRow>
                     <TableCell colSpan={4} className="text-right font-semibold">Total Amount:</TableCell>
                     <TableCell className="text-right font-bold font-mono">{formatCurrency(totalFilteredAmount)}</TableCell>
-                    <TableCell colSpan={6}></TableCell> 
+                    <TableCell colSpan={7}></TableCell> {/* Adjusted colSpan */}
                   </TableRow>
                 </TableFooter>
               </Table>
@@ -400,3 +428,5 @@ export default function AdminCollectionPage() {
     </div>
   );
 }
+
+    
