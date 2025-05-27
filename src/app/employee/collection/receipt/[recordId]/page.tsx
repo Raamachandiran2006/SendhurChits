@@ -113,22 +113,21 @@ export default function CollectionReceiptPage() {
             #printable-receipt-area #receipt-content {
               width: 100% !important;
               margin: 0 !important;
-              padding: 0 !important; /* Remove padding here, add to .receipt-print-content */
+              padding: 0 !important; 
               box-shadow: none !important;
               border: none !important;
               background: white !important;
             }
             .receipt-print-content {
-              padding: 2mm !important; /* Padding inside the border */
-              width: calc(100% - 4mm) !important; /* Adjust width for padding */
+              padding: 2mm !important; 
+              width: calc(100% - 4mm) !important; 
               box-sizing: border-box !important;
               font-family: 'Courier New', Courier, monospace !important;
               font-size: 11pt !important;
               line-height: 1.3 !important;
               color: black !important;
               font-weight: normal !important; /* Default to normal */
-              border: 1px solid black; /* Add border here */
-              margin: 0 auto; /* Center content if body is wider */
+              margin: 0 auto; 
             }
             .center { text-align: center !important; }
             .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 1mm !important; }
@@ -303,32 +302,34 @@ export default function CollectionReceiptPage() {
 
   return (
     <div id="receipt-content-wrapper" className="flex flex-col items-center justify-start min-h-screen bg-background p-4 print:bg-white print:p-0">
-      <div id="receipt-content" className="w-full max-w-xs bg-white p-6 shadow-lg print:shadow-none print:p-0 print:border-none">
-        <div className="text-center mb-4">
-          <h1 className="text-xl font-bold">{receipt.companyName || "Sendhur Chits"}</h1>
-          <p className="text-sm">Payment Receipt</p>
-        </div>
-        <div className="text-xs space-y-1 border-t border-b border-dashed border-gray-400 py-2 my-2">
-          <p><strong>Receipt No:</strong> {receipt.receiptNumber}</p>
-          <p><strong>Date:</strong> {formatDate(receipt.paymentDate)} {receipt.paymentTime}</p>
-        </div>
-        <div className="text-xs space-y-1 mb-2">
-          <p><strong>Group:</strong> {receipt.groupName} (ID: {receipt.groupId})</p>
-          <p><strong>Member:</strong> {receipt.userFullname} (@{receipt.userUsername})</p>
-          {receipt.dueNumber && <p><strong>Due No:</strong> {receipt.dueNumber}</p>}
-          {receipt.chitAmount !== null && receipt.chitAmount !== undefined && (
-            <p><strong>Installment Amount:</strong> {formatCurrency(receipt.chitAmount)}</p>
-          )}
-          <p className="font-bold text-sm"><strong>Paid Amount:</strong> {formatCurrency(receipt.amount)}</p>
-          {receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined && (
-            <p><strong>Total Balance:</strong> {formatCurrency(receipt.userTotalDueBeforeThisPayment)}</p>
-          )}
-          <p><strong>Payment Mode:</strong> {receipt.paymentMode}</p>
-        </div>
-        <div className="text-xs space-y-1 border-t border-dashed border-gray-400 pt-2 mt-2">
-          {receipt.remarks && <p><strong>Remarks:</strong> {receipt.remarks}</p>}
-          {receipt.virtualTransactionId && <p><strong>Virtual ID:</strong> {receipt.virtualTransactionId}</p>}
-          <p className="text-center mt-4">Thank You!</p>
+      <div id="printable-receipt-area">
+        <div id="receipt-content" className="w-full max-w-xs bg-white p-6 shadow-lg print:shadow-none print:p-0 print:border-none">
+            <div className="text-center mb-4">
+            <h1 className="text-xl font-bold">{receipt.companyName || "Sendhur Chits"}</h1>
+            <p className="text-sm">Payment Receipt</p>
+            </div>
+            <div className="text-xs space-y-1 border-t border-b border-dashed border-gray-400 py-2 my-2">
+            <p><strong>Receipt No:</strong> {receipt.receiptNumber}</p>
+            <p><strong>Date:</strong> {formatDate(receipt.paymentDate)} {receipt.paymentTime}</p>
+            </div>
+            <div className="text-xs space-y-1 mb-2">
+            <p><strong>Group:</strong> {receipt.groupName} {receipt.groupId ? `(ID: ${receipt.groupId})` : ''}</p>
+            <p><strong>Member:</strong> {receipt.userFullname} {receipt.userUsername ? `(@${receipt.userUsername})` : ''}</p>
+            {receipt.dueNumber && <p><strong>Due No:</strong> {receipt.dueNumber}</p>}
+            {receipt.chitAmount !== null && receipt.chitAmount !== undefined && (
+                <p><strong>Installment Amount:</strong> {formatCurrency(receipt.chitAmount)}</p>
+            )}
+            <p className="font-bold text-sm"><strong>Paid Amount:</strong> {formatCurrency(receipt.amount)}</p>
+            {receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined && (
+                <p><strong>Total Balance:</strong> {formatCurrency(receipt.userTotalDueBeforeThisPayment)}</p>
+            )}
+            <p><strong>Payment Mode:</strong> {receipt.paymentMode}</p>
+            </div>
+            <div className="text-xs space-y-1 border-t border-dashed border-gray-400 pt-2 mt-2">
+            {receipt.remarks && <p><strong>Remarks:</strong> {receipt.remarks}</p>}
+            {receipt.virtualTransactionId && <p><strong>Virtual ID:</strong> {receipt.virtualTransactionId}</p>}
+            <p className="text-center mt-4">Thank You!</p>
+            </div>
         </div>
       </div>
 
@@ -346,6 +347,4 @@ export default function CollectionReceiptPage() {
     </div>
   );
 }
-    
-
     
