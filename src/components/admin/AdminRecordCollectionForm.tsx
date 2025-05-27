@@ -16,9 +16,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db, storage } from "@/lib/firebase";
-import { ref as storageRefFB, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref as storageRefFB, uploadBytes, getDownloadURL } from "firebase/storage"; // Aliased to avoid conflict
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc, orderBy, getDoc } from "firebase/firestore";
-import type { Group, User, CollectionRecord, Admin, AuctionRecord } from "@/types";
+import type { Group, User, Admin, CollectionRecord, AuctionRecord } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -118,37 +118,43 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         let y = 10;
         const lineHeight = 5; 
         const margin = 3; 
+        const pageWidth = doc.internal.pageSize.getWidth();
+        if (!pageWidth || pageWidth <= 0) {
+            console.error("[PDF Generation] Invalid page width:", pageWidth);
+            return null; 
+        }
+        const centerX = pageWidth / 2;
 
-        doc.setFont('Times-Bold'); 
+        doc.setFont('Helvetica-Bold'); // Changed from Times-Bold
         doc.setFontSize(12); 
-        doc.text(String(recordData.companyName || "Sendhur Chits"), doc.internal.pageSize.width / 2, y, { align: 'center' }); y += lineHeight * 1.5;
+        doc.text(String(recordData.companyName || "Sendhur Chits"), Number(centerX), Number(y), { align: 'center' }); y += lineHeight * 1.5;
         
-        doc.setFont('Times-Roman'); 
+        doc.setFont('Helvetica'); // Changed from Times-Roman
         doc.setFontSize(12); 
-        doc.text(`Receipt No: ${recordData.receiptNumber || 'N/A'}`, doc.internal.pageSize.width / 2, y, { align: 'center' }); y += lineHeight;
-        doc.text(`Date: ${formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy")} ${recordData.paymentTime || ''}`, doc.internal.pageSize.width / 2, y, { align: 'center' }); y += lineHeight;
+        doc.text(`Receipt No: ${recordData.receiptNumber || 'N/A'}`, Number(centerX), Number(y), { align: 'center' }); y += lineHeight;
+        doc.text(`Date: ${formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy")} ${recordData.paymentTime || ''}`, Number(centerX), Number(y), { align: 'center' }); y += lineHeight;
         
         doc.setLineDashPattern([1, 1], 0); 
-        doc.line(margin, y, doc.internal.pageSize.width - margin, y); y += lineHeight * 0.5; 
+        doc.line(Number(margin), Number(y), Number(pageWidth - margin), Number(y)); y += lineHeight * 0.5; 
         doc.setLineDashPattern([], 0); 
         
         y += lineHeight * 0.5;
         
         const wrapText = (text: string, x: number, yPos: number, maxWidth: number, lHeight: number): number => {
             const lines = doc.splitTextToSize(text, maxWidth);
-            doc.text(lines, x, yPos);
+            doc.text(lines, Number(x), Number(yPos));
             return yPos + (lines.length * lHeight);
         };
-
+    
         const printLine = (label: string, value: string | number | null | undefined, yPos: number, isBoldValue: boolean = false): number => {
-            doc.setFont('Times-Bold');
+            doc.setFont('Helvetica-Bold'); // Changed
             doc.setFontSize(12);
-            doc.text(label, margin, yPos);
+            doc.text(label, Number(margin), Number(yPos));
             const labelWidth = doc.getTextWidth(label);
             
-            doc.setFont(isBoldValue ? 'Times-Bold' : 'Times-Roman');
+            doc.setFont(isBoldValue ? 'Helvetica-Bold' : 'Helvetica'); // Changed
             doc.setFontSize(12);
-            return wrapText(String(value || 'N/A'), margin + labelWidth + 2, yPos, 66 - labelWidth - 2, lineHeight);
+            return wrapText(String(value || 'N/A'), Number(margin + labelWidth + 2), Number(yPos), Number(66 - labelWidth - 2), Number(lineHeight));
         };
         
         y = printLine("Group:", recordData.groupName || 'N/A', y);
@@ -176,13 +182,13 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         y = printLine("Mode:", recordData.paymentMode || 'N/A', y);
         
         doc.setLineDashPattern([1, 1], 0);
-        doc.line(margin, y, doc.internal.pageSize.width - margin, y); y += lineHeight * 0.5;
+        doc.line(Number(margin), Number(y), Number(pageWidth - margin), Number(y)); y += lineHeight * 0.5;
         doc.setLineDashPattern([], 0);
         
         y += lineHeight;
-        doc.setFont('Times-Roman');
+        doc.setFont('Helvetica'); // Changed
         doc.setFontSize(12);
-        doc.text("Thank You!", doc.internal.pageSize.width / 2, y, { align: 'center' });
+        doc.text("Thank You!", Number(centerX), Number(y), { align: 'center' });
         
         return doc.output('blob');
     } catch (pdfError) {
@@ -416,7 +422,7 @@ export function AdminRecordCollectionForm() {
     }
 
     setIsSubmitting(true);
-    console.log("Admin Record Collection Form onSubmit - values:", values);
+    console.log("[Admin Collection Form] onSubmit - values:", values);
     const selectedGroup = groups.find(g => g.id === values.selectedGroupId);
     const selectedUser = groupMembers.find(m => m.id === values.selectedUserId);
 
@@ -455,7 +461,7 @@ export function AdminRecordCollectionForm() {
             chitAmountForDue = selectedAuction.finalAmountToBePaid;
             dueNumberForRecord = selectedAuction.auctionNumber || null;
         } else if (selectedGroup && selectedGroup.rate !== null && selectedGroup.rate !== undefined) {
-            chitAmountForDue = selectedGroup.rate; // Fallback if auction specific amount not found
+            chitAmountForDue = selectedGroup.rate; 
         }
         console.log("Calculated chitAmountForDue:", chitAmountForDue, "dueNumberForRecord:", dueNumberForRecord);
 
@@ -478,7 +484,6 @@ export function AdminRecordCollectionForm() {
         }
         console.log("Fetched userTotalDueBeforeThisPayment:", userDueBeforePayment);
         
-        // Calculate total paid for THIS specific due including this transaction for PDF
         if (selectedUser.id && selectedGroup.id && dueNumberForRecord !== null) {
             const collectionsForDueQuery = query(
             collection(db, "collectionRecords"),
@@ -491,7 +496,7 @@ export function AdminRecordCollectionForm() {
             collectionsForDueSnapshot.forEach(snap => {
             sumPaidForDueAlready += (snap.data() as CollectionRecord).amount || 0;
             });
-            totalPaidForThisSpecificDue = sumPaidForDueAlready + values.amount; // Add current payment
+            totalPaidForThisSpecificDue = sumPaidForDueAlready + values.amount; 
             if(chitAmountForDue !== null) {
               balanceForThisSpecificInstallment = chitAmountForDue - totalPaidForThisSpecificDue;
             }
@@ -517,21 +522,21 @@ export function AdminRecordCollectionForm() {
             chitAmount: chitAmountForDue,
             amount: values.amount,
             userTotalDueBeforeThisPayment: userDueBeforePayment,
-            balanceAmount: balanceAmountAfterPayment, // This is balance for *this bill* against *this due*
-            totalPaidForThisDue: totalPaidForThisSpecificDue, // For PDF Display
-            balanceForThisInstallment: balanceForThisSpecificInstallment, // For PDF Display
+            balanceAmount: balanceAmountAfterPayment, 
+            totalPaidForThisDue: totalPaidForThisSpecificDue, 
+            balanceForThisInstallment: balanceForThisSpecificInstallment, 
             paymentMode: values.paymentMode,
             remarks: values.remarks || "Auction Collection",
             virtualTransactionId: virtualId,
         };
-        console.log("Data prepared for PDF generation (tempRecordDataForPdf):", tempRecordDataForPdf);
+        console.log("[Admin Collection Form] Data prepared for PDF generation (tempRecordDataForPdf):", tempRecordDataForPdf);
         
         receiptPdfDownloadUrl = await generateAndUploadReceiptPdf(
             tempRecordDataForPdf,
             selectedGroup.id,
             newReceiptNumber
         );
-        console.log("Receipt PDF Download URL from helper:", receiptPdfDownloadUrl);
+        console.log("[Admin Collection Form] Receipt PDF Download URL from helper:", receiptPdfDownloadUrl);
 
         const finalCollectionRecordData: Omit<CollectionRecord, "id"> & { recordedAt?: any } = {
             receiptNumber: newReceiptNumber,
@@ -561,14 +566,14 @@ export function AdminRecordCollectionForm() {
             virtualTransactionId: virtualId,
             receiptPdfUrl: receiptPdfDownloadUrl,
         };
-        console.log("Final data being saved to Firestore (finalCollectionRecordData):", finalCollectionRecordData);
+        console.log("[Admin Collection Form] Final data being saved to Firestore (finalCollectionRecordData):", finalCollectionRecordData);
 
         await runTransaction(db, async (transaction) => {
             const userDocRef = doc(db, "users", selectedUser.id);
             const currentDueAmount = userDueBeforePayment !== null ? userDueBeforePayment : (userDocSnapshot.data()?.dueAmount || 0);
             const newDueAmount = currentDueAmount - values.amount;
             transaction.update(userDocRef, { dueAmount: newDueAmount });
-            console.log(`Updated user ${selectedUser.username} due amount from ${currentDueAmount} to ${newDueAmount}`);
+            console.log(`[Admin Collection Form] Updated user ${selectedUser.username} due amount from ${currentDueAmount} to ${newDueAmount}`);
 
             const collectionRecordRef = doc(collection(db, "collectionRecords")); 
             newCollectionRecordId = collectionRecordRef.id; 
@@ -576,11 +581,11 @@ export function AdminRecordCollectionForm() {
                 ...finalCollectionRecordData,
                 recordedAt: serverTimestamp() as Timestamp,
             });
-            console.log("Collection record set in transaction, newCollectionRecordId:", newCollectionRecordId);
+            console.log("[Admin Collection Form] Collection record set in transaction, newCollectionRecordId:", newCollectionRecordId);
         });
         
         if (!newCollectionRecordId) {
-            console.error("Failed to obtain new collection record ID for redirection.");
+            console.error("[Admin Collection Form] Failed to obtain new collection record ID for redirection.");
             throw new Error("Failed to obtain new collection record ID for redirection.");
         }
 
@@ -588,17 +593,16 @@ export function AdminRecordCollectionForm() {
         
         router.push(`/admin/collection/receipt/${newCollectionRecordId}`);
     } catch (error) {
-      console.error("Error recording collection in onSubmit:", error);
+      console.error("[Admin Collection Form] Error recording collection in onSubmit:", error);
       toast({ title: "Error", description: "Could not record collection. " + (error as Error).message, variant: "destructive" });
-      setIsSubmitting(false); // Re-enable button on error
-    } 
-    // No finally for setIsSubmitting here, as redirect handles it on success
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
     <Card className="shadow-xl w-full max-w-2xl mx-auto">
       <CardHeader>
-        {/* Title is on the page already */}
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -871,5 +875,6 @@ export function AdminRecordCollectionForm() {
     </Card>
   );
 }
+
 
     
