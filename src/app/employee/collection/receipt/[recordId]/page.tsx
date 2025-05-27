@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import type { CollectionRecord } from '@/types';
+import type { CollectionRecord, Group, AuctionRecord } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Loader2, Printer, Download as DownloadIcon, ArrowLeft, Eye } from 'lucide-react';
 import { format } from 'date-fns';
@@ -43,14 +43,33 @@ export default function EmployeeCollectionReceiptPage() {
 
   useEffect(() => {
     if (recordId) {
-      const fetchReceipt = async () => {
+      const fetchReceiptAndRelatedData = async () => {
         setLoading(true);
         setError(null);
         try {
           const docRef = doc(db, "collectionRecords", recordId);
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
-            setReceipt({ id: docSnap.id, ...docSnap.data() } as CollectionRecord);
+            const collectionData = { id: docSnap.id, ...docSnap.data() } as CollectionRecord;
+            
+            // Fetch Group Total Amount
+            if (collectionData.groupId) {
+              const groupDocRef = doc(db, "groups", collectionData.groupId);
+              const groupSnap = await getDoc(groupDocRef);
+              if (groupSnap.exists()) {
+                collectionData.groupTotalAmount = (groupSnap.data() as Group).totalAmount;
+              }
+            }
+
+            // Fetch Auction Date if auctionId exists
+            if (collectionData.auctionId) {
+              const auctionDocRef = doc(db, "auctionRecords", collectionData.auctionId);
+              const auctionSnap = await getDoc(auctionDocRef);
+              if (auctionSnap.exists()) {
+                collectionData.auctionDateForReceipt = (auctionSnap.data() as AuctionRecord).auctionDate;
+              }
+            }
+            setReceipt(collectionData);
           } else {
             setError("Receipt not found.");
           }
@@ -61,27 +80,29 @@ export default function EmployeeCollectionReceiptPage() {
           setLoading(false);
         }
       };
-      fetchReceipt();
+      fetchReceiptAndRelatedData();
     }
   }, [recordId]);
 
   const handlePrint = () => {
     if (!receipt) return;
 
-    const companyName = receipt.companyName || "Sendhur Chits";
-    const receiptNumber = receipt.receiptNumber || 'N/A';
-    const paymentDate = formatDate(receipt.paymentDate, "dd-MMM-yyyy");
-    const paymentTime = receipt.paymentTime || '';
-    const groupName = receipt.groupName || 'N/A';
-    const groupId = receipt.groupId ? `(ID: ${receipt.groupId})` : '';
-    const userFullname = receipt.userFullname || 'N/A';
-    const userUsername = receipt.userUsername ? `(@${receipt.userUsername})` : '';
+    const companyNameHtml = `<div class="company-name center">SENDHUR CHITS</div>`;
+    const receiptNumberHtml = `<div class="receipt-info center">Receipt No: ${receipt.receiptNumber || 'N/A'}</div>`;
+    const dateTimeHtml = `<div class="receipt-info center">Date: ${formatDate(receipt.paymentDate, "dd-MMM-yyyy")} ${receipt.paymentTime || ''}</div>`;
+    
+    const groupNameHtml = `<div class="section-item"><span class="field-label">Group:</span> <span class="field-value">${receipt.groupName || 'N/A'}</span></div>`;
+    const userNameHtml = `<div class="section-item"><span class="field-label">Name:</span> <span class="field-value">${receipt.userFullname || 'N/A'}</span></div>`;
+    
+    const chitSchemeValueHtml = `<div class="section-item"><span class="field-label">Chit Scheme Value:</span> <span class="field-value">${receipt.groupTotalAmount ? formatCurrency(receipt.groupTotalAmount) : 'N/A'}</span></div>`;
+    const chitDateHtml = `<div class="section-item"><span class="field-label">Chit Date:</span> <span class="field-value">${receipt.auctionDateForReceipt ? formatDate(receipt.auctionDateForReceipt, "dd-MMM-yyyy") : formatDate(receipt.paymentDate, "dd-MMM-yyyy")}</span></div>`;
     
     const dueNumberHtml = receipt.dueNumber ? `<div class="section-item"><span class="field-label">Due No.:</span> <span class="field-value">${receipt.dueNumber}</span></div>` : '';
-    const chitAmountHtml = (receipt.chitAmount !== null && receipt.chitAmount !== undefined) ? `<div class="section-item"><span class="field-label">Installment:</span> <span class="field-value">${formatCurrency(receipt.chitAmount)}</span></div>` : '';
-    const paidAmount = formatCurrency(receipt.amount);
+    const dueAmountHtml = (receipt.chitAmount !== null && receipt.chitAmount !== undefined) ? `<div class="section-item"><span class="field-label">Due Amount:</span> <span class="field-value">${formatCurrency(receipt.chitAmount)}</span></div>` : '';
+    const paidAmountHtml = `<div class="section-item"><span class="field-label">Paid:</span> <span class="field-value">${formatCurrency(receipt.amount)}</span></div>`;
     const totalBalanceHtml = (receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) ? `<div class="section-item"><span class="field-label">Total Balance:</span> <span class="field-value">${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</span></div>` : '';
-    const paymentMode = receipt.paymentMode || 'N/A';
+    const paymentModeHtml = `<div class="section-item"><span class="field-label">Mode:</span> <span class="field-value">${receipt.paymentMode || 'N/A'}</span></div>`;
+    const thankYouHtml = `<div class="thank-you center">Thank You!</div>`;
 
     const receiptHTML = `
       <!DOCTYPE html>
@@ -135,14 +156,14 @@ export default function EmployeeCollectionReceiptPage() {
             }
             .receipt-print-content {
               font-family: 'Courier New', Courier, monospace !important;
-              font-size: 11pt !important; 
+              font-size: 12pt !important; 
               line-height: 1.2 !important;
               color: black !important;
               font-weight: normal !important;
             }
             .center { text-align: center !important; }
-            .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 11pt !important; }
-            .receipt-info { font-weight: normal !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 11pt !important; }
+            .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 12pt !important; }
+            .receipt-info { font-weight: normal !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 12pt !important; }
             
             .section-item {
               display: flex !important; 
@@ -156,15 +177,15 @@ export default function EmployeeCollectionReceiptPage() {
             .field-label { display: inline !important; font-weight: bold !important; padding-right: 0.5em; }
             .field-value { display: inline !important; font-weight: normal !important; }
 
-            .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 0.5mm !important; font-size: 11pt !important; }
+            .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 0.5mm !important; font-size: 12pt !important; }
             hr {
               border: none !important;
               border-top: 1px dashed black !important;
               margin: 1mm 0 !important;
             }
-            h1, h2, h3, h4, h5, h6, p {
+            h1, h2, h3, h4, h5, h6, p, div {
                 margin: 0.5mm 0 !important;
-                font-size: 11pt !important; 
+                font-size: 12pt !important; 
             }
             iframe[id^="webpack-dev-server-client-overlay"],
             iframe[id^="vite-error-overlay"],
@@ -179,19 +200,21 @@ export default function EmployeeCollectionReceiptPage() {
       <body>
         <div id="printable-receipt-area">
           <div class="receipt-print-content" id="receipt-content">
-            <div class="company-name">SENDHUR CHITS</div>
-            <div class="receipt-info">Receipt No: ${receiptNumber}</div>
-            <div class="receipt-info">Date: ${paymentDate} ${paymentTime}</div>
+            ${companyNameHtml}
+            ${receiptNumberHtml}
+            ${dateTimeHtml}
             <hr>
-            <div class="section-item"><span class="field-label">Group:</span><span class="field-value"> ${groupName} ${groupId}</span></div>
-            <div class="section-item"><span class="field-label">Member:</span><span class="field-value"> ${userFullname} ${userUsername}</span></div>
+            ${groupNameHtml}
+            ${userNameHtml}
+            ${chitSchemeValueHtml}
+            ${chitDateHtml}
             ${dueNumberHtml}
-            ${chitAmountHtml}
-            <div class="section-item"><span class="field-label">Paid:</span><span class="field-value"> ${paidAmount}</span></div>
+            ${dueAmountHtml}
+            ${paidAmountHtml}
             ${totalBalanceHtml}
-            <div class="section-item"><span class="field-label">Mode:</span><span class="field-value"> ${paymentMode}</span></div>
+            ${paymentModeHtml}
             <hr>
-            <div class="thank-you">Thank You!</div>
+            ${thankYouHtml}
           </div>
         </div>
       </body>
@@ -230,7 +253,6 @@ export default function EmployeeCollectionReceiptPage() {
       document.body.removeChild(link);
       return;
     }
-
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -261,13 +283,16 @@ export default function EmployeeCollectionReceiptPage() {
         return yPos + (lines.length * lHeight);
     };
     
-    y = wrapText(`Group: ${receipt.groupName || 'N/A'} ${receipt.groupId ? `(ID: ${receipt.groupId})` : ''}`, margin, y, 66, lineHeight);
-    y = wrapText(`Member: ${receipt.userFullname || 'N/A'} ${receipt.userUsername ? `(@${receipt.userUsername})` : ''}`, margin, y, 66, lineHeight);
+    y = wrapText(`Group: ${receipt.groupName || 'N/A'}`, margin, y, 66, lineHeight);
+    y = wrapText(`Name: ${receipt.userFullname || 'N/A'}`, margin, y, 66, lineHeight);
+    y = wrapText(`Chit Scheme Value: ${receipt.groupTotalAmount ? formatCurrency(receipt.groupTotalAmount) : 'N/A'}`, margin, y, 66, lineHeight);
+    y = wrapText(`Chit Date: ${receipt.auctionDateForReceipt ? formatDate(receipt.auctionDateForReceipt, "dd-MMM-yyyy") : formatDate(receipt.paymentDate, "dd-MMM-yyyy")}`, margin, y, 66, lineHeight);
+
     if (receipt.dueNumber) {
          y = wrapText(`Due No.: ${receipt.dueNumber}`, margin, y, 66, lineHeight);
     }
     if (receipt.chitAmount !== null && receipt.chitAmount !== undefined) {
-        y = wrapText(`Installment: ${formatCurrency(receipt.chitAmount)}`, margin, y, 66, lineHeight);
+        y = wrapText(`Due Amount: ${formatCurrency(receipt.chitAmount)}`, margin, y, 66, lineHeight);
     }
     doc.setFont('Courier', 'bold');
     doc.setFontSize(10);
@@ -341,10 +366,12 @@ export default function EmployeeCollectionReceiptPage() {
           <p><strong>Date:</strong> {formatDate(receipt.paymentDate)} {receipt.paymentTime}</p>
           </div>
           <div className="text-xs space-y-1 mb-2">
-          <p><strong>Group:</strong> {receipt.groupName} {receipt.groupId ? `(ID: ${receipt.groupId})` : ''}</p>
-          <p><strong>Member:</strong> {receipt.userFullname} {receipt.userUsername ? `(@${receipt.userUsername})` : ''}</p>
+          <p><strong>Group:</strong> {receipt.groupName}</p>
+          <p><strong>Name:</strong> {receipt.userFullname}</p>
+          <p><strong>Chit Scheme Value:</strong> {receipt.groupTotalAmount ? formatCurrency(receipt.groupTotalAmount) : 'N/A'}</p>
+          <p><strong>Chit Date:</strong> {receipt.auctionDateForReceipt ? formatDate(receipt.auctionDateForReceipt) : formatDate(receipt.paymentDate)}</p>
           {receipt.dueNumber ? <p><strong>Due No:</strong> {receipt.dueNumber}</p> : null}
-          {(receipt.chitAmount !== null && receipt.chitAmount !== undefined) ? <p><strong>Installment Amount:</strong> {formatCurrency(receipt.chitAmount)}</p> : null}
+          {(receipt.chitAmount !== null && receipt.chitAmount !== undefined) ? <p><strong>Due Amount:</strong> {formatCurrency(receipt.chitAmount)}</p> : null}
           <p className="font-bold text-sm"><strong>Paid Amount:</strong> {formatCurrency(receipt.amount)}</p>
           {(receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) ? <p><strong>Total Balance:</strong> {formatCurrency(receipt.userTotalDueBeforeThisPayment)}</p> : null}
           <p><strong>Payment Mode:</strong> {receipt.paymentMode}</p>

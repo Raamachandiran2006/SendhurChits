@@ -89,6 +89,7 @@ export interface AuctionRecord {
   finalAmountToBePaid?: number | null; // This is the installment paid by all members (including winner)
   recordedAt: import('firebase/firestore').Timestamp;
   virtualTransactionId?: string;
+  amountPaidToWinner?: number | null;
 }
 
 export interface ExpenseRecord {
@@ -132,10 +133,12 @@ export interface CollectionRecord {
   recordedByEmployeeName?: string | null;
   virtualTransactionId?: string;
   receiptPdfUrl?: string | null;
+  groupTotalAmount?: number | null; // Total value of the chit group
+  auctionDateForReceipt?: string | null; // Date of the auction this collection pertains to
 }
 
 // This type is used by the Admin Payment Portal form, and saves to 'paymentRecords'
-export interface PaymentRecord { // Renamed from CollectionRecord to avoid confusion
+export interface PaymentRecord { 
   id: string; // Firestore document ID
   groupId: string;
   groupName: string;
