@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
 import type { CollectionRecord, Group, AuctionRecord } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Loader2, Printer, Download as DownloadIcon, ArrowLeft, Eye } from 'lucide-react';
@@ -41,6 +41,12 @@ export default function AdminCollectionReceiptPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // New state for detailed installment financials
+  const [amountDueForThisInstallment, setAmountDueForThisInstallment] = useState<number | null>(null);
+  const [totalPaidForThisDue, setTotalPaidForThisDue] = useState<number | null>(null);
+  const [balanceForThisInstallment, setBalanceForThisInstallment] = useState<number | null>(null);
+
+
   useEffect(() => {
     if (recordId) {
       const fetchReceiptAndRelatedData = async () => {
@@ -52,6 +58,7 @@ export default function AdminCollectionReceiptPage() {
           if (docSnap.exists()) {
             const collectionData = { id: docSnap.id, ...docSnap.data() } as CollectionRecord;
             
+            // Fetch group total amount for "Chit Scheme Value"
             if (collectionData.groupId) {
               const groupDocRef = doc(db, "groups", collectionData.groupId);
               const groupSnap = await getDoc(groupDocRef);
@@ -60,14 +67,69 @@ export default function AdminCollectionReceiptPage() {
               }
             }
 
+            // Fetch auction date for "Chit Date"
+            // Also fetch AuctionRecord's finalAmountToBePaid for "Due Amount (This Inst.)"
+            let fetchedAmountDueForThisInstallment: number | null = collectionData.chitAmount || null; // Fallback to stored chitAmount
+
             if (collectionData.auctionId) {
               const auctionDocRef = doc(db, "auctionRecords", collectionData.auctionId);
               const auctionSnap = await getDoc(auctionDocRef);
               if (auctionSnap.exists()) {
-                collectionData.auctionDateForReceipt = (auctionSnap.data() as AuctionRecord).auctionDate;
+                const auctionData = auctionSnap.data() as AuctionRecord;
+                collectionData.auctionDateForReceipt = auctionData.auctionDate;
+                if (auctionData.finalAmountToBePaid !== null && auctionData.finalAmountToBePaid !== undefined) {
+                  fetchedAmountDueForThisInstallment = auctionData.finalAmountToBePaid;
+                }
+              }
+            } else if (collectionData.groupId && collectionData.auctionNumber !== null && collectionData.auctionNumber !== undefined) {
+              // Fallback: if no auctionId, try to find auction by groupId and auctionNumber
+              const auctionQuery = query(
+                collection(db, "auctionRecords"),
+                where("groupId", "==", collectionData.groupId),
+                where("auctionNumber", "==", collectionData.auctionNumber)
+              );
+              const auctionSnapshot = await getDocs(auctionQuery);
+              if (!auctionSnapshot.empty) {
+                const auctionData = auctionSnapshot.docs[0].data() as AuctionRecord;
+                collectionData.auctionDateForReceipt = auctionData.auctionDate;
+                 if (auctionData.finalAmountToBePaid !== null && auctionData.finalAmountToBePaid !== undefined) {
+                  fetchedAmountDueForThisInstallment = auctionData.finalAmountToBePaid;
+                }
               }
             }
-            setReceipt(collectionData);
+            setAmountDueForThisInstallment(fetchedAmountDueForThisInstallment);
+            setReceipt(collectionData); // Set base receipt data
+
+            // Fetch total paid for this specific due/auction installment
+            if (collectionData.userId && collectionData.groupId && collectionData.auctionNumber !== null && collectionData.auctionNumber !== undefined) {
+              const collectionsForDueQuery = query(
+                collection(db, "collectionRecords"),
+                where("userId", "==", collectionData.userId),
+                where("groupId", "==", collectionData.groupId),
+                where("auctionNumber", "==", collectionData.auctionNumber)
+              );
+              const collectionsForDueSnapshot = await getDocs(collectionsForDueQuery);
+              let sumPaidForDue = 0;
+              collectionsForDueSnapshot.forEach(snap => {
+                sumPaidForDue += (snap.data() as CollectionRecord).amount || 0;
+              });
+              setTotalPaidForThisDue(sumPaidForDue);
+
+              if (fetchedAmountDueForThisInstallment !== null) {
+                setBalanceForThisInstallment(fetchedAmountDueForThisInstallment - sumPaidForDue);
+              } else {
+                setBalanceForThisInstallment(null);
+              }
+            } else {
+              // If not related to a specific auction number, these might not be applicable
+              setTotalPaidForThisDue(collectionData.amount); // Assume current bill amount is total paid for this non-specific due
+              if (fetchedAmountDueForThisInstallment !== null) {
+                 setBalanceForThisInstallment(fetchedAmountDueForThisInstallment - collectionData.amount);
+              } else {
+                 setBalanceForThisInstallment(null);
+              }
+            }
+
           } else {
             setError("Receipt not found.");
           }
@@ -89,17 +151,26 @@ export default function AdminCollectionReceiptPage() {
     const receiptNumberHtml = `<div class="receipt-info center">Receipt No: ${receipt.receiptNumber || 'N/A'}</div>`;
     const dateTimeHtml = `<div class="receipt-info center">Date: ${formatDate(receipt.paymentDate, "dd-MMM-yyyy")} ${receipt.paymentTime || ''}</div>`;
     
-    const groupNameHtml = `<div class="section-item">Group : ${receipt.groupName || 'N/A'}</div>`;
-    const userNameHtml = `<div class="section-item">Name : ${receipt.userFullname || 'N/A'}</div>`;
+    const groupNameHtml = `<div class="section-item"><span class="field-label">Group:</span> <span class="field-value">${receipt.groupName || 'N/A'}</span></div>`;
+    const userNameHtml = `<div class="section-item"><span class="field-label">Name:</span> <span class="field-value">${receipt.userFullname || 'N/A'}</span></div>`;
     
-    const chitSchemeValueHtml = `<div class="section-item">Chit Value : ${receipt.groupTotalAmount ? formatCurrency(receipt.groupTotalAmount) : 'N/A'}</div>`;
-    const chitDateHtml = `<div class="section-item">Chit Date : ${receipt.auctionDateForReceipt ? formatDate(receipt.auctionDateForReceipt, "dd-MMM-yyyy") : formatDate(receipt.paymentDate, "dd-MMM-yyyy")}</div>`;
+    const chitSchemeValueHtml = `<div class="section-item"><span class="field-label">Chit Scheme Value:</span> <span class="field-value">${receipt.groupTotalAmount ? formatCurrency(receipt.groupTotalAmount) : 'N/A'}</span></div>`;
+    const chitDateHtml = `<div class="section-item"><span class="field-label">Chit Date:</span> <span class="field-value">${receipt.auctionDateForReceipt ? formatDate(receipt.auctionDateForReceipt, "dd-MMM-yyyy") : formatDate(receipt.paymentDate, "dd-MMM-yyyy")}</span></div>`;
     
-    const dueNumberHtml = receipt.dueNumber ? `<div class="section-item">Due No. : ${receipt.dueNumber}</div>` : '';
-    const dueAmountHtml = (receipt.chitAmount !== null && receipt.chitAmount !== undefined) ? `<div class="section-item">Due Amount : ${formatCurrency(receipt.chitAmount)}</div>` : '';
-    const paidAmountHtml = `<div class="section-item">Paid : ${formatCurrency(receipt.amount)}</div>`;
-    const totalBalanceHtml = (receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) ? `<div class="section-item">Total Balance : ${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</div>` : '';
-    const paymentModeHtml = `<div class="section-item">Mode : ${receipt.paymentMode || 'N/A'}</div>`;
+    const dueNumberHtml = receipt.dueNumber ? `<div class="section-item"><span class="field-label">Due No.:</span> <span class="field-value">${receipt.dueNumber}</span></div>` : '';
+    
+    // "Due Amount (This Inst.)"
+    const dueAmountForInstallmentHtml = (amountDueForThisInstallment !== null && amountDueForThisInstallment !== undefined) ? `<div class="section-item"><span class="field-label">Due Amount (This Inst.):</span> <span class="field-value">${formatCurrency(amountDueForThisInstallment)}</span></div>` : '';
+    // "Paid Amount (This Inst.)"
+    const totalPaidForInstallmentHtml = (totalPaidForThisDue !== null && totalPaidForThisDue !== undefined) ? `<div class="section-item"><span class="field-label">Paid Amount (This Inst.):</span> <span class="field-value">${formatCurrency(totalPaidForThisDue)}</span></div>` : '';
+    // "Bill Amount (This Txn.)"
+    const billAmountHtml = `<div class="section-item"><span class="field-label">Bill Amount (This Txn.):</span> <span class="field-value">${formatCurrency(receipt.amount)}</span></div>`;
+    // "Balance (This Inst.)"
+    const balanceForInstallmentHtml = (balanceForThisInstallment !== null && balanceForThisInstallment !== undefined) ? `<div class="section-item"><span class="field-label">Balance (This Inst.):</span> <span class="field-value">${formatCurrency(balanceForThisInstallment)}</span></div>` : '';
+    // "User Total Balance (Overall)"
+    const userOverallBalanceHtml = (receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) ? `<div class="section-item"><span class="field-label">User Total Balance (Overall):</span> <span class="field-value">${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</span></div>` : '';
+
+    const paymentModeHtml = `<div class="section-item"><span class="field-label">Mode:</span> <span class="field-value">${receipt.paymentMode || 'N/A'}</span></div>`;
     const thankYouHtml = `<div class="thank-you center">Thank You!</div>`;
 
     const receiptHTML = `
@@ -154,14 +225,13 @@ export default function AdminCollectionReceiptPage() {
             }
             .receipt-print-content {
               font-family: 'Times New Roman', Times, serif !important;
-              font-size: 14pt !important; 
+              font-size: 12px !important; 
               line-height: 1.2 !important;
               color: black !important;
-              font-weight: normal !important;
             }
             .center { text-align: center !important; }
-            .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 14pt !important; }
-            .receipt-info { font-weight: normal !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 14pt !important; }
+            .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 12px !important; }
+            .receipt-info { font-weight: normal !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 12px !important; }
             
             .section-item {
               display: flex !important; 
@@ -175,7 +245,7 @@ export default function AdminCollectionReceiptPage() {
             .field-label { display: inline !important; font-weight: bold !important; padding-right: 0.5em; }
             .field-value { display: inline !important; font-weight: normal !important; }
 
-            .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 0.5mm !important; font-size: 14pt !important; }
+            .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 0.5mm !important; font-size: 12px !important; }
             hr {
               border: none !important;
               border-top: 1px dashed black !important;
@@ -183,7 +253,7 @@ export default function AdminCollectionReceiptPage() {
             }
             h1, h2, h3, h4, h5, h6, p, div {
                 margin: 0.5mm 0 !important;
-                font-size: 14pt !important; 
+                font-size: 12px !important; 
             }
             iframe[id^="webpack-dev-server-client-overlay"],
             iframe[id^="vite-error-overlay"],
@@ -207,9 +277,11 @@ export default function AdminCollectionReceiptPage() {
             ${chitSchemeValueHtml}
             ${chitDateHtml}
             ${dueNumberHtml}
-            ${dueAmountHtml}
-            ${paidAmountHtml}
-            ${totalBalanceHtml}
+            ${dueAmountForInstallmentHtml}
+            ${totalPaidForInstallmentHtml}
+            ${billAmountHtml}
+            ${balanceForInstallmentHtml}
+            ${userOverallBalanceHtml}
             ${paymentModeHtml}
             <hr>
             ${thankYouHtml}
@@ -252,6 +324,7 @@ export default function AdminCollectionReceiptPage() {
       return;
     }
     
+    // Fallback PDF generation if URL is not available (should not happen with new flow)
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -298,14 +371,21 @@ export default function AdminCollectionReceiptPage() {
     if (receipt.dueNumber) {
          y = printLine("Due No.:", receipt.dueNumber, y);
     }
-    if (receipt.chitAmount !== null && receipt.chitAmount !== undefined) {
-        y = printLine("Due Amount:", formatCurrency(receipt.chitAmount), y);
+    if (amountDueForThisInstallment !== null && amountDueForThisInstallment !== undefined) {
+        y = printLine("Due Amount (This Inst.):", formatCurrency(amountDueForThisInstallment), y);
     }
-    y = printLine("Paid:", formatCurrency(receipt.amount), y, true); 
+    if (totalPaidForThisDue !== null && totalPaidForThisDue !== undefined) {
+        y = printLine("Paid Amount (This Inst.):", formatCurrency(totalPaidForThisDue), y);
+    }
+    y = printLine("Bill Amount (This Txn.):", formatCurrency(receipt.amount), y, true); 
     
-    if (receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) {
-        y = printLine("Total Balance:", formatCurrency(receipt.userTotalDueBeforeThisPayment), y);
+    if (balanceForThisInstallment !== null && balanceForThisInstallment !== undefined) {
+        y = printLine("Balance (This Inst.):", formatCurrency(balanceForThisInstallment), y);
     }
+    if (receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) {
+        y = printLine("User Total Balance (Overall):", formatCurrency(receipt.userTotalDueBeforeThisPayment), y);
+    }
+
     y = printLine("Mode:", receipt.paymentMode || 'N/A', y);
     
     doc.setLineDashPattern([1, 1], 0);
@@ -377,9 +457,13 @@ export default function AdminCollectionReceiptPage() {
             <p><strong>Chit Scheme Value:</strong> {receipt.groupTotalAmount ? formatCurrency(receipt.groupTotalAmount) : 'N/A'}</p>
             <p><strong>Chit Date:</strong> {receipt.auctionDateForReceipt ? formatDate(receipt.auctionDateForReceipt) : formatDate(receipt.paymentDate)}</p>
             {receipt.dueNumber ? <p><strong>Due No:</strong> {receipt.dueNumber}</p> : null}
-            {(receipt.chitAmount !== null && receipt.chitAmount !== undefined) ? <p><strong>Due Amount:</strong> {formatCurrency(receipt.chitAmount)}</p> : null}
-            <p className="font-bold text-sm"><strong>Paid Amount:</strong> {formatCurrency(receipt.amount)}</p>
-            {(receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) ? <p><strong>Total Balance:</strong> {formatCurrency(receipt.userTotalDueBeforeThisPayment)}</p> : null}
+            
+            {(amountDueForThisInstallment !== null && amountDueForThisInstallment !== undefined) ? <p><strong>Due Amount (This Inst.):</strong> {formatCurrency(amountDueForThisInstallment)}</p> : null}
+            {(totalPaidForThisDue !== null && totalPaidForThisDue !== undefined) ? <p><strong>Total Paid (This Inst.):</strong> {formatCurrency(totalPaidForThisDue)}</p> : null}
+            <p className="font-bold text-sm"><strong>Bill Amount (This Txn.):</strong> {formatCurrency(receipt.amount)}</p>
+            {(balanceForThisInstallment !== null && balanceForThisInstallment !== undefined) ? <p><strong>Balance (This Inst.):</strong> {formatCurrency(balanceForThisInstallment)}</p> : null}
+            {(receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) ? <p><strong>User Total Balance (Overall):</strong> {formatCurrency(receipt.userTotalDueBeforeThisPayment)}</p> : null}
+
             <p><strong>Payment Mode:</strong> {receipt.paymentMode}</p>
           </div>
           <div className="text-xs space-y-1 border-t border-dashed border-gray-400 pt-2 mt-2">
@@ -402,5 +486,3 @@ export default function AdminCollectionReceiptPage() {
     </div>
   );
 }
-
-    

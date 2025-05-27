@@ -154,14 +154,13 @@ export default function EmployeeCollectionReceiptPage() {
             }
             .receipt-print-content {
               font-family: 'Times New Roman', Times, serif !important;
-              font-size: 14pt !important; 
+              font-size: 12px !important; 
               line-height: 1.2 !important;
               color: black !important;
-              font-weight: normal !important;
             }
             .center { text-align: center !important; }
-            .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 14pt !important; }
-            .receipt-info { font-weight: normal !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 14pt !important; }
+            .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 12px !important; }
+            .receipt-info { font-weight: normal !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 12px !important; }
             
             .section-item {
               display: flex !important; 
@@ -175,7 +174,7 @@ export default function EmployeeCollectionReceiptPage() {
             .field-label { display: inline !important; font-weight: bold !important; padding-right: 0.5em; }
             .field-value { display: inline !important; font-weight: normal !important; }
 
-            .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 0.5mm !important; font-size: 14pt !important; }
+            .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 0.5mm !important; font-size: 12px !important; }
             hr {
               border: none !important;
               border-top: 1px dashed black !important;
@@ -183,7 +182,7 @@ export default function EmployeeCollectionReceiptPage() {
             }
             h1, h2, h3, h4, h5, h6, p, div {
                 margin: 0.5mm 0 !important;
-                font-size: 14pt !important; 
+                font-size: 12px !important; 
             }
             iframe[id^="webpack-dev-server-client-overlay"],
             iframe[id^="vite-error-overlay"],
@@ -400,5 +399,3 @@ export default function EmployeeCollectionReceiptPage() {
     </div>
   );
 }
-
-    
