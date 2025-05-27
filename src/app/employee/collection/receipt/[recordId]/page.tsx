@@ -52,7 +52,6 @@ export default function EmployeeCollectionReceiptPage() {
           if (docSnap.exists()) {
             const collectionData = { id: docSnap.id, ...docSnap.data() } as CollectionRecord;
             
-            // Fetch Group Total Amount
             if (collectionData.groupId) {
               const groupDocRef = doc(db, "groups", collectionData.groupId);
               const groupSnap = await getDoc(groupDocRef);
@@ -61,7 +60,6 @@ export default function EmployeeCollectionReceiptPage() {
               }
             }
 
-            // Fetch Auction Date if auctionId exists
             if (collectionData.auctionId) {
               const auctionDocRef = doc(db, "auctionRecords", collectionData.auctionId);
               const auctionSnap = await getDoc(auctionDocRef);
@@ -155,15 +153,15 @@ export default function EmployeeCollectionReceiptPage() {
               box-sizing: border-box !important;
             }
             .receipt-print-content {
-              font-family: 'Courier New', Courier, monospace !important;
-              font-size: 12pt !important; 
+              font-family: 'Times New Roman', Times, serif !important;
+              font-size: 12px !important; 
               line-height: 1.2 !important;
               color: black !important;
               font-weight: normal !important;
             }
             .center { text-align: center !important; }
-            .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 12pt !important; }
-            .receipt-info { font-weight: normal !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 12pt !important; }
+            .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 12px !important; }
+            .receipt-info { font-weight: normal !important; text-align: center !important; margin-bottom: 0.5mm !important; font-size: 12px !important; }
             
             .section-item {
               display: flex !important; 
@@ -177,7 +175,7 @@ export default function EmployeeCollectionReceiptPage() {
             .field-label { display: inline !important; font-weight: bold !important; padding-right: 0.5em; }
             .field-value { display: inline !important; font-weight: normal !important; }
 
-            .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 0.5mm !important; font-size: 12pt !important; }
+            .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 0.5mm !important; font-size: 12px !important; }
             hr {
               border: none !important;
               border-top: 1px dashed black !important;
@@ -185,7 +183,7 @@ export default function EmployeeCollectionReceiptPage() {
             }
             h1, h2, h3, h4, h5, h6, p, div {
                 margin: 0.5mm 0 !important;
-                font-size: 12pt !important; 
+                font-size: 12px !important; 
             }
             iframe[id^="webpack-dev-server-client-overlay"],
             iframe[id^="vite-error-overlay"],
@@ -262,12 +260,12 @@ export default function EmployeeCollectionReceiptPage() {
     const lineHeight = 5; 
     const margin = 3; 
 
-    doc.setFontSize(11); 
-    doc.setFont('Courier', 'bold');
-    doc.text(receipt.companyName || "Sendhur Chits", doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight * 1.5;
+    doc.setFont('Times-Roman', 'bold'); // Changed font
+    doc.setFontSize(12); // Changed font size
+    doc.text(receipt.companyName || "SENDHUR CHITS", doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight * 1.5;
     
-    doc.setFont('Courier', 'normal');
-    doc.setFontSize(9);
+    doc.setFont('Times-Roman', 'normal'); // Changed font
+    doc.setFontSize(10); // Changed font size slightly for details
     doc.text(`Receipt No: ${receipt.receiptNumber || 'N/A'}`, doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight;
     doc.text(`Date: ${formatDate(receipt.paymentDate, "dd-MMM-yyyy")} ${receipt.paymentTime || ''}`, doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight;
     
@@ -276,33 +274,38 @@ export default function EmployeeCollectionReceiptPage() {
     doc.setLineDashPattern([], 0); 
     
     y += lineHeight * 0.5;
-    doc.setFontSize(9);
+    doc.setFontSize(10); // Changed font size for section items
      const wrapText = (text: string, x: number, yPos: number, maxWidth: number, lHeight: number): number => {
         const lines = doc.splitTextToSize(text, maxWidth);
         doc.text(lines, x, yPos);
         return yPos + (lines.length * lHeight);
     };
     
-    y = wrapText(`Group: ${receipt.groupName || 'N/A'}`, margin, y, 66, lineHeight);
-    y = wrapText(`Name: ${receipt.userFullname || 'N/A'}`, margin, y, 66, lineHeight);
-    y = wrapText(`Chit Scheme Value: ${receipt.groupTotalAmount ? formatCurrency(receipt.groupTotalAmount) : 'N/A'}`, margin, y, 66, lineHeight);
-    y = wrapText(`Chit Date: ${receipt.auctionDateForReceipt ? formatDate(receipt.auctionDateForReceipt, "dd-MMM-yyyy") : formatDate(receipt.paymentDate, "dd-MMM-yyyy")}`, margin, y, 66, lineHeight);
+    const printLine = (label: string, value: string | number | null | undefined, yPos: number, isBoldValue: boolean = false): number => {
+        doc.setFont('Times-Roman', 'bold');
+        doc.text(label, margin, yPos);
+        const labelWidth = doc.getTextWidth(label);
+        doc.setFont('Times-Roman', isBoldValue ? 'bold' : 'normal');
+        return wrapText(value?.toString() || 'N/A', margin + labelWidth + 2, yPos, 66 - labelWidth - 2, lineHeight);
+    };
+
+    y = printLine("Group:", receipt.groupName || 'N/A', y);
+    y = printLine("Name:", receipt.userFullname || 'N/A', y);
+    y = printLine("Chit Scheme Value:", receipt.groupTotalAmount ? formatCurrency(receipt.groupTotalAmount) : 'N/A', y);
+    y = printLine("Chit Date:", receipt.auctionDateForReceipt ? formatDate(receipt.auctionDateForReceipt, "dd-MMM-yyyy") : formatDate(receipt.paymentDate, "dd-MMM-yyyy"), y);
 
     if (receipt.dueNumber) {
-         y = wrapText(`Due No.: ${receipt.dueNumber}`, margin, y, 66, lineHeight);
+         y = printLine("Due No.:", receipt.dueNumber, y);
     }
     if (receipt.chitAmount !== null && receipt.chitAmount !== undefined) {
-        y = wrapText(`Due Amount: ${formatCurrency(receipt.chitAmount)}`, margin, y, 66, lineHeight);
+        y = printLine("Due Amount:", formatCurrency(receipt.chitAmount), y);
     }
-    doc.setFont('Courier', 'bold');
-    doc.setFontSize(10);
-    y = wrapText(`Paid: ${formatCurrency(receipt.amount)}`, margin, y, 66, lineHeight);
-    doc.setFont('Courier', 'normal');
-    doc.setFontSize(9);
+    y = printLine("Paid:", formatCurrency(receipt.amount), y, true); // Paid amount bold
+    
     if (receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) {
-        y = wrapText(`Total Balance: ${formatCurrency(receipt.userTotalDueBeforeThisPayment)}`, margin, y, 66, lineHeight);
+        y = printLine("Total Balance:", formatCurrency(receipt.userTotalDueBeforeThisPayment), y);
     }
-    y = wrapText(`Mode: ${receipt.paymentMode || 'N/A'}`, margin, y, 66, lineHeight);
+    y = printLine("Mode:", receipt.paymentMode || 'N/A', y);
     
     doc.setLineDashPattern([1, 1], 0);
     doc.line(margin, y, doc.internal.pageSize.getWidth() - margin, y); y += lineHeight * 0.5;
@@ -310,6 +313,7 @@ export default function EmployeeCollectionReceiptPage() {
     
     y += lineHeight;
     doc.setFontSize(10);
+    doc.setFont('Times-Roman', 'normal');
     doc.text("Thank You!", doc.internal.pageSize.getWidth() / 2, y, { align: 'center' });
     
     doc.save(`receipt_${receipt.receiptNumber}.pdf`);
@@ -358,7 +362,7 @@ export default function EmployeeCollectionReceiptPage() {
     <div id="receipt-content-wrapper" className="flex flex-col items-center justify-start min-h-screen bg-background p-4 print:bg-white print:p-0">
        <div id="screen-receipt-content" className="w-full max-w-md bg-card p-6 shadow-lg print:p-0">
           <div className="text-center mb-4">
-          <h1 className="text-xl font-bold">{receipt.companyName || "Sendhur Chits"}</h1>
+          <h1 className="text-xl font-bold">{receipt.companyName || "SENDHUR CHITS"}</h1>
           <p className="text-sm">Payment Receipt</p>
           </div>
           <div className="text-xs space-y-1 border-t border-b border-dashed border-gray-400 py-2 my-2">
@@ -396,3 +400,5 @@ export default function EmployeeCollectionReceiptPage() {
     </div>
   );
 }
+
+    
