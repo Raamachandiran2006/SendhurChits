@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react"; // Added useMemo
@@ -8,7 +7,7 @@ import { collection, getDocs, orderBy, query as firestoreQuery, Timestamp } from
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Loader2, ArchiveRestore, PlusCircle, ArrowLeft, ListChecks, ChevronRight, ChevronDown, Filter, Download } from "lucide-react";
+import { Loader2, ArchiveRestore, PlusCircle, ArrowLeft, ListChecks, ChevronRight, ChevronDown, Filter, Download, ReceiptText } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table"; // Added TableFooter
 import { format, parseISO, subDays, isAfter, startOfDay, endOfDay } from "date-fns";
 import { useSearchParams } from "next/navigation";
@@ -325,6 +324,7 @@ export default function AdminCollectionPage() {
                     <TableHead>Location</TableHead>
                     <TableHead>Collected By</TableHead>
                     <TableHead>Remarks</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -374,6 +374,13 @@ export default function AdminCollectionPage() {
                         </TableCell>
                         <TableCell>{record.recordedByEmployeeName || "N/A"}</TableCell>
                         <TableCell className="max-w-xs truncate">{record.remarks || "N/A"}</TableCell>
+                        <TableCell>
+                          <Button asChild variant="ghost" size="icon">
+                            <Link href={`/admin/collection/receipt/${record.id}`} title="View Receipt">
+                              <ReceiptText className="h-4 w-4 text-primary" />
+                            </Link>
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     </React.Fragment>
                   )})}
@@ -382,7 +389,7 @@ export default function AdminCollectionPage() {
                   <TableRow>
                     <TableCell colSpan={4} className="text-right font-semibold">Total Amount:</TableCell>
                     <TableCell className="text-right font-bold font-mono">{formatCurrency(totalFilteredAmount)}</TableCell>
-                    <TableCell colSpan={5}></TableCell> 
+                    <TableCell colSpan={6}></TableCell> 
                   </TableRow>
                 </TableFooter>
               </Table>
