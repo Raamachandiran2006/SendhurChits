@@ -111,29 +111,29 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     console.log("[PDF Generation] Admin: Generating blob with data:", recordData);
     try {
         const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: [72, 'auto'] 
+            orientation: 'portrait',
+            unit: 'mm',
+            format: [72, 'auto'] 
         });
         let y = 10;
         const lineHeight = 5; 
         const margin = 3; 
 
-        doc.setFont('Times-Roman', 'bold'); 
+        doc.setFont('Times New Roman', 'bold'); 
         doc.setFontSize(12); 
-        doc.text(recordData.companyName || "Sendhur Chits", doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight * 1.5;
+        doc.text(recordData.companyName || "Sendhur Chits", doc.internal.pageSize.width / 2, y, { align: 'center' }); y += lineHeight * 1.5;
         
-        doc.setFont('Times-Roman', 'normal'); 
-        doc.setFontSize(10); 
-        doc.text(`Receipt No: ${recordData.receiptNumber || 'N/A'}`, doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight;
-        doc.text(`Date: ${formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy")} ${recordData.paymentTime || ''}`, doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight;
+        doc.setFont('Times New Roman', 'normal'); 
+        doc.setFontSize(12); 
+        doc.text(`Receipt No: ${recordData.receiptNumber || 'N/A'}`, doc.internal.pageSize.width / 2, y, { align: 'center' }); y += lineHeight;
+        doc.text(`Date: ${formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy")} ${recordData.paymentTime || ''}`, doc.internal.pageSize.width / 2, y, { align: 'center' }); y += lineHeight;
         
         doc.setLineDashPattern([1, 1], 0); 
-        doc.line(margin, y, doc.internal.pageSize.getWidth() - margin, y); y += lineHeight * 0.5; 
+        doc.line(margin, y, doc.internal.pageSize.width - margin, y); y += lineHeight * 0.5; 
         doc.setLineDashPattern([], 0); 
         
         y += lineHeight * 0.5;
-        doc.setFontSize(10); 
+        doc.setFontSize(12); 
         const wrapText = (text: string, x: number, yPos: number, maxWidth: number, lHeight: number): number => {
             const lines = doc.splitTextToSize(text, maxWidth);
             doc.text(lines, x, yPos);
@@ -141,10 +141,10 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         };
 
         const printLine = (label: string, value: string | number | null | undefined, yPos: number, isBoldValue: boolean = false): number => {
-            doc.setFont('Times-Roman', 'bold');
+            doc.setFont('Times New Roman', 'bold');
             doc.text(label, margin, yPos);
             const labelWidth = doc.getTextWidth(label);
-            doc.setFont('Times-Roman', isBoldValue ? 'bold' : 'normal');
+            doc.setFont('Times New Roman', isBoldValue ? 'bold' : 'normal');
             return wrapText(value?.toString() || 'N/A', margin + labelWidth + 2, yPos, 66 - labelWidth - 2, lineHeight);
         };
         
@@ -153,28 +153,33 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         y = printLine("Chit Scheme Value:", recordData.groupTotalAmount ? formatCurrencyLocal(recordData.groupTotalAmount) : 'N/A', y);
         y = printLine("Chit Date:", recordData.auctionDateForReceipt ? formatDateLocal(recordData.auctionDateForReceipt, "dd-MMM-yyyy") : formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy"), y);
 
-
         if (recordData.dueNumber) {
             y = printLine("Due No.:", recordData.dueNumber, y);
         }
         if (recordData.chitAmount !== null && recordData.chitAmount !== undefined) {
-            y = printLine("Due Amount:", formatCurrencyLocal(recordData.chitAmount), y);
+            y = printLine("Due Amount (This Inst.):", formatCurrencyLocal(recordData.chitAmount), y);
         }
-        y = printLine("Paid:", formatCurrencyLocal(recordData.amount), y, true); 
+         if (recordData.totalPaidForThisDue !== null && recordData.totalPaidForThisDue !== undefined) {
+            y = printLine("Paid Amount (This Inst.):", formatCurrencyLocal(recordData.totalPaidForThisDue), y);
+        }
+        y = printLine("Bill Amount (This Txn.):", formatCurrencyLocal(recordData.amount), y, true); 
         
+        if (recordData.balanceForThisInstallment !== null && recordData.balanceForThisInstallment !== undefined) {
+            y = printLine("Balance (This Inst.):", formatCurrencyLocal(recordData.balanceForThisInstallment), y);
+        }
         if (recordData.userTotalDueBeforeThisPayment !== null && recordData.userTotalDueBeforeThisPayment !== undefined) {
-            y = printLine("Total Balance:", formatCurrencyLocal(recordData.userTotalDueBeforeThisPayment), y);
+            y = printLine("User Total Balance (Overall):", formatCurrencyLocal(recordData.userTotalDueBeforeThisPayment), y);
         }
         y = printLine("Mode:", recordData.paymentMode || 'N/A', y);
         
         doc.setLineDashPattern([1, 1], 0);
-        doc.line(margin, y, doc.internal.pageSize.getWidth() - margin, y); y += lineHeight * 0.5;
+        doc.line(margin, y, doc.internal.pageSize.width - margin, y); y += lineHeight * 0.5;
         doc.setLineDashPattern([], 0);
         
         y += lineHeight;
-        doc.setFontSize(10);
-        doc.setFont('Times-Roman', 'normal');
-        doc.text("Thank You!", doc.internal.pageSize.getWidth() / 2, y, { align: 'center' });
+        doc.setFontSize(12);
+        doc.setFont('Times New Roman', 'normal');
+        doc.text("Thank You!", doc.internal.pageSize.width / 2, y, { align: 'center' });
         
         return doc.output('blob');
     } catch (pdfError) {
@@ -419,7 +424,7 @@ export function AdminRecordCollectionForm() {
     }
     
     const selectedAuction = groupAuctions.find(a => a.id === values.selectedAuctionId);
-    if (!selectedAuction) { // This check is now for a required field
+    if (!selectedAuction) { 
       toast({ title: "Error", description: "Selected auction not found or is invalid.", variant: "destructive" });
       setIsSubmitting(false);
       return;
@@ -445,7 +450,6 @@ export function AdminRecordCollectionForm() {
             chitAmountForDue = selectedAuction.finalAmountToBePaid;
             dueNumberForRecord = selectedAuction.auctionNumber || null;
         } else if (selectedGroup && selectedGroup.rate !== null && selectedGroup.rate !== undefined) {
-            // This fallback might not be hit as much if auction selection is compulsory
             chitAmountForDue = selectedGroup.rate;
         }
         console.log("Calculated chitAmountForDue:", chitAmountForDue, "dueNumberForRecord:", dueNumberForRecord);
@@ -835,5 +839,3 @@ export function AdminRecordCollectionForm() {
     </Card>
   );
 }
-
-    
