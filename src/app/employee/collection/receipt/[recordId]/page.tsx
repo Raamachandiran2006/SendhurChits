@@ -76,13 +76,13 @@ export default function EmployeeCollectionReceiptPage() {
     const groupId = receipt.groupId ? `(ID: ${receipt.groupId})` : '';
     const userFullname = receipt.userFullname || 'N/A';
     const userUsername = receipt.userUsername ? `(@${receipt.userUsername})` : '';
-    const dueNumberHtml = receipt.dueNumber ? `<div class="section-item"><span class="field-label">Due No.:</span><span class="field-value"> ${receipt.dueNumber}</span></div>` : '';
-    const chitAmountHtml = (receipt.chitAmount !== null && receipt.chitAmount !== undefined) ? `<div class="section-item"><span class="field-label">Installment:</span><span class="field-value"> ${formatCurrency(receipt.chitAmount)}</span></div>` : '';
+    
+    const dueNumberHtml = receipt.dueNumber ? `<div class="section-item"><span class="field-label">Due No.:</span> <span class="field-value">${receipt.dueNumber}</span></div>` : '';
+    const chitAmountHtml = (receipt.chitAmount !== null && receipt.chitAmount !== undefined) ? `<div class="section-item"><span class="field-label">Installment:</span> <span class="field-value">${formatCurrency(receipt.chitAmount)}</span></div>` : '';
     const paidAmount = formatCurrency(receipt.amount);
-    const totalBalanceHtml = (receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) ? `<div class="section-item"><span class="field-label">Total Balance:</span><span class="field-value"> ${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</span></div>` : '';
+    const totalBalanceHtml = (receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) ? `<div class="section-item"><span class="field-label">Total Balance:</span> <span class="field-value">${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</span></div>` : '';
     const paymentMode = receipt.paymentMode || 'N/A';
-    const remarksHtml = (receipt.remarks && receipt.remarks.trim() !== "") ? `<div class="section-item"><span class="field-label">Remarks:</span><span class="field-value"> ${receipt.remarks}</span></div>` : '';
-
+    const remarksHtml = (receipt.remarks && receipt.remarks.trim() !== "") ? `<div class="section-item"><span class="field-label">Remarks:</span> <span class="field-value">${receipt.remarks}</span></div>` : '';
 
     const receiptHTML = `
       <!DOCTYPE html>
@@ -131,7 +131,7 @@ export default function EmployeeCollectionReceiptPage() {
               margin: 0 !important;
               padding: 0 !important; 
               box-shadow: none !important;
-              border: none !important;
+              /* border: 1px solid black; REMOVED BOX */
               background: white !important;
             }
             .receipt-print-content {
@@ -139,16 +139,16 @@ export default function EmployeeCollectionReceiptPage() {
               width: calc(100% - 4mm) !important; 
               box-sizing: border-box !important;
               font-family: 'Courier New', Courier, monospace !important;
-              font-size: 11pt !important;
+              font-size: 11pt !important; /* Adjusted Font Size */
               line-height: 1.3 !important;
               color: black !important;
-              font-weight: normal !important; /* Base font weight */
+              font-weight: normal !important; 
               margin: 0 auto; 
             }
             .center { text-align: center !important; }
             .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 1mm !important; }
             .receipt-info { font-weight: normal !important; text-align: center !important; margin-bottom: 0.5mm !important; }
-            .field-label { display: inline; font-weight: bold !important; margin-right: 4px;}
+            .field-label { display: inline; font-weight: bold !important; }
             .field-value { display: inline; font-weight: normal !important; }
             .section-item { margin-bottom: 0.5mm !important; }
             .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 1mm !important; }
@@ -159,9 +159,9 @@ export default function EmployeeCollectionReceiptPage() {
             }
             h1, h2, h3, h4, h5, h6, p {
                 margin: 0.5mm 0 !important;
-                font-size: 11pt !important;
+                font-size: 11pt !important; /* Adjusted Font Size */
             }
-             iframe[id^="webpack-dev-server-client-overlay"],
+            iframe[id^="webpack-dev-server-client-overlay"],
             iframe[id^="vite-error-overlay"],
             div[id^="vite-plugin-checker-error-overlay"],
             div[class*="firebase-emulator-warning"] {
@@ -178,13 +178,13 @@ export default function EmployeeCollectionReceiptPage() {
             <div class="receipt-info">Receipt No: ${receiptNumber}</div>
             <div class="receipt-info">Date: ${paymentDate} ${paymentTime}</div>
             <hr>
-            <div class="section-item"><span class="field-label">Group:</span><span class="field-value"> ${groupName} ${groupId}</span></div>
-            <div class="section-item"><span class="field-label">Member:</span><span class="field-value"> ${userFullname} ${userUsername}</span></div>
+            <div class="section-item"><span class="field-label">Group:</span> <span class="field-value">${groupName} ${groupId}</span></div>
+            <div class="section-item"><span class="field-label">Member:</span> <span class="field-value">${userFullname} ${userUsername}</span></div>
             ${dueNumberHtml}
             ${chitAmountHtml}
-            <div class="section-item"><span class="field-label">Paid:</span><span class="field-value"> ${paidAmount}</span></div>
+            <div class="section-item"><span class="field-label">Paid:</span> <span class="field-value">${paidAmount}</span></div>
             ${totalBalanceHtml}
-            <div class="section-item"><span class="field-label">Mode:</span><span class="field-value"> ${paymentMode}</span></div>
+            <div class="section-item"><span class="field-label">Mode:</span> <span class="field-value">${paymentMode}</span></div>
             ${remarksHtml}
             <hr>
             <div class="thank-you">Thank You!</div>
@@ -282,6 +282,7 @@ export default function EmployeeCollectionReceiptPage() {
     if (receipt && receipt.userId) {
       router.push(`/employee/users/${receipt.userId}#due-sheet`);
     } else {
+      // Fallback if userId is not on receipt, though it should be
       router.push('/employee/collection'); 
     }
   };
