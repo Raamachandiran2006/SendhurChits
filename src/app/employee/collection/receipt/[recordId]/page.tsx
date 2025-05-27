@@ -86,6 +86,7 @@ export default function CollectionReceiptPage() {
               width: 72mm !important; /* Strict width for thermal printer */
               font-family: 'Courier New', Courier, monospace !important; /* Monospace font often works best */
               font-size: 15pt !important; /* Updated font size */
+              font-weight: bold !important; /* Make all text bold */
               line-height: 1.3 !important;
               color: black !important;
               background-color: white !important;
@@ -100,8 +101,9 @@ export default function CollectionReceiptPage() {
             .center {
               text-align: center !important;
             }
-            .bold {
-              font-weight: bold !important;
+            /* .bold class is less necessary if body is bold, but can be kept for specific emphasis if needed */
+            .bold { 
+              /* font-weight: bold !important; */ /* Redundant if body is bold */
             }
             hr {
               border: none !important;
@@ -111,29 +113,29 @@ export default function CollectionReceiptPage() {
              p, div.section-item {
               margin: 0.5mm 0 !important; /* Reduced vertical spacing */
               padding: 0 !important;
-              font-size: 15pt !important; /* Updated font size */
+              font-size: 15pt !important; /* Ensure this font size is consistent */
             }
             h1, h2, h3, h4, h5, h6 {
                 margin: 0.5mm 0 !important;
-                font-size: 15pt !important; /* Updated font size */
+                font-size: 15pt !important; /* Ensure this font size is consistent */
             }
           }
         </style>
       </head>
       <body>
         <div class="receipt-print-content">
-          <div class="center bold section-item">${receipt.companyName || "Sendhur Chits"}</div>
+          <div class="center section-item">${receipt.companyName || "Sendhur Chits"}</div>
           <div class="center section-item">Receipt No: ${receipt.receiptNumber || 'N/A'}</div>
           <div class="center section-item">Date: ${formatDate(receipt.paymentDate, "dd-MMM-yyyy")} ${receipt.paymentTime || ''}</div>
           <hr>
-          <div class="section-item"><strong>Group:</strong> ${receipt.groupName || 'N/A'} ${receipt.groupId ? `(ID: ${receipt.groupId})` : ''}</div>
-          <div class="section-item"><strong>Member:</strong> ${receipt.userFullname || 'N/A'} ${receipt.userUsername ? `(@${receipt.userUsername})` : ''}</div>
-          ${receipt.dueNumber ? `<div class="section-item"><strong>Due No.:</strong> ${receipt.dueNumber}</div>` : ''}
-          ${receipt.chitAmount !== null && receipt.chitAmount !== undefined ? `<div class="section-item"><strong>Installment:</strong> ${formatCurrency(receipt.chitAmount)}</div>` : ''}
-          <div class="section-item bold"><strong>Paid:</strong> ${formatCurrency(receipt.amount)}</div>
-          ${receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined ? `<div class="section-item"><strong>Total Balance:</strong> ${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</div>` : ''}
-          <div class="section-item"><strong>Mode:</strong> ${receipt.paymentMode || 'N/A'}</div>
-          ${receipt.remarks && receipt.remarks.trim() !== "" ? `<div class="section-item"><strong>Remarks:</strong> ${receipt.remarks}</div>` : ''}
+          <div class="section-item">Group: ${receipt.groupName || 'N/A'} ${receipt.groupId ? `(ID: ${receipt.groupId})` : ''}</div>
+          <div class="section-item">Member: ${receipt.userFullname || 'N/A'} ${receipt.userUsername ? `(@${receipt.userUsername})` : ''}</div>
+          ${receipt.dueNumber ? `<div class="section-item">Due No.: ${receipt.dueNumber}</div>` : ''}
+          ${receipt.chitAmount !== null && receipt.chitAmount !== undefined ? `<div class="section-item">Installment: ${formatCurrency(receipt.chitAmount)}</div>` : ''}
+          <div class="section-item">Paid: ${formatCurrency(receipt.amount)}</div>
+          ${receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined ? `<div class="section-item">Total Balance: ${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</div>` : ''}
+          <div class="section-item">Mode: ${receipt.paymentMode || 'N/A'}</div>
+          ${receipt.remarks && receipt.remarks.trim() !== "" ? `<div class="section-item">Remarks: ${receipt.remarks}</div>` : ''}
           <hr>
           <div class="center section-item">Thank You!</div>
         </div>
@@ -198,7 +200,7 @@ export default function CollectionReceiptPage() {
     
     y += lineHeight * 0.5;
     doc.text(`Group: ${receipt.groupName || 'N/A'} ${receipt.groupId ? `(ID: ${receipt.groupId})` : ''}`, margin, y); y += lineHeight;
-    doc.text(`User: ${receipt.userFullname || 'N/A'} ${receipt.userUsername ? `(@${receipt.userUsername})` : ''}`, margin, y); y += lineHeight;
+    doc.text(`Member: ${receipt.userFullname || 'N/A'} ${receipt.userUsername ? `(@${receipt.userUsername})` : ''}`, margin, y); y += lineHeight;
     if (receipt.dueNumber) {
          doc.text(`Due No.: ${receipt.dueNumber}`, margin, y); y += lineHeight;
     }
