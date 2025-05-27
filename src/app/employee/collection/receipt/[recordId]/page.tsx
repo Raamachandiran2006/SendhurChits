@@ -85,7 +85,7 @@ export default function CollectionReceiptPage() {
               padding: 0 !important;
               width: 72mm !important; /* Strict width for thermal printer */
               font-family: 'Courier New', Courier, monospace !important; /* Monospace font often works best */
-              font-size: 15pt !important; /* Updated font size */
+              font-size: 13pt !important; /* Updated font size */
               font-weight: bold !important; /* Make all text bold */
               line-height: 1.3 !important;
               color: black !important;
@@ -101,10 +101,6 @@ export default function CollectionReceiptPage() {
             .center {
               text-align: center !important;
             }
-            /* .bold class is less necessary if body is bold, but can be kept for specific emphasis if needed */
-            .bold { 
-              /* font-weight: bold !important; */ /* Redundant if body is bold */
-            }
             hr {
               border: none !important;
               border-top: 1px dashed black !important;
@@ -113,11 +109,11 @@ export default function CollectionReceiptPage() {
              p, div.section-item {
               margin: 0.5mm 0 !important; /* Reduced vertical spacing */
               padding: 0 !important;
-              font-size: 15pt !important; /* Ensure this font size is consistent */
+              font-size: 13pt !important; /* Ensure this font size is consistent */
             }
             h1, h2, h3, h4, h5, h6 {
                 margin: 0.5mm 0 !important;
-                font-size: 15pt !important; /* Ensure this font size is consistent */
+                font-size: 13pt !important; /* Ensure this font size is consistent */
             }
           }
         </style>
@@ -158,7 +154,6 @@ export default function CollectionReceiptPage() {
       printFrame.contentWindow?.focus();
       printFrame.contentWindow?.print();
     }
-    // Optionally remove the iframe after a delay
     setTimeout(() => {
       document.body.removeChild(printFrame);
     }, 1000);
@@ -177,17 +172,16 @@ export default function CollectionReceiptPage() {
       return;
     }
 
-    // Fallback PDF generation if URL is not available
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: [72, 200] // Adjusted for 72mm width, height can be auto
+      format: [72, 200] 
     });
     let y = 10;
-    const lineHeight = 6; // Approx for 9pt font
-    const margin = 3; // Small margin
+    const lineHeight = 6; 
+    const margin = 3; 
 
-    doc.setFontSize(10); // Main text size
+    doc.setFontSize(10); 
     doc.setFont('Courier', 'bold');
     doc.text(receipt.companyName || "Sendhur Chits", doc.internal.pageSize.getWidth() / 2, y, { align: 'center' }); y += lineHeight * 1.5;
     
@@ -268,7 +262,6 @@ export default function CollectionReceiptPage() {
     );
   }
 
-  // Screen display (remains the same)
   return (
     <div id="printable-receipt-area" className="flex flex-col items-center justify-start min-h-screen bg-background p-4 print:bg-white print:p-0">
       <div id="receipt-content" className="w-full max-w-xs bg-white p-6 shadow-lg print:shadow-none print:p-0 print:border-none">
@@ -314,4 +307,6 @@ export default function CollectionReceiptPage() {
     </div>
   );
 }
+    
+
     
