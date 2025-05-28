@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, LocateFixed } from "lucide-react";
@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db, storage } from "@/lib/firebase";
-import { ref as storageRefFB, uploadBytes, getDownloadURL } from "firebase/storage"; // Aliased to avoid conflict
+import { ref as storageRefFB, uploadBytes, getDownloadURL } from "firebase/storage"; 
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc, orderBy, getDoc } from "firebase/firestore";
 import type { Group, User, Admin, CollectionRecord, AuctionRecord } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,7 +24,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import jsPDF from 'jspdf';
-import { Separator } from "@/components/ui/separator";
 
 const formatTimeTo12Hour = (timeStr?: string): string => {
   if (!timeStr) return "";
@@ -105,7 +104,7 @@ async function generateUniqueReceiptNumber(maxRetries = 5): Promise<string> {
     if (snapshot.empty) {
       return receiptNumber;
     }
-    console.warn("[Admin Collection Form] Receipt number ${receiptNumber} already exists, retrying...");
+    console.warn(`[Admin Collection Form] Receipt number ${receiptNumber} already exists, retrying...`);
   }
   throw new Error("Failed to generate a unique receipt number after several retries.");
 }
@@ -116,7 +115,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: [72, 135] 
+      format: [72, 'auto'] 
     });
     let y = 10;
     const lineHeight = 5; 
@@ -133,7 +132,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     doc.text(String(recordData.companyName || "Sendhur Chits"), Number(centerX), Number(y), { align: 'center' }); y += lineHeight * 1.5;
     
     doc.setFont('Helvetica');  
-    doc.setFontSize(12); 
+    doc.setFontSize(10); 
     doc.text(`Receipt No: ${recordData.receiptNumber || 'N/A'}`, Number(centerX), Number(y), { align: 'center' }); y += lineHeight;
     doc.text(`Date: ${formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy")} ${recordData.paymentTime || ''}`, Number(centerX), Number(y), { align: 'center' }); y += lineHeight;
     
@@ -151,12 +150,12 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
 
     const printLine = (label: string, value: string | number | null | undefined, yPos: number, isBoldValue: boolean = false): number => {
         doc.setFont('Helvetica-Bold'); 
-        doc.setFontSize(12);
+        doc.setFontSize(10);
         doc.text(label, Number(margin), Number(yPos));
         const labelWidth = doc.getTextWidth(label);
         
         doc.setFont(isBoldValue ? 'Helvetica-Bold' : 'Helvetica'); 
-        doc.setFontSize(12);
+        doc.setFontSize(10);
         return wrapText(String(value || 'N/A'), Number(margin + labelWidth + 2), Number(yPos), Number(66 - labelWidth - 2), Number(lineHeight));
     };
     
@@ -190,7 +189,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     
     y += lineHeight;
     doc.setFont('Helvetica'); 
-    doc.setFontSize(12);
+    doc.setFontSize(10);
     doc.text("Thank You!", Number(centerX), Number(y), { align: 'center' });
     
     return doc.output('blob');
@@ -233,7 +232,6 @@ async function generateAndUploadReceiptPdf(
     return null;
   }
 }
-
 
 export function AdminRecordCollectionForm() {
   const { toast } = useToast();

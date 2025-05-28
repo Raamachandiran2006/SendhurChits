@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form"; // Removed FormMessage
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form"; 
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, LocateFixed } from "lucide-react";
@@ -46,8 +46,6 @@ const formatDateLocal = (dateString: string | undefined | null, outputFormat: st
   }
 };
 
-
-// Helper for time formatting
 const formatTimeTo12Hour = (timeStr?: string): string => {
   if (!timeStr) return "";
   if (/^([01]\d|2[0-3]):([0-5]\d)$/.test(timeStr)) {
@@ -117,7 +115,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: [72, 135] 
+      format: [72, 'auto'] 
     });
     let y = 10;
     const lineHeight = 5;
@@ -134,7 +132,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     doc.text(String(recordData.companyName || "Sendhur Chits"), Number(centerX), Number(y), { align: 'center' }); y += lineHeight * 1.5;
     
     doc.setFont('Helvetica');
-    doc.setFontSize(12);
+    doc.setFontSize(10);
     doc.text(`Receipt No: ${recordData.receiptNumber || 'N/A'}`, Number(centerX), Number(y), { align: 'center' }); y += lineHeight;
     doc.text(`Date: ${formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy")} ${recordData.paymentTime || ''}`, Number(centerX), Number(y), { align: 'center' }); y += lineHeight;
     
@@ -152,12 +150,12 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     
     const printLine = (label: string, value: string | number | null | undefined, yPos: number, isBoldValue: boolean = false): number => {
         doc.setFont('Helvetica-Bold');
-        doc.setFontSize(12);
+        doc.setFontSize(10);
         doc.text(label, Number(margin), Number(yPos));
         const labelWidth = doc.getTextWidth(label);
         
         doc.setFont(isBoldValue ? 'Helvetica-Bold' : 'Helvetica');
-        doc.setFontSize(12);
+        doc.setFontSize(10);
         return wrapText(String(value || 'N/A'), Number(margin + labelWidth + 2), Number(yPos), Number(66 - labelWidth - 2), Number(lineHeight));
     };
 
@@ -192,7 +190,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     
     y += lineHeight;
     doc.setFont('Helvetica');
-    doc.setFontSize(12);
+    doc.setFontSize(10);
     doc.text("Thank You!", Number(centerX), Number(y), { align: 'center' });
     
     return doc.output('blob');
@@ -333,7 +331,6 @@ export function RecordCollectionForm() {
           }
         } catch (error) {
           console.error("Error fetching members for group:", error);
-          toast({ title: "Error", description: "Could not load members for the selected group.", variant: "destructive" });
           setGroupMembers([]);
         } finally {
           setLoadingMembers(false);
@@ -349,7 +346,6 @@ export function RecordCollectionForm() {
           setGroupAuctions(auctionSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()} as AuctionRecord)));
         } catch (error) {
           console.error("Error fetching auctions for group:", error);
-          toast({ title: "Error", description: "Could not load auctions for the selected group.", variant: "destructive" });
           setGroupAuctions([]);
         } finally {
           setLoadingAuctions(false);
@@ -364,7 +360,7 @@ export function RecordCollectionForm() {
         const userExistsInGroup = groupMembers.some(member => member.id === preselectedUserIdFromQuery);
         if (userExistsInGroup) {
             setValue("selectedUserId", preselectedUserIdFromQuery, { shouldValidate: true });
-        } else if (watchedGroupId && preselectedUserFullnameFromQuery) { // Ensure group is selected before showing toast
+        } else if (watchedGroupId && preselectedUserFullnameFromQuery) { 
             toast({
                 variant: "default",
                 title: "User Not in Selected Group",
@@ -381,7 +377,7 @@ export function RecordCollectionForm() {
     preselectedUserFullnameFromQuery, 
     preselectedUserUsernameFromQuery, 
     groupMembers, 
-    watchedGroupId, // Added dependency
+    watchedGroupId,
     setValue, 
     toast
 ]);
@@ -598,6 +594,33 @@ export function RecordCollectionForm() {
         throw new Error("Failed to obtain new collection record ID for redirection.");
       }
 
+      const notificationPayload = {
+        toPhoneNumber: selectedUser.phone,
+        userName: selectedUser.fullname,
+        amount: values.amount,
+        receiptNumber: newReceiptNumber,
+        collectionLocation: collectionLocationToStore,
+        paymentDate: format(values.paymentDate, "yyyy-MM-dd"),
+        paymentTime: values.paymentTime,
+      };
+
+      try {
+        const response = await fetch('/api/send-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(notificationPayload),
+        });
+        const result = await response.json();
+        if (result.success) {
+          toast({ title: "Notification Sent", description: "SMS and WhatsApp notifications initiated."});
+        } else {
+          toast({ title: "Notification Failed", description: result.error || "Could not send notifications.", variant: "destructive"});
+        }
+      } catch (notifError) {
+        console.error("Error sending notification:", notifError);
+        toast({ title: "Notification Error", description: "Failed to trigger notifications.", variant: "destructive"});
+      }
+
       toast({ title: "Collection Recorded", description: `Payment from ${selectedUser.fullname} recorded. ${receiptPdfDownloadUrl ? 'Receipt PDF generated.' : 'Receipt PDF generation failed.'}` });
       
       router.push(`/employee/collection/receipt/${newCollectionRecordId}`);
@@ -612,7 +635,6 @@ export function RecordCollectionForm() {
   return (
     <Card className="shadow-xl w-full max-w-2xl mx-auto">
       <CardHeader>
-        {/* Title is on the page itself */}
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -638,7 +660,6 @@ export function RecordCollectionForm() {
                         ))}
                       </SelectContent>
                     </Select>
-                    {/* <FormMessage /> */}
                   </FormItem>
                 )}
               />
@@ -673,7 +694,6 @@ export function RecordCollectionForm() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {/* <FormMessage /> */}
                 </FormItem>
               )}
             />
@@ -704,7 +724,6 @@ export function RecordCollectionForm() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {/* <FormMessage /> */}
                 </FormItem>
               )}
             />
@@ -729,7 +748,6 @@ export function RecordCollectionForm() {
                         <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
                       </PopoverContent>
                     </Popover>
-                    {/* <FormMessage /> */}
                   </FormItem>
                 )}
               />
@@ -746,7 +764,6 @@ export function RecordCollectionForm() {
                         onChange={(e) => field.onChange(e.target.value ? formatTimeTo12Hour(e.target.value) : "")}
                       />
                     </FormControl>
-                    {/* <FormMessage /> */}
                   </FormItem>
                 )}
               />
@@ -768,7 +785,6 @@ export function RecordCollectionForm() {
                         <SelectItem value="Partial Payment">Partial Payment</SelectItem>
                         </SelectContent>
                     </Select>
-                    {/* <FormMessage /> */}
                     </FormItem>
                 )}
                 />
@@ -788,7 +804,6 @@ export function RecordCollectionForm() {
                         <SelectItem value="Netbanking">Netbanking</SelectItem>
                         </SelectContent>
                     </Select>
-                    {/* <FormMessage /> */}
                     </FormItem>
                 )}
                 />
@@ -819,7 +834,6 @@ export function RecordCollectionForm() {
                         />
                     </div>
                   </FormControl>
-                  {/* <FormMessage /> */}
                 </FormItem>
               )}
             />
@@ -851,7 +865,6 @@ export function RecordCollectionForm() {
                       {locationError && <Alert variant="destructive"><AlertTitle>Location Error</AlertTitle><AlertDescription>{locationError}</AlertDescription></Alert>}
                     </div>
                   )}
-                  {/* <FormMessage /> */}
                 </FormItem>
               )}
             />
@@ -872,7 +885,6 @@ export function RecordCollectionForm() {
                       <SelectItem value="Auction Collection">Auction Collection</SelectItem>
                     </SelectContent>
                   </Select>
-                  {/* <FormMessage /> */}
                 </FormItem>
               )}
             />
