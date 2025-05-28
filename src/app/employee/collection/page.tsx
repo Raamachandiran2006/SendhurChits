@@ -1,16 +1,16 @@
 
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react"; // Added useMemo
+import React, { useEffect, useState, useMemo } from "react";
 import type { CollectionRecord, Employee } from "@/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query as firestoreQuery, Timestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Loader2, ArchiveRestore, PlusCircle, ArrowLeft, ListChecks, ChevronRight, ChevronDown, Filter, Download } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table"; // Added TableFooter
-import { format, parseISO, subDays, isAfter, startOfDay, endOfDay } from "date-fns"; // Added startOfDay, endOfDay
+import { Loader2, ArchiveRestore, PlusCircle, ArrowLeft, ListChecks, ChevronRight, ChevronDown, Filter, Download, Search, ReceiptText } from "lucide-react"; // Added Search
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
+import { format, parseISO, subDays, isAfter, startOfDay, endOfDay } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams } from "next/navigation";
 import {
@@ -21,12 +21,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input"; // Added Input
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 type CollectionFilterType = "all" | "today" | "last7Days" | "last10Days" | "last30Days";
 
-const formatDateSafe = (dateInput: Date | string | Timestamp | undefined | null, outputFormat: string = "dd MMM yy") => { // Changed default to dd MMM yy for consistency
+const formatDateSafe = (dateInput: Date | string | Timestamp | undefined | null, outputFormat: string = "dd MMM yy") => {
   if (!dateInput) return "N/A";
   try {
     let date: Date;
@@ -111,10 +112,11 @@ export default function EmployeeCollectionPage() {
   const [rawCollectionHistory, setRawCollectionHistory] = useState<CollectionRecord[]>([]);
   const [filteredCollectionHistory, setFilteredCollectionHistory] = useState<CollectionRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const searchParams = useSearchParams();
-  const refreshId = searchParams.get('refreshId');
+  const searchParamsHook = useSearchParams();
+  const refreshId = searchParamsHook.get('refreshId');
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [selectedFilter, setSelectedFilter] = useState<CollectionFilterType>("all");
+  const [searchTerm, setSearchTerm] = useState(""); // New state for search term
 
   const toggleRowExpansion = (recordId: string) => {
     setExpandedRows(prev => ({ ...prev, [recordId]: !prev[recordId] }));
@@ -148,43 +150,50 @@ export default function EmployeeCollectionPage() {
   }, [employee, refreshId]);
 
   useEffect(() => {
-    const applyFilter = () => {
-      if (selectedFilter === "all") {
-        setFilteredCollectionHistory(rawCollectionHistory);
-        return;
-      }
+    let tempFiltered = [...rawCollectionHistory];
+
+    // Apply date filter
+    if (selectedFilter !== "all") {
       const now = new Date();
       let startDate: Date;
-      let endDate: Date | null = null; // For 'today' filter
+      let endDate: Date | null = null;
 
       if (selectedFilter === "today") {
         startDate = startOfDay(now);
         endDate = endOfDay(now);
       } else if (selectedFilter === "last7Days") {
-        startDate = startOfDay(subDays(now, 6)); // Include today
+        startDate = startOfDay(subDays(now, 6));
         endDate = endOfDay(now);
       } else if (selectedFilter === "last10Days") {
-        startDate = startOfDay(subDays(now, 9)); // Include today
+        startDate = startOfDay(subDays(now, 9));
         endDate = endOfDay(now);
       } else if (selectedFilter === "last30Days") {
-        startDate = startOfDay(subDays(now, 29)); // Include today
+        startDate = startOfDay(subDays(now, 29));
         endDate = endOfDay(now);
       } else {
-        setFilteredCollectionHistory(rawCollectionHistory);
-        return;
+        startDate = new Date(0); // Should not happen
       }
       
-      const filtered = rawCollectionHistory.filter(record => {
+      tempFiltered = tempFiltered.filter(record => {
         const recordDate = (record as any).filterDate || (record.recordedAt ? record.recordedAt.toDate() : new Date(0));
         if (endDate) {
           return isAfter(recordDate, startDate) && recordDate <= endDate;
         }
         return isAfter(recordDate, startDate);
       });
-      setFilteredCollectionHistory(filtered);
-    };
-    applyFilter();
-  }, [selectedFilter, rawCollectionHistory]);
+    }
+
+    // Apply search filter
+    if (searchTerm.trim() !== "") {
+      const lowercasedSearchTerm = searchTerm.toLowerCase().trim();
+      tempFiltered = tempFiltered.filter(record =>
+        (record.virtualTransactionId?.toLowerCase().includes(lowercasedSearchTerm)) ||
+        (record.receiptNumber?.toLowerCase().includes(lowercasedSearchTerm))
+      );
+    }
+
+    setFilteredCollectionHistory(tempFiltered);
+  }, [selectedFilter, rawCollectionHistory, searchTerm]);
 
   const totalFilteredAmount = useMemo(() => {
     return filteredCollectionHistory.reduce((sum, record) => sum + (record.amount || 0), 0);
@@ -201,7 +210,7 @@ export default function EmployeeCollectionPage() {
       return `Rs. ${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     };
     
-    const tableColumn = ["S.No", "Group Name", "User", "Date & Time", "Amount (Rs.)", "Type", "Mode", "Location", "Collected By", "Remarks", "Virtual ID"];
+    const tableColumn = ["S.No", "Group Name", "User", "Date & Time", "Amount (Rs.)", "Type", "Mode", "Location", "Collected By", "Remarks", "Virtual ID", "Receipt No."];
     const tableRows: any[][] = [];
 
     filteredCollectionHistory.forEach((record, index) => {
@@ -217,6 +226,7 @@ export default function EmployeeCollectionPage() {
         record.recordedByEmployeeName || "N/A",
         record.remarks || "N/A",
         record.virtualTransactionId || "N/A",
+        record.receiptNumber || "N/A",
       ];
       tableRows.push(recordData);
     });
@@ -233,21 +243,14 @@ export default function EmployeeCollectionPage() {
     doc.text(`Collection History`, 14, 15);
     doc.setFontSize(12);
     doc.text(`Filter: ${filterLabel[selectedFilter]}`, 14, 22);
-    doc.text(`Generated on: ${format(new Date(), "dd MMM yyyy, hh:mm a")}`, 14, 29);
+    if (searchTerm.trim() !== "") {
+        doc.text(`Search: "${searchTerm}"`, 14, 29);
+        autoTable(doc, { head: [tableColumn], body: tableRows, startY: 36, theme: 'grid', headStyles: { fillColor: [30, 144, 255] }, styles: { fontSize: 6, cellPadding: 1 }, columnStyles: { 0: { cellWidth: 7 }, 4: { halign: 'right' }, 7: { cellWidth: 'auto', overflow: 'linebreak' }, 11: {cellWidth: 'auto'} }, });
+    } else {
+        autoTable(doc, { head: [tableColumn], body: tableRows, startY: 35, theme: 'grid', headStyles: { fillColor: [30, 144, 255] }, styles: { fontSize: 7, cellPadding: 1.5 }, columnStyles: { 0: { cellWidth: 8 }, 4: { halign: 'right' }, 7: { cellWidth: 'auto', overflow: 'linebreak' }, 11: {cellWidth: 'auto'} }, });
+    }
 
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: 35,
-      theme: 'grid',
-      headStyles: { fillColor: [30, 144, 255] }, 
-      styles: { fontSize: 7, cellPadding: 1.5 },
-      columnStyles: { 
-        0: { cellWidth: 8 }, 4: { halign: 'right' },
-        7: { cellWidth: 'auto', overflow: 'linebreak' } 
-      },
-    });
-    doc.save(`collection_history_${selectedFilter}.pdf`);
+    doc.save(`employee_collection_history_${selectedFilter}_search_${searchTerm || 'none'}.pdf`);
   };
 
   return (
@@ -261,25 +264,6 @@ export default function EmployeeCollectionPage() {
           </div>
         </div>
         <div className="flex items-center gap-2 mt-4 sm:mt-0">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Filter className="mr-2 h-4 w-4" /> Filter
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Filter by Date</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => setSelectedFilter("all")}>All Time</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setSelectedFilter("today")}>Today</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setSelectedFilter("last7Days")}>Last 7 Days</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setSelectedFilter("last10Days")}>Last 10 Days</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setSelectedFilter("last30Days")}>Last 30 Days</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={filteredCollectionHistory.length === 0}>
-              <Download className="mr-2 h-4 w-4" /> Download PDF
-            </Button>
             <Button variant="outline" asChild size="sm">
                 <Link href="/employee/dashboard">
                     <ArrowLeft className="mr-2 h-4 w-4" />
@@ -294,13 +278,51 @@ export default function EmployeeCollectionPage() {
         </div>
       </div>
 
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+        <div className="relative w-full sm:max-w-md">
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+                type="text"
+                placeholder="Search by Virtual ID or Receipt No..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-full shadow-sm"
+            />
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                  <Filter className="mr-2 h-4 w-4" /> Filter
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Filter by Date</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setSelectedFilter("all")}>All Time</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedFilter("today")}>Today</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedFilter("last7Days")}>Last 7 Days</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedFilter("last10Days")}>Last 10 Days</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedFilter("last30Days")}>Last 30 Days</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={filteredCollectionHistory.length === 0} className="w-full sm:w-auto">
+              <Download className="mr-2 h-4 w-4" /> Download PDF
+            </Button>
+        </div>
+      </div>
+
       <Card className="shadow-xl">
         <CardHeader>
           <div className="flex items-center gap-2">
             <ListChecks className="h-6 w-6 text-primary" />
             <CardTitle>Collection History</CardTitle>
           </div>
-          <CardDescription>Chronological record of all collected payments (latest first). Filtered by: {selectedFilter}</CardDescription>
+          <CardDescription>
+            Chronological record of all collected payments (latest first). 
+            Filtered by: {selectedFilter}.
+            {searchTerm && ` Searched for: "${searchTerm}".`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -310,7 +332,12 @@ export default function EmployeeCollectionPage() {
             </div>
           ) : filteredCollectionHistory.length === 0 ? (
             <div className="text-center py-10">
-              <p className="text-muted-foreground">No collection records found {selectedFilter !== 'all' ? `for the selected period` : ''}. Click "Record Collection" to add one.</p>
+              <p className="text-muted-foreground">
+                No collection records found 
+                {selectedFilter !== 'all' ? ` for the selected period` : ''}
+                {searchTerm ? ` matching "${searchTerm}"` : ''}. 
+                { !searchTerm && <>{' '}Click "Record Collection" to add one.</>}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-md border">
@@ -327,6 +354,8 @@ export default function EmployeeCollectionPage() {
                     <TableHead>Location</TableHead>
                     <TableHead>Collected By</TableHead>
                     <TableHead>Remarks</TableHead>
+                    <TableHead>Receipt No.</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -376,6 +405,14 @@ export default function EmployeeCollectionPage() {
                         </TableCell>
                         <TableCell>{record.recordedByEmployeeName || "N/A"}</TableCell>
                         <TableCell className="max-w-xs truncate">{record.remarks || "N/A"}</TableCell>
+                        <TableCell>{record.receiptNumber || "N/A"}</TableCell>
+                        <TableCell>
+                          <Button asChild variant="ghost" size="icon">
+                            <Link href={`/employee/collection/receipt/${record.id}`} title="View Receipt">
+                              <ReceiptText className="h-4 w-4 text-primary" />
+                            </Link>
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     </React.Fragment>
                   )})}
@@ -384,7 +421,7 @@ export default function EmployeeCollectionPage() {
                   <TableRow>
                     <TableCell colSpan={4} className="text-right font-semibold">Total Amount:</TableCell>
                     <TableCell className="text-right font-bold font-mono">{formatCurrency(totalFilteredAmount)}</TableCell>
-                    <TableCell colSpan={5}></TableCell> 
+                    <TableCell colSpan={7}></TableCell> 
                   </TableRow>
                 </TableFooter>
               </Table>
