@@ -7,9 +7,8 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Card, CardHeader, CardContent } from "@/components/ui/card"; // Removed CardDescription, CardFooter
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-// import Link from "next/link"; // No longer needed
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
 
@@ -36,10 +35,10 @@ export function LoginForm() {
     <Card className="shadow-xl">
       <CardHeader className="items-center text-center space-y-0 pb-4">
         <Image
-          src="/sendhur_chits_logo_login.png" // Updated image source
+          src="/sendhur_chits_logo_login.png"
           alt="Sendhur Chits Logo"
           width={300} 
-          height={112} // Adjusted to maintain aspect ratio of 800x299
+          height={112} 
           priority 
           data-ai-hint="company logo"
           className="mb-4"
@@ -74,14 +73,17 @@ export function LoginForm() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button 
+              type="submit" 
+              className="w-full bg-[#f5b200] hover:bg-[#f5b200]/90 text-neutral-900" 
+              disabled={loading}
+            >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Login
             </Button>
           </form>
         </Form>
       </CardContent>
-      {/* CardFooter with signup link removed */}
     </Card>
   );
 }
