@@ -162,24 +162,23 @@ export default function EmployeeCollectionReceiptPage() {
     const receiptNumberHtml = `<div class="receipt-info center">Receipt No: ${receipt.receiptNumber || 'N/A'}</div>`;
     const dateTimeHtml = `<div class="receipt-info center">Date: ${formatDate(receipt.paymentDate, "dd-MMM-yyyy")} ${receipt.paymentTime || ''}</div>`;
     
-    const groupNameHtml = `<div class="section-item"><span class="field-label">Group:</span> <span class="field-value">${receipt.groupName || 'N/A'}</span></div>`;
-    const userNameHtml = `<div class="section-item"><span class="field-label">Name:</span> <span class="field-value">${receipt.userFullname || 'N/A'}</span></div>`;
+    const groupNameHtml = `<div class="section-item">Group : ${receipt.groupName || 'N/A'}</div>`;
+    const userNameHtml = `<div class="section-item">Name : ${receipt.userFullname || 'N/A'}</div>`;
     
-    const chitSchemeValueHtml = `<div class="section-item"><span class="field-label">Chit Scheme Value:</span> <span class="field-value">${receipt.groupTotalAmount ? formatCurrency(receipt.groupTotalAmount) : 'N/A'}</span></div>`;
-    const chitDateHtml = `<div class="section-item"><span class="field-label">Chit Date:</span> <span class="field-value">${receipt.auctionDateForReceipt ? formatDate(receipt.auctionDateForReceipt, "dd-MMM-yyyy") : formatDate(receipt.paymentDate, "dd-MMM-yyyy")}</span></div>`;
+    const chitSchemeValueHtml = `<div class="section-item">Chit Scheme Value : ${receipt.groupTotalAmount ? formatCurrency(receipt.groupTotalAmount) : 'N/A'}</div>`;
+    const chitDateHtml = `<div class="section-item">Chit Date : ${receipt.auctionDateForReceipt ? formatDate(receipt.auctionDateForReceipt, "dd-MMM-yyyy") : formatDate(receipt.paymentDate, "dd-MMM-yyyy")}</div>`;
     
-    const dueNumberHtml = receipt.dueNumber ? `<div class="section-item"><span class="field-label">Due No.:</span> <span class="field-value">${receipt.dueNumber}</span></div>` : '';
+    const dueNumberHtml = receipt.dueNumber ? `<div class="section-item">Due No. : ${receipt.dueNumber}</div>` : '';
     
-    const dueAmountForInstallmentHtml = (amountDueForThisInstallment !== null && amountDueForThisInstallment !== undefined) ? `<div class="section-item"><span class="field-label">Due Amount:</span> <span class="field-value">${formatCurrency(amountDueForThisInstallment)}</span></div>` : '';
-    const totalPaidForInstallmentHtml = (totalPaidForThisDue !== null && totalPaidForThisDue !== undefined) ? `<div class="section-item"><span class="field-label">Paid Amount (This Inst.):</span> <span class="field-value">${formatCurrency(totalPaidForThisDue)}</span></div>` : '';
-    const billAmountHtml = `<div class="section-item"><span class="field-label">Bill Amount (This Txn.):</span> <span class="field-value">${formatCurrency(receipt.amount)}</span></div>`;
-    const balanceForInstallmentHtml = (balanceForThisInstallment !== null && balanceForThisInstallment !== undefined) ? `<div class="section-item"><span class="field-label">Balance (This Inst.):</span> <span class="field-value">${formatCurrency(balanceForThisInstallment)}</span></div>` : '';
-    const overallBalanceHtml = (receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) ? `<div class="section-item"><span class="field-label">User Total Balance (Overall):</span> <span class="field-value">${formatCurrency(receipt.userTotalDueBeforeThisPayment)}</span></div>` : '';
+    const dueAmountForInstallmentHtml = (amountDueForThisInstallment !== null && amountDueForThisInstallment !== undefined) ? `<div class="section-item">Due Amount : ${formatCurrency(amountDueForThisInstallment)}</div>` : '';
+    const totalPaidForInstallmentHtml = (totalPaidForThisDue !== null && totalPaidForThisDue !== undefined) ? `<div class="section-item">Paid Amount : ${formatCurrency(totalPaidForThisDue)}</div>` : '';
+    const billAmountHtml = `<div class="section-item">Bill Amount : ${formatCurrency(receipt.amount)}</div>`;
+    const balanceForInstallmentHtml = (balanceForThisInstallment !== null && balanceForThisInstallment !== undefined) ? `<div class="section-item">Balance : ${formatCurrency(balanceForThisInstallment)}</div>` : '';
 
-    const paymentModeHtml = `<div class="section-item"><span class="field-label">Mode:</span> <span class="field-value">${receipt.paymentMode || 'N/A'}</span></div>`;
+    const paymentModeHtml = `<div class="section-item"> Mode : {receipt.paymentMode || 'N/A'}</div>`;
     const thankYouHtml = `<div class="thank-you center">Thank You!</div>`;
 
-    const receiptHTML = \`
+    const receiptHTML = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -267,28 +266,27 @@ export default function EmployeeCollectionReceiptPage() {
       <body>
         <div id="printable-receipt-area">
           <div class="receipt-print-content">
-            \${companyNameHtml}
-            \${receiptNumberHtml}
-            \${dateTimeHtml}
+            ${companyNameHtml}
+            ${receiptNumberHtml}
+            ${dateTimeHtml}
             <hr>
-            \${groupNameHtml}
-            \${userNameHtml}
-            \${chitSchemeValueHtml}
-            \${chitDateHtml}
-            \${dueNumberHtml}
-            \${dueAmountForInstallmentHtml}
-            \${totalPaidForInstallmentHtml}
-            \${billAmountHtml}
-            \${balanceForInstallmentHtml}
-            \${overallBalanceHtml}
-            \${paymentModeHtml}
+            ${groupNameHtml}
+            ${userNameHtml}
+            ${chitSchemeValueHtml}
+            ${chitDateHtml}
+            ${dueNumberHtml}
+            ${dueAmountForInstallmentHtml}
+            ${totalPaidForInstallmentHtml}
+            ${billAmountHtml}
+            ${balanceForInstallmentHtml}
+            ${paymentModeHtml}
             <hr>
-            \${thankYouHtml}
+            ${thankYouHtml}
           </div>
         </div>
       </body>
       </html>
-    \`;
+    `;
 
     const printFrame = document.createElement('iframe');
     printFrame.style.position = 'absolute';
