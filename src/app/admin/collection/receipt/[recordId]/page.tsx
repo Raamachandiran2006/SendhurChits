@@ -177,7 +177,7 @@ export default function AdminCollectionReceiptPage() {
     const paymentModeHtml = `<div class="section-item"><span class="field-label">Mode:</span> <span class="field-value">${receipt.paymentMode || 'N/A'}</span></div>`;
     const thankYouHtml = `<div class="thank-you center">Thank You!</div>`;
 
-    const receiptHTML = \`
+    const receiptHTML = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -293,7 +293,7 @@ export default function AdminCollectionReceiptPage() {
         </div>
       </body>
       </html>
-    \`;
+    `;
 
     const printFrame = document.createElement('iframe');
     printFrame.style.position = 'absolute';

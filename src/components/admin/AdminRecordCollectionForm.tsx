@@ -2,12 +2,12 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, LocateFixed } from "lucide-react";
@@ -75,6 +75,16 @@ const formatDateLocal = (dateString: string | undefined | null, outputFormat: st
   }
 };
 
+const MAX_FILE_SIZE_MB = 5;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const ACCEPTED_DOCUMENT_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
+
+const optionalFileSchema = z.custom<File>((val) => val instanceof File, "File is required")
+  .refine((file) => file.size <= MAX_FILE_SIZE_BYTES, `Max file size is ${MAX_FILE_SIZE_MB}MB.`)
+  .refine((file) => ACCEPTED_DOCUMENT_TYPES.includes(file.type), "Only .pdf, .jpg, .jpeg, .png files.")
+  .optional()
+  .nullable();
+
 const recordCollectionFormSchema = z.object({
   selectedGroupId: z.string().min(1, "Please select a Group."),
   selectedAuctionId: z.string().min(1, "Auction number is required."),
@@ -86,6 +96,7 @@ const recordCollectionFormSchema = z.object({
   amount: z.coerce.number().int("Amount must be a whole number.").positive("Amount must be a positive number."),
   collectionLocationOption: z.enum(["User Location"], { required_error: "Collection location must be User Location."}),
   remarks: z.string().optional(),
+  guarantorAuthorizationDocFile: optionalFileSchema,
 });
 
 type RecordCollectionFormValues = z.infer<typeof recordCollectionFormSchema>;
@@ -102,7 +113,7 @@ async function generateUniqueReceiptNumber(maxRetries = 5): Promise<string> {
     if (snapshot.empty) {
       return receiptNumber;
     }
-    console.warn(`Receipt number ${receiptNumber} already exists, retrying...`);
+    console.warn(`[Admin Collection Form] Receipt number ${receiptNumber} already exists, retrying...`);
   }
   throw new Error("Failed to generate a unique receipt number after several retries.");
 }
@@ -113,23 +124,23 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         const doc = new jsPDF({
             orientation: 'portrait',
             unit: 'mm',
-            format: [72, 'auto'] 
+            format: [72, 135] 
         });
         let y = 10;
         const lineHeight = 5; 
         const margin = 3; 
-        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageWidth = doc.internal.pageSize.width;
         if (!pageWidth || pageWidth <= 0) {
             console.error("[PDF Generation] Invalid page width:", pageWidth);
             return null; 
         }
         const centerX = pageWidth / 2;
 
-        doc.setFont('Helvetica-Bold'); // Changed from Times-Bold
+        doc.setFont('Helvetica-Bold');
         doc.setFontSize(12); 
         doc.text(String(recordData.companyName || "Sendhur Chits"), Number(centerX), Number(y), { align: 'center' }); y += lineHeight * 1.5;
         
-        doc.setFont('Helvetica'); // Changed from Times-Roman
+        doc.setFont('Helvetica'); 
         doc.setFontSize(12); 
         doc.text(`Receipt No: ${recordData.receiptNumber || 'N/A'}`, Number(centerX), Number(y), { align: 'center' }); y += lineHeight;
         doc.text(`Date: ${formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy")} ${recordData.paymentTime || ''}`, Number(centerX), Number(y), { align: 'center' }); y += lineHeight;
@@ -147,12 +158,12 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         };
     
         const printLine = (label: string, value: string | number | null | undefined, yPos: number, isBoldValue: boolean = false): number => {
-            doc.setFont('Helvetica-Bold'); // Changed
+            doc.setFont('Helvetica-Bold'); 
             doc.setFontSize(12);
             doc.text(label, Number(margin), Number(yPos));
             const labelWidth = doc.getTextWidth(label);
             
-            doc.setFont(isBoldValue ? 'Helvetica-Bold' : 'Helvetica'); // Changed
+            doc.setFont(isBoldValue ? 'Helvetica-Bold' : 'Helvetica'); 
             doc.setFontSize(12);
             return wrapText(String(value || 'N/A'), Number(margin + labelWidth + 2), Number(yPos), Number(66 - labelWidth - 2), Number(lineHeight));
         };
@@ -177,7 +188,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
             y = printLine("Balance (This Inst.):", formatCurrencyLocal(recordData.balanceForThisInstallment), y);
         }
         if (recordData.userTotalDueBeforeThisPayment !== null && recordData.userTotalDueBeforeThisPayment !== undefined) {
-            y = printLine("User Total Balance (Overall):", formatCurrencyLocal(recordData.userTotalDueBeforeThisPayment), y);
+            y = printLine("Total Balance:", formatCurrencyLocal(recordData.userTotalDueBeforeThisPayment), y);
         }
         y = printLine("Mode:", recordData.paymentMode || 'N/A', y);
         
@@ -186,7 +197,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         doc.setLineDashPattern([], 0);
         
         y += lineHeight;
-        doc.setFont('Helvetica'); // Changed
+        doc.setFont('Helvetica'); 
         doc.setFontSize(12);
         doc.text("Thank You!", Number(centerX), Number(y), { align: 'center' });
         
@@ -231,7 +242,6 @@ async function generateAndUploadReceiptPdf(
   }
 }
 
-
 export function AdminRecordCollectionForm() {
   const { toast } = useToast();
   const router = useRouter();
@@ -271,12 +281,15 @@ export function AdminRecordCollectionForm() {
       amount: undefined,
       collectionLocationOption: "User Location", 
       remarks: "Auction Collection",
+      guarantorAuthorizationDocFile: null,
     },
   });
 
   const { watch, setValue, reset } = form;
   const watchedGroupId = watch("selectedGroupId");
   const watchedCollectionLocationOption = watch("collectionLocationOption");
+  const watchedGuarantorAuthorizationDocFile = watch("guarantorAuthorizationDocFile");
+
 
   useEffect(() => {
     const fetchGroups = async () => {
@@ -445,6 +458,8 @@ export function AdminRecordCollectionForm() {
     let userDueBeforePayment: number | null = null;
     let totalPaidForThisSpecificDue: number | null = null;
     let balanceForThisSpecificInstallment: number | null = null;
+    let guarantorAuthDocUrl: string | null = null;
+
 
     try {
         console.log("Attempting to generate unique receipt number...");
@@ -471,7 +486,7 @@ export function AdminRecordCollectionForm() {
         }
         console.log("Calculated balanceAmountAfterPayment:", balanceAmountAfterPayment);
 
-        const collectionLocationToStore = currentLocationValue;
+        const collectionLocationToStore = currentLocationValue; // Since "Office" is removed
         const virtualId = generate7DigitRandomNumber();
 
         const userDocRefForDueRead = doc(db, "users", selectedUser.id);
@@ -503,6 +518,13 @@ export function AdminRecordCollectionForm() {
         } else if (chitAmountForDue !== null) {
             totalPaidForThisSpecificDue = values.amount;
             balanceForThisSpecificInstallment = chitAmountForDue - values.amount;
+        }
+
+        if (values.guarantorAuthorizationDocFile) {
+          guarantorAuthDocUrl = await uploadFile(
+            values.guarantorAuthorizationDocFile,
+            `collection_guarantor_docs/${selectedGroup.id}/${selectedUser.id}/${values.guarantorAuthorizationDocFile.name}_${Date.now()}`
+          );
         }
 
 
@@ -565,6 +587,7 @@ export function AdminRecordCollectionForm() {
             recordedByEmployeeName: `Admin: ${admin.fullname}`, 
             virtualTransactionId: virtualId,
             receiptPdfUrl: receiptPdfDownloadUrl,
+            guarantorAuthDocUrl: guarantorAuthDocUrl || null,
         };
         console.log("[Admin Collection Form] Final data being saved to Firestore (finalCollectionRecordData):", finalCollectionRecordData);
 
@@ -864,6 +887,31 @@ export function AdminRecordCollectionForm() {
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="guarantorAuthorizationDocFile"
+              render={({ field: { onChange, value, onBlur, name, ref } }) => (
+                <FormItem>
+                  <FormLabel>Guarantor's Authorization Document (Optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="file"
+                      onBlur={onBlur}
+                      name={name}
+                      ref={ref}
+                      onChange={(e) => onChange(e.target.files?.[0] || null)}
+                      accept=".pdf,image/jpeg,image/png"
+                    />
+                  </FormControl>
+                  {watchedGuarantorAuthorizationDocFile && (
+                    <FormDescription className="text-xs">
+                      {watchedGuarantorAuthorizationDocFile.name}
+                    </FormDescription>
+                  )}
+                  {/* Remove FormMessage here to hide Zod errors for this field */}
+                </FormItem>
+              )}
+            />
 
             <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" disabled={isSubmitting || isFetchingLocation}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
@@ -875,6 +923,3 @@ export function AdminRecordCollectionForm() {
     </Card>
   );
 }
-
-
-    
