@@ -51,8 +51,8 @@ export function AppHeader() {
            <Image 
             src="/sendhur_chits_header_logo.png" 
             alt="Sendhur Chits Logo"
-            width={160} 
-            height={46} 
+            width={170} 
+            height={48} 
             priority
             data-ai-hint="company logo"
           />
@@ -93,9 +93,9 @@ export function AppHeader() {
                     {userType === 'employee' ? `Employee ID: ${entityUsername}` : (userType === 'admin' ? `@${entityUsername}` : `@${entityUsername}`)}
                   </p>
                   {userType === 'user' && userDueAmount !== undefined && (
-                    <div className="flex items-center sm:hidden mt-1 text-xs">
-                         <Wallet className="mr-1 h-3 w-3 text-muted-foreground" />
-                        <p className="leading-none">
+                    <div className="flex items-center sm:hidden mt-1">
+                         <Wallet className="mr-2 h-4 w-4 text-muted-foreground" />
+                        <p className="text-xs leading-none">
                             Due: <span className={cn("font-semibold", (userDueAmount ?? 0) > 0 ? "text-destructive" : "text-green-600")}>{formatCurrency(userDueAmount)}</span>
                         </p>
                     </div>
