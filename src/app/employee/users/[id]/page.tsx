@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { User, Group, CollectionRecord, PaymentRecord as AdminPaymentRecordType, AuctionRecord } from "@/types";
 import { db } from "@/lib/firebase";
@@ -17,6 +17,7 @@ import {
   Info,
   AlertTriangle,
   Phone,
+  Mail,
   CalendarDays,
   Home as HomeIcon,
   Users as GroupIcon,
@@ -28,7 +29,7 @@ import {
   Download,
   ChevronRight,
   ChevronDown,
-  Sheet,
+  Sheet as SheetIconComponent,
   Contact,
   ArchiveRestore 
 } from "lucide-react";
@@ -49,19 +50,34 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useToast } from "@/hooks/use-toast";
 
-
-// Helper functions
+// Helper function to format date safely
 const formatDateSafe = (dateInput: string | Date | Timestamp | undefined | null, outputFormat: string = "dd MMMM yyyy"): string => {
   if (!dateInput) return "N/A";
   try {
     let date: Date;
-    if (dateInput instanceof Timestamp) date = dateInput.toDate();
-    else if (typeof dateInput === 'string') date = dateInput.includes('T') ? parseISO(dateInput) : new Date(dateInput.replace(/-/g, '/'));
-    else if (dateInput instanceof Date) date = dateInput;
-    else return "N/A";
+    if (dateInput instanceof Timestamp) {
+      date = dateInput.toDate();
+    } else if (typeof dateInput === 'string') {
+      const parsedDate = new Date(dateInput.replace(/-/g, '/'));
+      if (isNaN(parsedDate.getTime())) {
+        const isoParsed = parseISO(dateInput);
+        if(isNaN(isoParsed.getTime())) return "N/A";
+        date = isoParsed;
+      } else {
+        date = parsedDate;
+      }
+    } else if (dateInput instanceof Date) {
+      date = dateInput;
+    } else {
+      return "N/A";
+    }
+
     if (isNaN(date.getTime())) return "N/A";
     return format(date, outputFormat);
-  } catch (e) { return "N/A"; }
+  } catch (e) {
+    console.error("Error formatting date:", dateInput, e);
+    return "N/A";
+  }
 };
 
 const formatDateTimeSafe = (dateInput: string | Date | Timestamp | undefined | null, outputFormat: string = "dd MMM yy, hh:mm a"): string => {
@@ -109,7 +125,7 @@ const parseDateTimeForSort = (dateStr?: string, timeStr?: string, recordTimestam
 };
 
 
-interface EmployeeUserTransaction {
+interface AdminUserTransaction {
   id: string;
   type: "Sent by User" | "Received by User";
   dateTime: Date;
@@ -149,8 +165,8 @@ export default function EmployeeViewUserDetailPage() {
   const [loadingUser, setLoadingUser] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [rawUserTransactions, setRawUserTransactions] = useState<EmployeeUserTransaction[]>([]);
-  const [filteredUserTransactions, setFilteredUserTransactions] = useState<EmployeeUserTransaction[]>([]);
+  const [rawUserTransactions, setRawUserTransactions] = useState<AdminUserTransaction[]>([]);
+  const [filteredUserTransactions, setFilteredUserTransactions] = useState<AdminUserTransaction[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(true);
   const [transactionError, setTransactionError] = useState<string | null>(null);
   const [selectedTransactionFilter, setSelectedTransactionFilter] = useState<TransactionFilterType>("all");
@@ -159,7 +175,6 @@ export default function EmployeeViewUserDetailPage() {
   const [dueSheetItems, setDueSheetItems] = useState<DueSheetItem[]>([]);
   const [loadingDueSheet, setLoadingDueSheet] = useState(true);
   const dueSheetRef = useRef<HTMLDivElement>(null);
-
 
   const fetchUserDetailsAndRelatedData = useCallback(async () => {
     if (!userId) {
@@ -193,7 +208,7 @@ export default function EmployeeViewUserDetailPage() {
       setUserGroups(fetchedGroups);
       setLoadingUser(false); 
 
-      let combinedTransactions: EmployeeUserTransaction[] = [];
+      let combinedTransactions: AdminUserTransaction[] = [];
       const collectionsRef = collection(db, "collectionRecords");
       const collectionsQuery = query(collectionsRef, where("userId", "==", userId), orderBy("recordedAt", "desc"));
       const collectionsSnapshot = await getDocs(collectionsQuery);
@@ -208,7 +223,7 @@ export default function EmployeeViewUserDetailPage() {
       });
       const paymentsRef = collection(db, "paymentRecords"); 
       const paymentsQuery = query(paymentsRef, where("userId", "==", userId), orderBy("recordedAt", "desc"));
-      const paymentsSnapshot = await getDocs(paymentsQuery);
+      const paymentsSnapshot = await getDocs(paymentsRef, paymentsQuery);
       paymentsSnapshot.forEach(docSnap => {
         const data = docSnap.data() as AdminPaymentRecordType; 
         combinedTransactions.push({
@@ -234,7 +249,7 @@ export default function EmployeeViewUserDetailPage() {
             if (auctionRecord.auctionNumber === undefined || auctionRecord.finalAmountToBePaid === null || auctionRecord.finalAmountToBePaid === undefined) continue;
             
             const amountDueForInstallment = auctionRecord.finalAmountToBePaid;
-            const penaltyChargedForInstallment = 0; 
+            const penaltyChargedForInstallment = 0; // Placeholder
             
             let totalCollectedForThisDue = 0;
             let latestPaidDate: Date | null = null;
@@ -458,7 +473,7 @@ export default function EmployeeViewUserDetailPage() {
               <Card className="shadow-md">
                 <CardHeader>
                   <div className="flex items-center gap-3">
-                    <Sheet className="mr-2 h-6 w-6 text-primary" />
+                    <SheetIconComponent className="mr-2 h-6 w-6 text-primary" />
                     <CardTitle className="text-xl font-bold text-foreground">Due Sheet</CardTitle>
                   </div>
                   <CardDescription>Detailed breakdown of dues for this user.</CardDescription>
@@ -537,7 +552,7 @@ export default function EmployeeViewUserDetailPage() {
                                 <TableRow>
                                     <TableHead>S.No</TableHead><TableHead>Date & Time</TableHead><TableHead>From</TableHead>
                                     <TableHead>To</TableHead><TableHead>Type</TableHead><TableHead className="text-right">Amount (₹)</TableHead>
-                                    <TableHead>Mode</TableHead><TableHead>Remarks/Source</TableHead>
+                                    <TableHead>Mode</TableHead><TableHead>Remarks/Source</TableHead><TableHead>Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -558,6 +573,15 @@ export default function EmployeeViewUserDetailPage() {
                                     <TableCell><span className={cn("font-semibold px-2 py-1 rounded-full text-xs", tx.type === "Sent by User" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" : "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300")}>{tx.type}</span></TableCell>
                                     <TableCell className="text-right font-mono">{formatCurrency(tx.amount)}</TableCell><TableCell>{tx.mode || "N/A"}</TableCell>
                                     <TableCell className="max-w-[200px]">{tx.remarksOrSource || "N/A"}</TableCell>
+                                    <TableCell>
+                                      {tx.originalSource === "CollectionRecord" && (
+                                        <Button asChild variant="ghost" size="icon">
+                                          <Link href={`/employee/collection/receipt/${tx.id}`} title="View Receipt">
+                                            <ReceiptText className="h-4 w-4 text-primary" />
+                                          </Link>
+                                        </Button>
+                                      )}
+                                    </TableCell>
                                     </TableRow>
                                 </React.Fragment>
                                 );
@@ -575,3 +599,4 @@ export default function EmployeeViewUserDetailPage() {
   );
 }
 
+    
