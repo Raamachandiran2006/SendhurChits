@@ -7,11 +7,11 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardHeader, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import Image from "next/image"; // Added Image import
+import Image from "next/image";
 
 const formSchema = z.object({
   username: z.string().min(1, "Phone number is required"), // This should be phone
@@ -34,15 +34,16 @@ export function LoginForm() {
 
   return (
     <Card className="shadow-xl">
-      <CardHeader className="items-center">
-        {/* Removed CardTitle and CardDescription */}
+      <CardHeader className="items-center text-center space-y-0 pb-4">
+        {/* Replaced CardTitle and CardDescription with Image */}
         <Image
-          src="/sendhur_chits_logo_login.png" // Assuming this is the path in your public folder
+          src="https://placehold.co/300x100.png" // Placeholder image
           alt="Sendhur Chits Logo"
-          width={300} // Adjust width as needed
-          height={112} // Adjust height based on aspect ratio (original 800x299 ~ 300x112)
-          priority // Preload the logo
+          width={300} 
+          height={100} 
+          priority 
           data-ai-hint="company logo"
+          className="mb-4"
         />
       </CardHeader>
       <CardContent>
@@ -81,6 +82,7 @@ export function LoginForm() {
           </form>
         </Form>
       </CardContent>
+      {/* CardFooter with signup link removed as per previous request */}
     </Card>
   );
 }
