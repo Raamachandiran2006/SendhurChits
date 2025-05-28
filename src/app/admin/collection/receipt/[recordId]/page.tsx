@@ -131,7 +131,7 @@ export default function AdminCollectionReceiptPage() {
                 setBalanceForThisInstallment(null);
               }
             } else {
-              setTotalPaidForThisDue(collectionData.amount); // If no specific auction, current payment is total paid for this generic due
+              setTotalPaidForThisDue(collectionData.amount); 
               if (fetchedAmountDueForThisInstallment !== null) {
                  setBalanceForThisInstallment(fetchedAmountDueForThisInstallment - (collectionData.amount || 0));
               } else {
@@ -189,8 +189,14 @@ export default function AdminCollectionReceiptPage() {
               margin: 0;
               size: 72mm auto; 
             }
-            body * { visibility: hidden !important; display: none !important; }
-            #printable-receipt-area, #printable-receipt-area * { display: block !important; visibility: visible !important; }
+            body > *:not(#printable-receipt-area) {
+              display: none !important;
+              visibility: hidden !important;
+            }
+            #printable-receipt-area, #printable-receipt-area * {
+              display: block !important;
+              visibility: visible !important;
+            }
              body, html {
               width: 72mm !important;
               height: auto !important; 
@@ -242,7 +248,7 @@ export default function AdminCollectionReceiptPage() {
               text-overflow: ellipsis;
             }
             .field-label { display: inline !important; font-weight: bold !important; padding-right: 0.5em !important; }
-            .field-value { display: inline !important; font-weight: normal !important; }
+            .field-value { display: inline !important; font-weight: normal !important;}
             .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 0.5mm !important; }
             hr {
               border: none !important;
