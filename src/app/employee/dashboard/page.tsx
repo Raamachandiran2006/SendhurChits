@@ -4,7 +4,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Briefcase, Users, Layers, Eye, TrendingUp, Loader2, AlertTriangle, Banknote, Wallet, ArchiveRestore, Sheet as SheetIcon } from "lucide-react"; // Added ArchiveRestore
+import { Briefcase, Users, Layers, Eye, TrendingUp, Loader2, AlertTriangle, Banknote, Wallet, ArchiveRestore, Sheet as SheetIcon, DollarSign } from "lucide-react"; // Added ArchiveRestore and DollarSign
 import Link from "next/link";
 import type { Employee, Group, CollectionRecord, PaymentRecord, SalaryRecord, ExpenseRecord, CreditRecord } from "@/types";
 import { useEffect, useState } from "react";
