@@ -3,12 +3,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import type { Group, AuctionRecord } from "@/types"; // Added AuctionRecord
+import type { Group, AuctionRecord } from "@/types";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, orderBy, getDocs } from "firebase/firestore"; // Added collection, query, where, orderBy, getDocs
+import { doc, getDoc, collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import { 
   Loader2, 
   ArrowLeft, 
@@ -22,14 +21,12 @@ import {
   SearchCode,
   Megaphone,
   CalendarClock,
-  History // Added History icon
+  History 
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
 import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
 
-// Updated formatDateSafe to handle potential Date objects directly
 const formatDateSafe = (dateInput: string | Date | undefined | null, outputFormat: string = "dd MMM yyyy") => {
   if (!dateInput) return "N/A";
   try {
@@ -37,10 +34,9 @@ const formatDateSafe = (dateInput: string | Date | undefined | null, outputForma
     if (dateInput instanceof Date) {
       date = dateInput;
     } else if (typeof dateInput === 'string') {
-      // Handle 'YYYY-MM-DD' or full ISO strings
       date = dateInput.includes('T') ? parseISO(dateInput) : new Date(dateInput.replace(/-/g, '/'));
     } else {
-      return "N/A"; // Should not happen with current types
+      return "N/A";
     }
 
     if (isNaN(date.getTime())) return "N/A";
@@ -73,9 +69,9 @@ export default function UserGroupDetailPage() {
   const groupId = params.groupId as string;
 
   const [group, setGroup] = useState<Group | null>(null);
-  const [auctionHistory, setAuctionHistory] = useState<AuctionRecord[]>([]); // State for auction history
+  const [auctionHistory, setAuctionHistory] = useState<AuctionRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingAuctionHistory, setLoadingAuctionHistory] = useState(true); // Loading state for auction history
+  const [loadingAuctionHistory, setLoadingAuctionHistory] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchGroupDetailsAndHistory = useCallback(async () => {
@@ -89,7 +85,6 @@ export default function UserGroupDetailPage() {
     setLoadingAuctionHistory(true);
     setError(null);
     try {
-      // Fetch Group Details
       const groupDocRef = doc(db, "groups", groupId);
       const groupDocSnap = await getDoc(groupDocRef);
 
@@ -100,12 +95,11 @@ export default function UserGroupDetailPage() {
         const groupData = { id: groupDocSnap.id, ...groupDocSnap.data() } as Group;
         setGroup(groupData);
 
-        // Fetch Auction History for this group
         const auctionRecordsRef = collection(db, "auctionRecords");
         const qAuction = query(
           auctionRecordsRef, 
           where("groupId", "==", groupId), 
-          orderBy("auctionDate", "desc") // Show newest first
+          orderBy("auctionDate", "desc")
         );
         const auctionSnapshot = await getDocs(qAuction);
         const fetchedAuctionHistory = auctionSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as AuctionRecord));
@@ -256,7 +250,7 @@ export default function UserGroupDetailPage() {
             </div>
           </div>
           <AuctionDetailItemReadOnly icon={Clock} label="Scheduled Time" value={group.auctionScheduledTime} />
-          <AuctionDetailItemReadOnly icon={Info} label="Last Auction Winner" value={group.lastAuctionWinner} />
+          {/* Removed Last Auction Winner display for regular users */}
         </CardContent>
       </Card>
 
@@ -291,7 +285,7 @@ export default function UserGroupDetailPage() {
                   </CardHeader>
                   <CardContent className="text-sm space-y-2 pb-4">
                       {auction.auctionTime && <div><strong className="text-foreground">Time:</strong> {auction.auctionTime}</div>}
-                      <div><strong className="text-foreground">Winner:</strong> {auction.winnerFullname} ({auction.winnerUsername})</div>
+                      {/* Removed Winner display for regular users */}
                       <div><strong className="text-foreground">Winning Bid:</strong> {formatCurrency(auction.winningBidAmount)}</div>
                   </CardContent>
                 </Card>
