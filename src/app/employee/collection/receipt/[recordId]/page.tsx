@@ -36,7 +36,7 @@ export default function EmployeeCollectionReceiptPage() {
   const router = useRouter();
   const recordId = params.recordId as string;
 
-  const [receipt, setReceipt] = useState<CollectionRecord | null>(null);
+  const [receipt, setReceipt] = useState<CollectionRecord & { groupTotalAmount?: number, auctionDateForReceipt?: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,12 +55,13 @@ export default function EmployeeCollectionReceiptPage() {
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             const collectionData = { id: docSnap.id, ...docSnap.data() } as CollectionRecord;
+            let augmentedReceiptData: CollectionRecord & { groupTotalAmount?: number, auctionDateForReceipt?: string | null } = { ...collectionData };
             
             if (collectionData.groupId) {
               const groupDocRef = doc(db, "groups", collectionData.groupId);
               const groupSnap = await getDoc(groupDocRef);
               if (groupSnap.exists()) {
-                collectionData.groupTotalAmount = (groupSnap.data() as Group).totalAmount;
+                augmentedReceiptData.groupTotalAmount = (groupSnap.data() as Group).totalAmount;
               }
             }
 
@@ -68,7 +69,7 @@ export default function EmployeeCollectionReceiptPage() {
               const auctionDocRef = doc(db, "auctionRecords", collectionData.auctionId);
               const auctionSnap = await getDoc(auctionDocRef);
               if (auctionSnap.exists()) {
-                collectionData.auctionDateForReceipt = (auctionSnap.data() as AuctionRecord).auctionDate;
+                augmentedReceiptData.auctionDateForReceipt = (auctionSnap.data() as AuctionRecord).auctionDate;
               }
             } else if (collectionData.groupId && collectionData.auctionNumber !== null && collectionData.auctionNumber !== undefined) {
                const auctionQuery = query(
@@ -78,12 +79,13 @@ export default function EmployeeCollectionReceiptPage() {
               );
               const auctionSnapshot = await getDocs(auctionQuery);
               if (!auctionSnapshot.empty) {
-                collectionData.auctionDateForReceipt = (auctionSnapshot.docs[0].data() as AuctionRecord).auctionDate;
+                augmentedReceiptData.auctionDateForReceipt = (auctionSnapshot.docs[0].data() as AuctionRecord).auctionDate;
               }
             }
             
             let fetchedAmountDueForThisInstallment: number | null = collectionData.chitAmount || null;
-             if (fetchedAmountDueForThisInstallment === null && collectionData.auctionId) {
+            
+            if (fetchedAmountDueForThisInstallment === null && collectionData.auctionId) {
                 const auctionDocRef = doc(db, "auctionRecords", collectionData.auctionId);
                 const auctionSnap = await getDoc(auctionDocRef);
                 if (auctionSnap.exists()) {
@@ -106,12 +108,12 @@ export default function EmployeeCollectionReceiptPage() {
                     }
                 }
             }
-
-
             setAmountDueForThisInstallment(fetchedAmountDueForThisInstallment);
             
-
-            if (collectionData.userId && collectionData.groupId && collectionData.auctionNumber !== null && collectionData.auctionNumber !== undefined) {
+            if (collectionData.totalPaidForThisDue !== undefined && collectionData.balanceForThisInstallment !== undefined) {
+                setTotalPaidForThisDue(collectionData.totalPaidForThisDue);
+                setBalanceForThisInstallment(collectionData.balanceForThisInstallment);
+            } else if (collectionData.userId && collectionData.groupId && collectionData.auctionNumber !== null && collectionData.auctionNumber !== undefined) {
               const collectionsForDueQuery = query(
                 collection(db, "collectionRecords"),
                 where("userId", "==", collectionData.userId),
@@ -138,7 +140,7 @@ export default function EmployeeCollectionReceiptPage() {
                  setBalanceForThisInstallment(null);
               }
             }
-             setReceipt(collectionData);
+             setReceipt(augmentedReceiptData);
           } else {
             setError("Receipt not found.");
           }
@@ -168,7 +170,7 @@ export default function EmployeeCollectionReceiptPage() {
     
     const dueNumberHtml = receipt.dueNumber ? `<div class="section-item"><span class="field-label">Due No.:</span> <span class="field-value">${receipt.dueNumber}</span></div>` : '';
     
-    const dueAmountForInstallmentHtml = (amountDueForThisInstallment !== null && amountDueForThisInstallment !== undefined) ? `<div class="section-item"><span class="field-label">Due Amount (This Inst.):</span> <span class="field-value">${formatCurrency(amountDueForThisInstallment)}</span></div>` : '';
+    const dueAmountForInstallmentHtml = (amountDueForThisInstallment !== null && amountDueForThisInstallment !== undefined) ? `<div class="section-item"><span class="field-label">Due Amount:</span> <span class="field-value">${formatCurrency(amountDueForThisInstallment)}</span></div>` : '';
     const totalPaidForInstallmentHtml = (totalPaidForThisDue !== null && totalPaidForThisDue !== undefined) ? `<div class="section-item"><span class="field-label">Paid Amount (This Inst.):</span> <span class="field-value">${formatCurrency(totalPaidForThisDue)}</span></div>` : '';
     const billAmountHtml = `<div class="section-item"><span class="field-label">Bill Amount (This Txn.):</span> <span class="field-value">${formatCurrency(receipt.amount)}</span></div>`;
     const balanceForInstallmentHtml = (balanceForThisInstallment !== null && balanceForThisInstallment !== undefined) ? `<div class="section-item"><span class="field-label">Balance (This Inst.):</span> <span class="field-value">${formatCurrency(balanceForThisInstallment)}</span></div>` : '';
@@ -403,6 +405,3 @@ export default function EmployeeCollectionReceiptPage() {
     </div>
   );
 }
-
-    
-    

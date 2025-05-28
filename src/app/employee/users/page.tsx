@@ -1,22 +1,24 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import type { User } from "@/types";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardHeader } from "@/components/ui/card"; // Removed CardTitle, CardDescription
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Users as UsersIcon, ArrowLeft } from "lucide-react";
+import { Loader2, Users as UsersIcon, ArrowLeft, Search } from "lucide-react"; // Added Search
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input"; // Added Input
 
 export default function EmployeeViewUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState(""); // State for search term
   const router = useRouter();
 
   useEffect(() => {
@@ -24,12 +26,11 @@ export default function EmployeeViewUsersPage() {
       setLoading(true);
       try {
         const usersRef = collection(db, "users");
-        // Fetch all users and then filter client-side to exclude admins
         const q = query(usersRef, orderBy("fullname")); 
         const querySnapshot = await getDocs(q);
         const fetchedUsers = querySnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() } as User))
-          .filter(user => !(user.isAdmin || user.username === 'admin')); // Exclude admins
+          .filter(user => !(user.isAdmin || user.username === 'admin'));
         setUsers(fetchedUsers);
       } catch (error) {
         console.error("Error fetching users:", error);
@@ -45,7 +46,6 @@ export default function EmployeeViewUsersPage() {
       return "N/A";
     }
     try {
-      // Attempt to parse ISO strings first, then general date strings
       const date = dateString.includes('T') ? parseISO(dateString) : new Date(dateString.replace(/-/g, '/'));
       if (isNaN(date.getTime())) {
         const parts = dateString.split('-');
@@ -70,6 +70,19 @@ export default function EmployeeViewUsersPage() {
   const handleUserRowClick = (userId: string) => {
     router.push(`/employee/users/${userId}`);
   };
+
+  // Filter users based on search term
+  const filteredUsers = useMemo(() => {
+    if (!searchTerm) {
+      return users;
+    }
+    const lowercasedSearchTerm = searchTerm.toLowerCase();
+    return users.filter(user =>
+      user.fullname.toLowerCase().includes(lowercasedSearchTerm) ||
+      user.phone.includes(searchTerm) ||
+      user.username.toLowerCase().includes(lowercasedSearchTerm)
+    );
+  }, [users, searchTerm]);
 
   if (loading) {
     return (
@@ -97,14 +110,29 @@ export default function EmployeeViewUsersPage() {
         </Button>
       </div>
 
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search by Name, Phone, or User ID..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 w-full max-w-md shadow-sm"
+          />
+        </div>
+      </div>
+
       <Card className="shadow-xl">
         <CardHeader>
             {/* Title and description are in the page header */}
         </CardHeader>
         <CardContent className="pt-6">
-          {users.length === 0 ? (
+          {filteredUsers.length === 0 ? (
             <div className="text-center py-10">
-              <p className="text-muted-foreground">No users found.</p>
+              <p className="text-muted-foreground">
+                {searchTerm ? `No users found matching "${searchTerm}".` : "No users found."}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-md border">
@@ -120,14 +148,12 @@ export default function EmployeeViewUsersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
+                  {filteredUsers.map((user) => (
                     <TableRow 
                       key={user.id} 
                       onClick={() => handleUserRowClick(user.id)}
                       className="cursor-pointer hover:bg-muted/70 transition-colors"
-                    >
-                      <TableCell className="font-medium">{user.fullname}</TableCell><TableCell>{user.username}</TableCell><TableCell>{user.phone}</TableCell><TableCell>{formatDateSafe(user.dob)}</TableCell><TableCell><Badge variant="secondary">User</Badge></TableCell><TableCell className="text-right">{user.groups?.length || 0}</TableCell>
-                    </TableRow>
+                    ><TableCell className="font-medium">{user.fullname}</TableCell><TableCell>{user.username}</TableCell><TableCell>{user.phone}</TableCell><TableCell>{formatDateSafe(user.dob)}</TableCell><TableCell><Badge variant="secondary">User</Badge></TableCell><TableCell className="text-right">{user.groups?.length || 0}</TableCell></TableRow>
                   ))}
                 </TableBody>
               </Table>
