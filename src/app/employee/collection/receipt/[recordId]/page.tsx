@@ -374,17 +374,16 @@ export default function EmployeeCollectionReceiptPage() {
           <p><strong>Date:</strong> {formatDate(receipt.paymentDate)} {receipt.paymentTime}</p>
           </div>
           <div className="text-xs space-y-1 mb-2">
-          <p><strong>Group:</strong> {receipt.groupName}</p>
-          <p><strong>Name:</strong> {receipt.userFullname}</p>
-          <p><strong>Chit Scheme Value:</strong> {receipt.groupTotalAmount ? formatCurrency(receipt.groupTotalAmount) : 'N/A'}</p>
-          <p><strong>Chit Date:</strong> {receipt.auctionDateForReceipt ? formatDate(receipt.auctionDateForReceipt) : formatDate(receipt.paymentDate)}</p>
-          {receipt.dueNumber ? <p><strong>Due No:</strong> {receipt.dueNumber}</p> : null}
-          {(amountDueForThisInstallment !== null && amountDueForThisInstallment !== undefined) ? <p><strong>Due Amount (This Inst.):</strong> {formatCurrency(amountDueForThisInstallment)}</p> : null}
-          {(totalPaidForThisDue !== null && totalPaidForThisDue !== undefined) ? <p><strong>Paid Amount (This Inst.):</strong> {formatCurrency(totalPaidForThisDue)}</p> : null}
-          <p className="font-bold text-sm"><strong>Bill Amount (This Txn.):</strong> {formatCurrency(receipt.amount)}</p>
-          {(balanceForThisInstallment !== null && balanceForThisInstallment !== undefined) ? <p><strong>Balance (This Inst.):</strong> {formatCurrency(balanceForThisInstallment)}</p> : null}
-          {(receipt.userTotalDueBeforeThisPayment !== null && receipt.userTotalDueBeforeThisPayment !== undefined) ? <p><strong>User Total Balance (Overall):</strong> {formatCurrency(receipt.userTotalDueBeforeThisPayment)}</p> : null}
-          <p><strong>Payment Mode:</strong> {receipt.paymentMode}</p>
+          <p><strong>Group :</strong> {receipt.groupName}</p>
+          <p><strong>Name :</strong> {receipt.userFullname}</p>
+          <p><strong>Chit Value :</strong> {receipt.groupTotalAmount ? formatCurrency(receipt.groupTotalAmount) : 'N/A'}</p>
+          <p><strong>Chit Date :</strong> {receipt.auctionDateForReceipt ? formatDate(receipt.auctionDateForReceipt) : formatDate(receipt.paymentDate)}</p>
+          {receipt.dueNumber ? <p><strong>Due No :</strong> {receipt.dueNumber}</p> : null}
+          {(amountDueForThisInstallment !== null && amountDueForThisInstallment !== undefined) ? <p><strong>Due Amount : </strong> {formatCurrency(amountDueForThisInstallment)}</p> : null}
+          {(totalPaidForThisDue !== null && totalPaidForThisDue !== undefined) ? <p><strong>Paid Amount :</strong> {formatCurrency(totalPaidForThisDue)}</p> : null}
+          <p className="font-bold text-sm"><strong>Bill Amount :</strong> {formatCurrency(receipt.amount)}</p>
+          {(balanceForThisInstallment !== null && balanceForThisInstallment !== undefined) ? <p><strong>Balance :</strong> {formatCurrency(balanceForThisInstallment)}</p> : null}
+          <p><strong>Payment Mode :</strong> {receipt.paymentMode}</p>
           </div>
           <div className="text-xs space-y-1 border-t border-dashed border-gray-400 pt-2 mt-2">
           {receipt.virtualTransactionId && <p><strong>Virtual ID:</strong> {receipt.virtualTransactionId}</p>}

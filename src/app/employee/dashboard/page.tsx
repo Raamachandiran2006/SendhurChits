@@ -4,7 +4,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Briefcase, Users, Layers, Eye, TrendingUp, Loader2, AlertTriangle, Banknote, Wallet } from "lucide-react";
+import { Briefcase, Users, Layers, Eye, TrendingUp, Loader2, AlertTriangle, Banknote, Wallet, ArchiveRestore, Sheet as SheetIcon } from "lucide-react"; // Added ArchiveRestore
 import Link from "next/link";
 import type { Employee, Group, CollectionRecord, PaymentRecord, SalaryRecord, ExpenseRecord, CreditRecord } from "@/types";
 import { useEffect, useState } from "react";
@@ -213,10 +213,18 @@ export default function EmployeeDashboardPage() {
               <ArchiveRestore className="mr-2 h-4 w-4" /> Collection Management
             </Link>
           </Button>
+           <Button asChild variant="outline">
+            <Link href="/employee/salary">
+              <DollarSign className="mr-2 h-4 w-4" /> My Salary
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/employee/due-sheet">
+              <SheetIcon className="mr-2 h-4 w-4" /> View Due Sheet
+            </Link>
+          </Button>
         </CardContent>
       </Card>
     </div>
   );
 }
-
-    
