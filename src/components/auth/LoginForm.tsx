@@ -11,9 +11,10 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import Image from "next/image"; // Added Image import
 
 const formSchema = z.object({
-  username: z.string().min(1, "Username is required"), // This should be phone
+  username: z.string().min(1, "Phone number is required"), // This should be phone
   password: z.string().min(1, "Password is required"),
 });
 
@@ -33,9 +34,16 @@ export function LoginForm() {
 
   return (
     <Card className="shadow-xl">
-      <CardHeader>
-        <CardTitle className="text-3xl font-bold text-center text-primary">Sendhur Chits Login</CardTitle>
-        <CardDescription className="text-center">Enter your phone number and password to access your account.</CardDescription>
+      <CardHeader className="items-center">
+        {/* Removed CardTitle and CardDescription */}
+        <Image
+          src="/sendhur_chits_logo_login.png" // Assuming this is the path in your public folder
+          alt="Sendhur Chits Logo"
+          width={300} // Adjust width as needed
+          height={112} // Adjust height based on aspect ratio (original 800x299 ~ 300x112)
+          priority // Preload the logo
+          data-ai-hint="company logo"
+        />
       </CardHeader>
       <CardContent>
         <Form {...form}>
