@@ -13,11 +13,11 @@ import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, doc, updateDoc, arrayUnion, query, where, writeBatch } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react"; // Added useMemo
 import type { User } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, PlusCircle, Users, CalendarIcon, Tag, LandmarkIcon, SearchCode, PercentIcon } from "lucide-react";
+import { Loader2, PlusCircle, Users as UsersIcon, CalendarIcon, Tag, LandmarkIcon, SearchCode, PercentIcon, Search } from "lucide-react"; // Added Search
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -47,6 +47,7 @@ export function CreateGroupForm() {
   const [users, setUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [memberSearchTerm, setMemberSearchTerm] = useState(""); // State for member search
 
   const form = useForm<z.infer<typeof groupFormSchema>>({
     resolver: zodResolver(groupFormSchema),
@@ -146,20 +147,28 @@ export function CreateGroupForm() {
   const handleNumericInputChange = (event: React.ChangeEvent<HTMLInputElement>, field: any) => {
     const valStr = event.target.value.trim();
     if (valStr === '') {
-      field.onChange(undefined); // Set to undefined if empty
+      field.onChange(undefined); 
     } else {
       const num = parseInt(valStr, 10);
       if (!isNaN(num)) {
-        field.onChange(num); // Set to parsed number if valid
+        field.onChange(num); 
       } else {
-        // If not a valid number (e.g., contains non-digits),
-        // we might want to keep the string to let Zod show an error,
-        // or set to undefined to signal an invalid number.
-        // For this case, let's set to undefined to rely on Zod's number type coercion.
         field.onChange(undefined);
       }
     }
   };
+
+  const filteredUsers = useMemo(() => {
+    if (!memberSearchTerm) {
+      return users;
+    }
+    const lowercasedSearchTerm = memberSearchTerm.toLowerCase();
+    return users.filter(user =>
+      user.fullname.toLowerCase().includes(lowercasedSearchTerm) ||
+      user.phone.includes(memberSearchTerm) || // Phone search is exact
+      user.username.toLowerCase().includes(lowercasedSearchTerm)
+    );
+  }, [users, memberSearchTerm]);
 
 
   return (
@@ -346,17 +355,31 @@ export function CreateGroupForm() {
                     <FormLabel className="text-base">Select Members</FormLabel>
                     <FormDescription>Choose users to add to this group.</FormDescription>
                   </div>
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder="Search members by name, phone, or ID..."
+                        value={memberSearchTerm}
+                        onChange={(e) => setMemberSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
                   {loadingUsers ? (
                      <div className="flex items-center space-x-2">
                         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                         <span className="text-muted-foreground">Loading users...</span>
                      </div>
-                  ) : users.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No users available to add.</p>
+                  ) : filteredUsers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {memberSearchTerm ? `No users found matching "${memberSearchTerm}".` : "No users available to add."}
+                    </p>
                   ) : (
                     <ScrollArea className="h-64 rounded-md border p-4">
                       <div className="space-y-2">
-                      {users.map((user) => (
+                      {filteredUsers.map((user) => (
                         <FormField key={user.id} control={form.control} name="memberUsernames"
                           render={({ field }) => {
                             return (
@@ -374,7 +397,7 @@ export function CreateGroupForm() {
                                     }}
                                   />
                                 </FormControl>
-                                <FormLabel className="font-normal">{user.fullname} (@{user.username})</FormLabel>
+                                <FormLabel className="font-normal">{user.fullname} (@{user.username}) - {user.phone}</FormLabel>
                               </FormItem>
                             );
                           }}
