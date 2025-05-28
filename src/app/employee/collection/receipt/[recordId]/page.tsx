@@ -109,7 +109,7 @@ export default function EmployeeCollectionReceiptPage() {
 
 
             setAmountDueForThisInstallment(fetchedAmountDueForThisInstallment);
-            setReceipt(collectionData);
+            
 
             if (collectionData.userId && collectionData.groupId && collectionData.auctionNumber !== null && collectionData.auctionNumber !== undefined) {
               const collectionsForDueQuery = query(
@@ -138,6 +138,7 @@ export default function EmployeeCollectionReceiptPage() {
                  setBalanceForThisInstallment(null);
               }
             }
+             setReceipt(collectionData);
           } else {
             setError("Receipt not found.");
           }
@@ -155,7 +156,7 @@ export default function EmployeeCollectionReceiptPage() {
   const handlePrint = () => {
     if (!receipt) return;
 
-    const companyNameHtml = `<div class="company-name center">SENDHUR CHITS</div>`;
+    const companyNameHtml = `<div class="company-name center">${receipt.companyName || "Sendhur Chits"}</div>`;
     const receiptNumberHtml = `<div class="receipt-info center">Receipt No: ${receipt.receiptNumber || 'N/A'}</div>`;
     const dateTimeHtml = `<div class="receipt-info center">Date: ${formatDate(receipt.paymentDate, "dd-MMM-yyyy")} ${receipt.paymentTime || ''}</div>`;
     
@@ -188,77 +189,62 @@ export default function EmployeeCollectionReceiptPage() {
               margin: 0;
               size: 72mm auto; 
             }
-            body > *:not(#printable-receipt-area) {
-              display: none !important;
-              visibility: hidden !important;
+             body * {
+                visibility: hidden !important;
             }
             #printable-receipt-area, #printable-receipt-area * {
-              display: block !important;
-              visibility: visible !important;
-            }
-             body, html {
-              width: 72mm !important;
-              height: auto !important; 
-              min-height: 0 !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              overflow: visible !important; 
-              background-color: white !important;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
+                visibility: visible !important;
             }
             #printable-receipt-area {
-              position: absolute !important;
-              left: 0 !important;
-              top: 0 !important;
-              width: 72mm !important;
-              height: auto !important; 
-              min-height: 0 !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              background: white !important;
-              overflow: visible !important;
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 72mm !important; 
+                height: auto !important; 
+                min-height: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+                overflow: visible !important;
             }
-            #printable-receipt-area #receipt-content {
-              width: 100% !important;
-              margin: 0 !important;
-              padding: 1mm !important; 
-              box-shadow: none !important;
-              background: white !important;
-              box-sizing: border-box !important;
+            #printable-receipt-area .receipt-print-content {
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 1mm !important; 
+                box-shadow: none !important;
+                background: white !important;
+                font-family: 'Times New Roman', Times, serif !important;
+                font-size: 11pt !important; 
+                line-height: 1.2 !important;
+                color: black !important;
+                box-sizing: border-box !important;
+                font-weight: normal !important;
             }
-            .receipt-print-content {
-              font-family: 'Times New Roman', Times, serif !important;
-              font-size: 11pt !important; 
-              font-weight: normal !important;
-              line-height: 1.2 !important;
-              color: black !important;
-            }
-            .center { text-align: center !important; }
-            .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 0.5mm !important; }
-            .receipt-info { font-weight: normal !important; text-align: center !important; margin-bottom: 0.5mm !important; }
-            .section-item {
-              display: flex !important; 
-              justify-content: flex-start !important;
-              align-items: baseline !important; 
-              margin-bottom: 0.5mm !important;
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            }
-            .field-label { display: inline !important; font-weight: bold !important; padding-right: 0.5em !important; }
-            .field-value { display: inline !important; font-weight: normal !important;}
-            .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 0.5mm !important; }
-            hr {
+            .receipt-print-content .center { text-align: center !important; margin-bottom: 0.5mm !important; }
+            .receipt-print-content .company-name { font-weight: bold !important; }
+            .receipt-print-content .receipt-info { font-weight: normal !important; }
+            .receipt-print-content .thank-you { font-weight: normal !important; margin-top: 0.5mm !important; }
+            .receipt-print-content hr {
               border: none !important;
               border-top: 1px dashed black !important;
               margin: 1mm 0 !important;
             }
-            h1, h2, h3, h4, h5, h6, p, div {
+            .receipt-print-content .section-item {
+              display: flex !important; 
+              justify-content: flex-start !important;
+              align-items: baseline !important; 
+              margin-bottom: 0.5mm !important;
+              white-space: nowrap; 
+              overflow: hidden;    
+              text-overflow: ellipsis; 
+            }
+            .receipt-print-content .field-label { display: inline !important; font-weight: bold !important; padding-right: 0.5em !important; }
+            .receipt-print-content .field-value { display: inline !important; font-weight: normal !important;}
+            .receipt-print-content h1, .receipt-print-content h2, .receipt-print-content h3, .receipt-print-content h4, .receipt-print-content h5, .receipt-print-content h6, .receipt-print-content p, .receipt-print-content div {
                 margin: 0.5mm 0 !important;
                 font-size: 11pt !important; 
             }
-            iframe[id^="webpack-dev-server-client-overlay"],
+             iframe[id^="webpack-dev-server-client-overlay"],
             iframe[id^="vite-error-overlay"],
             div[id^="vite-plugin-checker-error-overlay"],
             div[class*="firebase-emulator-warning"] {
@@ -270,7 +256,7 @@ export default function EmployeeCollectionReceiptPage() {
       </head>
       <body>
         <div id="printable-receipt-area">
-          <div class="receipt-print-content" id="receipt-content">
+          <div class="receipt-print-content">
             \${companyNameHtml}
             \${receiptNumberHtml}
             \${dateTimeHtml}
@@ -369,10 +355,10 @@ export default function EmployeeCollectionReceiptPage() {
   }
 
   return (
-    <div id="receipt-content-wrapper" className="flex flex-col items-center justify-start min-h-screen bg-background p-4 print:bg-white">
-       <div id="receipt-content" className="w-full max-w-md bg-card p-6 shadow-lg print:hidden">
+    <div id="receipt-content-wrapper" className="flex flex-col items-center justify-start min-h-screen bg-background p-4">
+       <div id="receipt-content" className="w-full max-w-md bg-card p-6 shadow-lg print:p-0">
           <div className="text-center mb-4">
-          <h1 className="text-xl font-bold">{receipt.companyName || "SENDHUR CHITS"}</h1>
+          <h1 className="text-xl font-bold">{receipt.companyName || "Sendhur Chits"}</h1>
           <p className="text-sm">Payment Receipt</p>
           </div>
           <div className="text-xs space-y-1 border-t border-b border-dashed border-gray-400 py-2 my-2">
