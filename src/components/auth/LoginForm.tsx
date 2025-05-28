@@ -7,14 +7,14 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Card, CardHeader, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardHeader, CardContent } from "@/components/ui/card"; // Removed CardDescription, CardFooter
 import { useAuth } from "@/contexts/AuthContext";
-import Link from "next/link";
+// import Link from "next/link"; // No longer needed
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
 
 const formSchema = z.object({
-  username: z.string().min(1, "Phone number is required"), // This should be phone
+  username: z.string().min(1, "Phone number is required"), // This is for phone
   password: z.string().min(1, "Password is required"),
 });
 
@@ -23,7 +23,7 @@ export function LoginForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      username: "", // Will be used for phone input
+      username: "", // For phone input
       password: "",
     },
   });
@@ -35,12 +35,11 @@ export function LoginForm() {
   return (
     <Card className="shadow-xl">
       <CardHeader className="items-center text-center space-y-0 pb-4">
-        {/* Replaced CardTitle and CardDescription with Image */}
         <Image
-          src="https://placehold.co/300x100.png" // Placeholder image
+          src="/sendhur_chits_logo_login.png" // Updated image source
           alt="Sendhur Chits Logo"
           width={300} 
-          height={100} 
+          height={112} // Adjusted to maintain aspect ratio of 800x299
           priority 
           data-ai-hint="company logo"
           className="mb-4"
@@ -82,7 +81,7 @@ export function LoginForm() {
           </form>
         </Form>
       </CardContent>
-      {/* CardFooter with signup link removed as per previous request */}
+      {/* CardFooter with signup link removed */}
     </Card>
   );
 }
