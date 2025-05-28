@@ -165,17 +165,17 @@ export default function EmployeeCollectionReceiptPage() {
     const groupNameHtml = `<div class="section-item">Group : ${receipt.groupName || 'N/A'}</div>`;
     const userNameHtml = `<div class="section-item">Name : ${receipt.userFullname || 'N/A'}</div>`;
     
-    const chitSchemeValueHtml = `<div class="section-item">Chit Scheme Value : ${receipt.groupTotalAmount ? formatCurrency(receipt.groupTotalAmount) : 'N/A'}</div>`;
+    const chitSchemeValueHtml = `<div class="section-item">Chit Value : ${receipt.groupTotalAmount ? formatCurrency(receipt.groupTotalAmount) : 'N/A'}</div>`;
     const chitDateHtml = `<div class="section-item">Chit Date : ${receipt.auctionDateForReceipt ? formatDate(receipt.auctionDateForReceipt, "dd-MMM-yyyy") : formatDate(receipt.paymentDate, "dd-MMM-yyyy")}</div>`;
     
     const dueNumberHtml = receipt.dueNumber ? `<div class="section-item">Due No. : ${receipt.dueNumber}</div>` : '';
     
-    const dueAmountForInstallmentHtml = (amountDueForThisInstallment !== null && amountDueForThisInstallment !== undefined) ? `<div class="section-item">Due Amount : ${formatCurrency(amountDueForThisInstallment)}</div>` : '';
+    const dueAmountForInstallmentHtml = (amountDueForThisInstallment !== null && amountDueForThisInstallment !== undefined) ? `<div class="section-item">Due Amount  : ${formatCurrency(amountDueForThisInstallment)}</div>` : '';
     const totalPaidForInstallmentHtml = (totalPaidForThisDue !== null && totalPaidForThisDue !== undefined) ? `<div class="section-item">Paid Amount : ${formatCurrency(totalPaidForThisDue)}</div>` : '';
     const billAmountHtml = `<div class="section-item">Bill Amount : ${formatCurrency(receipt.amount)}</div>`;
     const balanceForInstallmentHtml = (balanceForThisInstallment !== null && balanceForThisInstallment !== undefined) ? `<div class="section-item">Balance : ${formatCurrency(balanceForThisInstallment)}</div>` : '';
 
-    const paymentModeHtml = `<div class="section-item"> Mode : {receipt.paymentMode || 'N/A'}</div>`;
+    const paymentModeHtml = `<div class="section-item"> Mode : ${receipt.paymentMode || 'N/A'}</div>`;
     const thankYouHtml = `<div class="thank-you center">Thank You!</div>`;
 
     const receiptHTML = `
@@ -251,7 +251,7 @@ export default function EmployeeCollectionReceiptPage() {
             .receipt-print-content .field-value { display: inline !important; font-weight: normal !important;}
             .receipt-print-content h1, .receipt-print-content h2, .receipt-print-content h3, .receipt-print-content h4, .receipt-print-content h5, .receipt-print-content h6, .receipt-print-content p, .receipt-print-content div {
                 margin: 0.5mm 0 !important;
-                font-size: 11pt !important; 
+                font-size: 13pt !important; 
             }
             iframe[id^="webpack-dev-server-client-overlay"],
             iframe[id^="vite-error-overlay"],
@@ -281,7 +281,8 @@ export default function EmployeeCollectionReceiptPage() {
             ${balanceForInstallmentHtml}
             ${paymentModeHtml}
             <hr>
-            ${thankYouHtml}
+            ${thankYouHtml}<br>
+            <hr>
           </div>
         </div>
       </body>

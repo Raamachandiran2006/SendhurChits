@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form"; // Removed FormMessage
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, LocateFixed } from "lucide-react";
@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db, storage } from "@/lib/firebase";
-import { ref as storageRefFB, uploadBytes, getDownloadURL } from "firebase/storage"; // Aliased to avoid conflict
+import { ref as storageRefFB, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc, orderBy, getDoc } from "firebase/firestore";
 import type { Group, User, Employee, CollectionRecord, AuctionRecord } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,6 +24,28 @@ import { useToast } from "@/hooks/use-toast";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import jsPDF from 'jspdf';
+
+const formatCurrency = (amount: number | null | undefined) => {
+  if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
+  return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+};
+
+const formatDateLocal = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
+  if (!dateString) return "N/A";
+  try {
+    const date = new Date(dateString.replace(/-/g, '/'));
+    if (isNaN(date.getTime())) {
+        const isoDate = new Date(dateString);
+        if (isNaN(isoDate.getTime())) return "N/A";
+        return format(isoDate, outputFormat);
+    }
+    return format(date, outputFormat);
+  } catch (e) {
+    console.error("Error formatting date in formatDateLocal:", e, "input:", dateString);
+    return "N/A";
+  }
+};
+
 
 // Helper for time formatting
 const formatTimeTo12Hour = (timeStr?: string): string => {
@@ -53,27 +75,6 @@ const formatTimeTo24HourInput = (timeStr?: string): string => {
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
     }
     return "";
-};
-
-const formatCurrencyLocal = (amount: number | null | undefined) => {
-  if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
-  return `Rs. ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
-
-const formatDateLocal = (dateString: string | undefined | null, outputFormat: string = "dd MMM yyyy") => {
-  if (!dateString) return "N/A";
-  try {
-    const date = new Date(dateString.replace(/-/g, '/'));
-    if (isNaN(date.getTime())) {
-        const isoDate = new Date(dateString);
-        if (isNaN(isoDate.getTime())) return "N/A";
-        return format(isoDate, outputFormat);
-    }
-    return format(date, outputFormat);
-  } catch (e) {
-    console.error("Error formatting date in formatDateLocal:", e, "input:", dateString);
-    return "N/A";
-  }
 };
 
 const NO_AUCTION_SELECTED_VALUE = "no-auction-specific-collection";
@@ -116,23 +117,23 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: [72, 'auto'] 
+      format: [72, 135] 
     });
     let y = 10;
     const lineHeight = 5;
     const margin = 3;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    if (!pageWidth || pageWidth <= 0) {
+    const pageWidth = doc.internal.pageSize.width;
+     if (!pageWidth || pageWidth <= 0) {
         console.error("[PDF Generation] Invalid page width:", pageWidth);
         return null; 
     }
     const centerX = pageWidth / 2;
 
-    doc.setFont('Helvetica-Bold'); // Using Helvetica as a safer default
+    doc.setFont('Helvetica-Bold');
     doc.setFontSize(12);
     doc.text(String(recordData.companyName || "Sendhur Chits"), Number(centerX), Number(y), { align: 'center' }); y += lineHeight * 1.5;
     
-    doc.setFont('Helvetica'); // Using Helvetica
+    doc.setFont('Helvetica');
     doc.setFontSize(12);
     doc.text(`Receipt No: ${recordData.receiptNumber || 'N/A'}`, Number(centerX), Number(y), { align: 'center' }); y += lineHeight;
     doc.text(`Date: ${formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy")} ${recordData.paymentTime || ''}`, Number(centerX), Number(y), { align: 'center' }); y += lineHeight;
@@ -150,19 +151,19 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     };
     
     const printLine = (label: string, value: string | number | null | undefined, yPos: number, isBoldValue: boolean = false): number => {
-        doc.setFont('Helvetica-Bold'); // Using Helvetica
+        doc.setFont('Helvetica-Bold');
         doc.setFontSize(12);
         doc.text(label, Number(margin), Number(yPos));
         const labelWidth = doc.getTextWidth(label);
         
-        doc.setFont(isBoldValue ? 'Helvetica-Bold' : 'Helvetica'); // Using Helvetica
+        doc.setFont(isBoldValue ? 'Helvetica-Bold' : 'Helvetica');
         doc.setFontSize(12);
         return wrapText(String(value || 'N/A'), Number(margin + labelWidth + 2), Number(yPos), Number(66 - labelWidth - 2), Number(lineHeight));
     };
 
     y = printLine("Group:", recordData.groupName || 'N/A', y);
     y = printLine("Name:", recordData.userFullname || 'N/A', y);
-    y = printLine("Chit Scheme Value:", recordData.groupTotalAmount ? formatCurrencyLocal(recordData.groupTotalAmount) : 'N/A', y);
+    y = printLine("Chit Scheme Value:", recordData.groupTotalAmount ? formatCurrency(recordData.groupTotalAmount) : 'N/A', y);
     y = printLine("Chit Date:", recordData.auctionDateForReceipt ? formatDateLocal(recordData.auctionDateForReceipt, "dd-MMM-yyyy") : formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy"), y);
 
 
@@ -170,18 +171,18 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
          y = printLine("Due No.:", recordData.dueNumber, y);
     }
     if (recordData.chitAmount !== null && recordData.chitAmount !== undefined) {
-        y = printLine("Due Amount (This Inst.):", formatCurrencyLocal(recordData.chitAmount), y);
+        y = printLine("Due Amount (This Inst.):", formatCurrency(recordData.chitAmount), y);
     }
      if (recordData.totalPaidForThisDue !== null && recordData.totalPaidForThisDue !== undefined) {
-        y = printLine("Paid Amount (This Inst.):", formatCurrencyLocal(recordData.totalPaidForThisDue), y);
+        y = printLine("Paid Amount (This Inst.):", formatCurrency(recordData.totalPaidForThisDue), y);
     }
-    y = printLine("Bill Amount (This Txn.):", formatCurrencyLocal(recordData.amount), y, true); 
+    y = printLine("Bill Amount (This Txn.):", formatCurrency(recordData.amount), y, true); 
     
     if (recordData.balanceForThisInstallment !== null && recordData.balanceForThisInstallment !== undefined) {
-        y = printLine("Balance (This Inst.):", formatCurrencyLocal(recordData.balanceForThisInstallment), y);
+        y = printLine("Balance (This Inst.):", formatCurrency(recordData.balanceForThisInstallment), y);
     }
     if (recordData.userTotalDueBeforeThisPayment !== null && recordData.userTotalDueBeforeThisPayment !== undefined) {
-        y = printLine("Total Balance:", formatCurrencyLocal(recordData.userTotalDueBeforeThisPayment), y);
+        y = printLine("Total Balance:", formatCurrency(recordData.userTotalDueBeforeThisPayment), y);
     }
     y = printLine("Mode:", recordData.paymentMode || 'N/A', y);
     
@@ -190,7 +191,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     doc.setLineDashPattern([], 0);
     
     y += lineHeight;
-    doc.setFont('Helvetica'); // Using Helvetica
+    doc.setFont('Helvetica');
     doc.setFontSize(12);
     doc.text("Thank You!", Number(centerX), Number(y), { align: 'center' });
     
@@ -234,7 +235,6 @@ async function generateAndUploadReceiptPdf(
     return null;
   }
 }
-
 
 export function RecordCollectionForm() {
   const { toast } = useToast();
@@ -359,32 +359,32 @@ export function RecordCollectionForm() {
     }
   }, [watchedGroupId, groups, setValue, toast]);
 
-  useEffect(() => {
+ useEffect(() => {
     if (preselectedUserIdFromQuery && groupMembers.length > 0 && watchedGroupId) {
-      const userExistsInGroup = groupMembers.some(member => member.id === preselectedUserIdFromQuery);
-      if (userExistsInGroup) {
-        setValue("selectedUserId", preselectedUserIdFromQuery, { shouldValidate: true });
-      } else if (preselectedUserFullnameFromQuery && watchedGroupId) { // Added watchedGroupId check
-          toast({
-              variant: "default",
-              title: "User Not in Selected Group",
-              description: `${preselectedUserFullnameFromQuery} (@${preselectedUserUsernameFromQuery || 'N/A'}) is not a member of the currently selected group. Please select a different group or user.`,
-              duration: 7000,
-          });
-          setValue("selectedUserId", ""); 
-      }
+        const userExistsInGroup = groupMembers.some(member => member.id === preselectedUserIdFromQuery);
+        if (userExistsInGroup) {
+            setValue("selectedUserId", preselectedUserIdFromQuery, { shouldValidate: true });
+        } else if (watchedGroupId && preselectedUserFullnameFromQuery) { // Ensure group is selected before showing toast
+            toast({
+                variant: "default",
+                title: "User Not in Selected Group",
+                description: `${preselectedUserFullnameFromQuery} (@${preselectedUserUsernameFromQuery || 'N/A'}) is not a member of the currently selected group. Please select a different group or user.`,
+                duration: 7000,
+            });
+            setValue("selectedUserId", ""); 
+        }
     } else if (!preselectedUserIdFromQuery && (!watchedGroupId || groupMembers.length === 0) ) {
-      setValue("selectedUserId", "");
+        setValue("selectedUserId", "");
     }
-  }, [
-    preselectedUserIdFromQuery,
-    preselectedUserFullnameFromQuery,
-    preselectedUserUsernameFromQuery,
-    groupMembers,
-    setValue,
-    watchedGroupId, 
+}, [
+    preselectedUserIdFromQuery, 
+    preselectedUserFullnameFromQuery, 
+    preselectedUserUsernameFromQuery, 
+    groupMembers, 
+    watchedGroupId, // Added dependency
+    setValue, 
     toast
-  ]);
+]);
 
 
   const handleFetchLocation = useCallback(() => {
@@ -612,6 +612,7 @@ export function RecordCollectionForm() {
   return (
     <Card className="shadow-xl w-full max-w-2xl mx-auto">
       <CardHeader>
+        {/* Title is on the page itself */}
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -637,7 +638,7 @@ export function RecordCollectionForm() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
+                    {/* <FormMessage /> */}
                   </FormItem>
                 )}
               />
@@ -667,12 +668,12 @@ export function RecordCollectionForm() {
                       <SelectItem value={NO_AUCTION_SELECTED_VALUE}>General Due / Not for Specific Auction</SelectItem>
                       {groupAuctions.map((auction) => (
                         <SelectItem key={auction.id} value={auction.id}>
-                          Auction #{auction.auctionNumber} - {auction.auctionMonth} (Due: {formatCurrencyLocal(auction.finalAmountToBePaid)})
+                          Auction #{auction.auctionNumber} - {auction.auctionMonth} (Due: {formatCurrency(auction.finalAmountToBePaid)})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormMessage />
+                  {/* <FormMessage /> */}
                 </FormItem>
               )}
             />
@@ -698,12 +699,12 @@ export function RecordCollectionForm() {
                     <SelectContent>
                       {groupMembers.map((member) => (
                         <SelectItem key={member.id} value={member.id}>
-                          {member.fullname} (@{member.username}) - Due: {formatCurrencyLocal(member.dueAmount)}
+                          {member.fullname} (@{member.username}) - Due: {formatCurrency(member.dueAmount)}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormMessage />
+                  {/* <FormMessage /> */}
                 </FormItem>
               )}
             />
@@ -728,7 +729,7 @@ export function RecordCollectionForm() {
                         <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
                       </PopoverContent>
                     </Popover>
-                    <FormMessage />
+                    {/* <FormMessage /> */}
                   </FormItem>
                 )}
               />
@@ -745,7 +746,7 @@ export function RecordCollectionForm() {
                         onChange={(e) => field.onChange(e.target.value ? formatTimeTo12Hour(e.target.value) : "")}
                       />
                     </FormControl>
-                    <FormMessage />
+                    {/* <FormMessage /> */}
                   </FormItem>
                 )}
               />
@@ -767,7 +768,7 @@ export function RecordCollectionForm() {
                         <SelectItem value="Partial Payment">Partial Payment</SelectItem>
                         </SelectContent>
                     </Select>
-                    <FormMessage />
+                    {/* <FormMessage /> */}
                     </FormItem>
                 )}
                 />
@@ -787,7 +788,7 @@ export function RecordCollectionForm() {
                         <SelectItem value="Netbanking">Netbanking</SelectItem>
                         </SelectContent>
                     </Select>
-                    <FormMessage />
+                    {/* <FormMessage /> */}
                     </FormItem>
                 )}
                 />
@@ -818,7 +819,7 @@ export function RecordCollectionForm() {
                         />
                     </div>
                   </FormControl>
-                  <FormMessage />
+                  {/* <FormMessage /> */}
                 </FormItem>
               )}
             />
@@ -850,7 +851,7 @@ export function RecordCollectionForm() {
                       {locationError && <Alert variant="destructive"><AlertTitle>Location Error</AlertTitle><AlertDescription>{locationError}</AlertDescription></Alert>}
                     </div>
                   )}
-                  <FormMessage />
+                  {/* <FormMessage /> */}
                 </FormItem>
               )}
             />
@@ -871,7 +872,7 @@ export function RecordCollectionForm() {
                       <SelectItem value="Auction Collection">Auction Collection</SelectItem>
                     </SelectContent>
                   </Select>
-                  <FormMessage />
+                  {/* <FormMessage /> */}
                 </FormItem>
               )}
             />
@@ -886,5 +887,3 @@ export function RecordCollectionForm() {
     </Card>
   );
 }
-
-    
