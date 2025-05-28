@@ -56,7 +56,6 @@ export default function AdminCollectionReceiptPage() {
           if (docSnap.exists()) {
             const collectionData = { id: docSnap.id, ...docSnap.data() } as CollectionRecord;
             
-            // Fetch Group Total Amount
             if (collectionData.groupId) {
               const groupDocRef = doc(db, "groups", collectionData.groupId);
               const groupSnap = await getDoc(groupDocRef);
@@ -65,7 +64,6 @@ export default function AdminCollectionReceiptPage() {
               }
             }
 
-            // Fetch Auction Date for Receipt
             if (collectionData.auctionId) {
               const auctionDocRef = doc(db, "auctionRecords", collectionData.auctionId);
               const auctionSnap = await getDoc(auctionDocRef);
@@ -85,9 +83,7 @@ export default function AdminCollectionReceiptPage() {
             }
             
             let fetchedAmountDueForThisInstallment: number | null = collectionData.chitAmount || null;
-
-            // If chitAmount isn't directly on collectionData, try to get it from auctionRecord
-            if (fetchedAmountDueForThisInstallment === null && collectionData.auctionId) {
+             if (fetchedAmountDueForThisInstallment === null && collectionData.auctionId) {
                 const auctionDocRef = doc(db, "auctionRecords", collectionData.auctionId);
                 const auctionSnap = await getDoc(auctionDocRef);
                 if (auctionSnap.exists()) {
@@ -193,11 +189,12 @@ export default function AdminCollectionReceiptPage() {
               margin: 0;
               size: 72mm auto; 
             }
-            body > *:not(#printable-receipt-area) { display: none !important; visibility: hidden !important; }
+            body * { visibility: hidden !important; display: none !important; }
             #printable-receipt-area, #printable-receipt-area * { display: block !important; visibility: visible !important; }
-            body, html {
+             body, html {
               width: 72mm !important;
               height: auto !important; 
+              min-height: 0 !important;
               margin: 0 !important;
               padding: 0 !important;
               overflow: visible !important; 
@@ -228,6 +225,7 @@ export default function AdminCollectionReceiptPage() {
             .receipt-print-content {
               font-family: 'Times New Roman', Times, serif !important;
               font-size: 11pt !important; 
+              font-weight: normal !important;
               line-height: 1.2 !important;
               color: black !important;
             }
@@ -244,8 +242,7 @@ export default function AdminCollectionReceiptPage() {
               text-overflow: ellipsis;
             }
             .field-label { display: inline !important; font-weight: bold !important; padding-right: 0.5em !important; }
-            .field-value { display: inline !important; font-weight: normal !important; margin-left: 0.5em !important; }
-
+            .field-value { display: inline !important; font-weight: normal !important; }
             .thank-you { font-weight: normal !important; text-align: center !important; margin-top: 0.5mm !important; }
             hr {
               border: none !important;
@@ -304,26 +301,40 @@ export default function AdminCollectionReceiptPage() {
       frameDoc.open();
       frameDoc.write(receiptHTML);
       frameDoc.close();
-      printFrame.contentWindow?.focus(); 
-      printFrame.contentWindow?.print();
+      
+      const attemptPrint = () => {
+        if (printFrame.contentWindow?.document.readyState === 'complete') {
+          printFrame.contentWindow?.focus(); 
+          printFrame.contentWindow?.print();
+          setTimeout(() => {
+            if (document.body.contains(printFrame)) {
+              document.body.removeChild(printFrame);
+            }
+          }, 1000); 
+        } else {
+          setTimeout(attemptPrint, 100);
+        }
+      };
+      attemptPrint();
+    } else {
+      console.error("Could not get iframe document context for printing.");
+      if (document.body.contains(printFrame)) {
+          document.body.removeChild(printFrame);
+      }
     }
-    setTimeout(() => {
-      document.body.removeChild(printFrame);
-    }, 1000); 
   };
 
   const handleDone = () => {
     if (receipt && receipt.userId) {
       router.push(`/admin/users/${receipt.userId}#due-sheet`);
     } else {
-      // Fallback if user ID isn't on receipt, though it should be
       router.push('/admin/collection'); 
     }
   };
 
   if (loading) {
     return (
-      <div id="printable-receipt-area" className="flex min-h-screen flex-col items-center justify-center p-4">
+      <div className="flex min-h-screen flex-col items-center justify-center p-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="mt-2 text-muted-foreground">Loading receipt...</p>
       </div>
@@ -332,7 +343,7 @@ export default function AdminCollectionReceiptPage() {
 
   if (error) {
     return (
-      <div id="printable-receipt-area" className="flex min-h-screen flex-col items-center justify-center p-4 text-center">
+      <div className="flex min-h-screen flex-col items-center justify-center p-4 text-center">
         <p className="text-destructive">{error}</p>
         <Button onClick={() => router.back()} variant="outline" className="mt-4">
           <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
@@ -343,7 +354,7 @@ export default function AdminCollectionReceiptPage() {
 
   if (!receipt) {
     return (
-      <div id="printable-receipt-area" className="flex min-h-screen flex-col items-center justify-center p-4">
+      <div className="flex min-h-screen flex-col items-center justify-center p-4">
         <p>Receipt not found.</p>
          <Button onClick={() => router.back()} variant="outline" className="mt-4">
            <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
@@ -353,8 +364,8 @@ export default function AdminCollectionReceiptPage() {
   }
 
   return (
-    <div id="receipt-content-wrapper" className="flex flex-col items-center justify-start min-h-screen bg-background p-4 print:bg-white print:p-0">
-      <div id="screen-receipt-content" className="w-full max-w-md bg-card p-6 shadow-lg print:hidden print:p-0">
+    <div id="receipt-content-wrapper" className="flex flex-col items-center justify-start min-h-screen bg-background p-4 print:bg-white">
+      <div id="receipt-content" className="w-full max-w-md bg-card p-6 shadow-lg print:hidden">
           <div className="text-center mb-4">
             <h1 className="text-xl font-bold">{receipt.companyName || "SENDHUR CHITS"}</h1>
             <p className="text-sm">Payment Receipt</p>
@@ -366,7 +377,7 @@ export default function AdminCollectionReceiptPage() {
           <div className="text-xs space-y-1 mb-2">
             <p><strong>Group:</strong> {receipt.groupName}</p>
             <p><strong>Name:</strong> {receipt.userFullname}</p>
-            <p><strong>Chit Value:</strong> {receipt.groupTotalAmount ? formatCurrency(receipt.groupTotalAmount) : 'N/A'}</p>
+            <p><strong>Chit Scheme Value:</strong> {receipt.groupTotalAmount ? formatCurrency(receipt.groupTotalAmount) : 'N/A'}</p>
             <p><strong>Chit Date:</strong> {receipt.auctionDateForReceipt ? formatDate(receipt.auctionDateForReceipt) : formatDate(receipt.paymentDate)}</p>
             {receipt.dueNumber ? <p><strong>Due No:</strong> {receipt.dueNumber}</p> : null}
             
@@ -394,3 +405,4 @@ export default function AdminCollectionReceiptPage() {
     </div>
   );
 }
+    
