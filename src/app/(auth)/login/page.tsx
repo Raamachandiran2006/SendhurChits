@@ -30,7 +30,6 @@ export default function LoginPage() {
     );
   }
   
+  // The AuthLayout now handles displaying the logo globally for auth pages
   return <LoginForm />;
 }
-
-    
