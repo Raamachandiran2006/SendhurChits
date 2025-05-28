@@ -61,7 +61,7 @@ export default function EmployeeDueSheetPage() {
   }, [allUsers, searchTerm]);
 
   const handleRowClick = (userId: string) => {
-    router.push(`/employee/users/${userId}`);
+    router.push(`/employee/users/${userId}#due-sheet`); // Appended #due-sheet
   };
 
   return (
