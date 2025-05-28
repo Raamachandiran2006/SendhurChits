@@ -6,7 +6,7 @@ import Image from "next/image"; // Import next/image
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, UserCircle, Shield, Briefcase, Landmark, Wallet, Globe } from "lucide-react"; 
+import { LogOut, UserCircle, Shield, Briefcase, Landmark, Wallet } from "lucide-react"; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,7 +18,6 @@ import {
 import type { User, Employee } from "@/types";
 import { cn } from "@/lib/utils";
 import React from "react";
-import { useLanguage } from "@/contexts/LanguageContext"; // Assuming this might still be used if admin has lang features
 
 const formatCurrency = (amount: number | null | undefined) => {
   if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
@@ -30,24 +29,10 @@ const formatCurrency = (amount: number | null | undefined) => {
 export function AppHeader() {
   const { loggedInEntity, userType, logout } = useAuth();
   
-  // Conditionally use language context only if userType is admin
-  let t: (key: string, params?: Record<string, string | number>) => string = (key) => key; // Default to key
-  let currentLanguage: string | undefined;
-  let setLanguage: ((language: "en" | "ta") => void) | undefined;
-
-  if (userType === 'admin') {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const langContext = useLanguage();
-    if (langContext) {
-      t = langContext.t;
-      currentLanguage = langContext.language;
-      setLanguage = langContext.setLanguage;
-    }
-  }
-  
   if (!loggedInEntity) return null;
 
   const getInitials = (name: string) => {
+    if (!name || name.trim() === "") return "??";
     const names = name.split(' ');
     if (names.length === 1) return names[0][0].toUpperCase();
     return names[0][0].toUpperCase() + names[names.length - 1][0].toUpperCase();
@@ -66,37 +51,17 @@ export function AppHeader() {
            <Image 
             src="/sendhur_chits_header_logo.png" 
             alt="Sendhur Chits Logo"
-            width={133} // Adjusted width for a common header height
-            height={32} // Adjusted height
+            width={133} 
+            height={32} 
             priority
             data-ai-hint="company logo"
           />
         </Link>
         
         <div className="flex items-center gap-2 sm:gap-4">
-          {userType === 'admin' && setLanguage && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="h-9 w-9">
-                  <Globe className="h-4 w-4" />
-                  <span className="sr-only">{t('toggleLanguage', { currentLanguage: currentLanguage === 'en' ? 'English' : 'Tamil' })}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>{t('selectLanguage')}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setLanguage('en')} disabled={currentLanguage === 'en'}>
-                  English
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setLanguage('ta')} disabled={currentLanguage === 'ta'}>
-                  தமிழ் (Tamil)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
           <div className="hidden sm:flex flex-col items-end text-right">
             <span className="text-sm text-foreground">
-              {userType === 'admin' ? t('welcomeUser', {name: entityFullname}) : `Welcome, ${entityFullname}`}
+              Welcome, {entityFullname}
             </span>
             {userType === 'user' && userDueAmount !== undefined && (
               <div className="flex items-center text-xs">
@@ -142,7 +107,7 @@ export function AppHeader() {
                  <DropdownMenuItem asChild>
                    <Link href="/admin" className="flex items-center">
                     <Shield className="mr-2 h-4 w-4" />
-                    {t('adminOverview')}
+                    Admin Overview
                    </Link>
                  </DropdownMenuItem>
               )}
@@ -173,7 +138,7 @@ export function AppHeader() {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive-foreground focus:bg-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
-                {userType === 'admin' ? t('logout') : 'Log out'}
+                Log out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
