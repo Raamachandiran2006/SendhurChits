@@ -51,8 +51,8 @@ export function AppHeader() {
            <Image 
             src="/sendhur_chits_header_logo.png" 
             alt="Sendhur Chits Logo"
-            width={133} 
-            height={32} 
+            width={160} 
+            height={46} 
             priority
             data-ai-hint="company logo"
           />
@@ -64,7 +64,7 @@ export function AppHeader() {
               Welcome, {entityFullname}
             </span>
             {userType === 'user' && userDueAmount !== undefined && (
-              <div className="flex items-center text-xs">
+              <div className="flex items-center text-xs mt-1">
                 <Wallet className="mr-1 h-3 w-3 text-muted-foreground" />
                 <span className={cn(
                     "font-semibold",
