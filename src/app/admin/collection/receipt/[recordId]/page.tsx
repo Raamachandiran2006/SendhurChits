@@ -230,7 +230,6 @@ export default function AdminCollectionReceiptPage() {
               font-size: 11pt !important; 
               line-height: 1.2 !important;
               color: black !important;
-              font-weight: normal !important;
             }
             .center { text-align: center !important; }
             .company-name { font-weight: bold !important; text-align: center !important; margin-bottom: 0.5mm !important; }
