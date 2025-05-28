@@ -190,11 +190,20 @@ export default function AdminCollectionReceiptPage() {
               margin: 0;
               size: 72mm auto; 
             }
-            body * {
+            body, html {
+                width: 72mm !important;
+                height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: visible !important;
+            }
+            body > *:not(#printable-receipt-area) {
+                display: none !important;
                 visibility: hidden !important;
             }
             #printable-receipt-area, #printable-receipt-area * {
                 visibility: visible !important;
+                display: block !important;
             }
             #printable-receipt-area {
                 position: absolute !important;
@@ -219,7 +228,6 @@ export default function AdminCollectionReceiptPage() {
                 line-height: 1.2 !important;
                 color: black !important;
                 box-sizing: border-box !important;
-                font-weight: normal !important;
             }
             .receipt-print-content .center { text-align: center !important; margin-bottom: 0.5mm !important; }
             .receipt-print-content .company-name { font-weight: bold !important; }
@@ -398,4 +406,5 @@ export default function AdminCollectionReceiptPage() {
   );
 }
 
+    
     

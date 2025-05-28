@@ -189,11 +189,20 @@ export default function EmployeeCollectionReceiptPage() {
               margin: 0;
               size: 72mm auto; 
             }
-             body * {
+             body, html {
+                width: 72mm !important;
+                height: auto !important; 
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: visible !important; 
+            }
+            body > *:not(#printable-receipt-area) {
+                display: none !important;
                 visibility: hidden !important;
             }
             #printable-receipt-area, #printable-receipt-area * {
                 visibility: visible !important;
+                display: block !important; 
             }
             #printable-receipt-area {
                 position: absolute !important;
@@ -201,11 +210,11 @@ export default function EmployeeCollectionReceiptPage() {
                 top: 0 !important;
                 width: 72mm !important; 
                 height: auto !important; 
-                min-height: 0 !important;
+                min-height: 0 !important; 
                 margin: 0 !important;
                 padding: 0 !important;
                 background: white !important;
-                overflow: visible !important;
+                overflow: visible !important; 
             }
             #printable-receipt-area .receipt-print-content {
                 width: 100% !important;
@@ -218,7 +227,6 @@ export default function EmployeeCollectionReceiptPage() {
                 line-height: 1.2 !important;
                 color: black !important;
                 box-sizing: border-box !important;
-                font-weight: normal !important;
             }
             .receipt-print-content .center { text-align: center !important; margin-bottom: 0.5mm !important; }
             .receipt-print-content .company-name { font-weight: bold !important; }
@@ -244,7 +252,7 @@ export default function EmployeeCollectionReceiptPage() {
                 margin: 0.5mm 0 !important;
                 font-size: 11pt !important; 
             }
-             iframe[id^="webpack-dev-server-client-overlay"],
+            iframe[id^="webpack-dev-server-client-overlay"],
             iframe[id^="vite-error-overlay"],
             div[id^="vite-plugin-checker-error-overlay"],
             div[class*="firebase-emulator-warning"] {
@@ -396,4 +404,5 @@ export default function EmployeeCollectionReceiptPage() {
   );
 }
 
+    
     
