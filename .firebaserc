@@ -1,6 +1,7 @@
 {
   "projects": {
-    "chit": "chit-210c0"
+    "chit": "chit-210c0",
+    "default": "chit-210c0"
   },
   "targets": {},
   "etags": {}

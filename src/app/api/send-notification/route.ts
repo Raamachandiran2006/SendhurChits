@@ -8,6 +8,7 @@ export async function POST(request: NextRequest) {
     const { toPhoneNumber, userName, amount, receiptNumber, collectionLocation, paymentDate, paymentTime } = body;
 
     if (!toPhoneNumber || !userName || amount === undefined || !receiptNumber) {
+      console.error('[API/send-notification] Missing required fields:', body);
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -15,24 +16,31 @@ export async function POST(request: NextRequest) {
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
     const twilioWhatsAppFromNumber = process.env.TWILIO_WHATSAPP_FROM_NUMBER;
-    const defaultCountryCode = process.env.DEFAULT_COUNTRY_CODE || '+91'; // Default to India if not set
+    const defaultCountryCode = process.env.DEFAULT_COUNTRY_CODE || '+91';
 
     if (!accountSid || !authToken || !twilioPhoneNumber || !twilioWhatsAppFromNumber) {
-      console.error('Twilio credentials or numbers are not configured in environment variables.');
+      console.error('[API/send-notification] Twilio credentials or numbers are not configured in environment variables.');
       return NextResponse.json({ success: false, error: 'Twilio configuration missing on server' }, { status: 500 });
     }
 
     const client = twilio(accountSid, authToken);
-    const formattedToPhoneNumber = defaultCountryCode + toPhoneNumber; // Assuming toPhoneNumber is 10 digits
+    
+    // Ensure toPhoneNumber is just the 10 digits if defaultCountryCode is used.
+    // If toPhoneNumber already includes country code, adjust accordingly.
+    const formattedToPhoneNumber = defaultCountryCode + toPhoneNumber.replace(/^\+?91/, ''); // Example: remove +91 if present before adding default
 
     const formattedAmount = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
-    const collectionDateTime = `${paymentDate} ${paymentTime}`;
+    const collectionDateTime = `${paymentDate} ${paymentTime || ''}`;
     
     let messageBody = `Dear ${userName},\n\nCollection Recorded:\nAmount: ${formattedAmount}\nReceipt No: ${receiptNumber}\nDate: ${collectionDateTime}\n`;
-    if (collectionLocation && collectionLocation !== "Office") {
+    if (collectionLocation && collectionLocation !== "Office" && !collectionLocation.startsWith("http")) {
       messageBody += `Location: ${collectionLocation}\n`;
+    } else if (collectionLocation && collectionLocation.startsWith("http")) {
+      messageBody += `Location: View on Map\n`; // Keep it generic for SMS/WhatsApp if it's a URL
     }
     messageBody += `\nThank you,\nSendhur Chits`;
+
+    console.log(`[API/send-notification] Attempting to send to ${formattedToPhoneNumber}. Message: ${messageBody}`);
 
     let smsSent = false;
     let whatsappSent = false;
@@ -41,30 +49,30 @@ export async function POST(request: NextRequest) {
 
     // Send SMS
     try {
-      await client.messages.create({
+      const smsResponse = await client.messages.create({
         body: messageBody,
         from: twilioPhoneNumber,
         to: formattedToPhoneNumber,
       });
       smsSent = true;
-      console.log(`SMS sent successfully to ${formattedToPhoneNumber}`);
+      console.log(`[API/send-notification] SMS sent successfully to ${formattedToPhoneNumber}. SID: ${smsResponse.sid}`);
     } catch (error: any) {
       smsError = error.message;
-      console.error(`Error sending SMS to ${formattedToPhoneNumber}:`, error.message);
+      console.error(`[API/send-notification] Error sending SMS to ${formattedToPhoneNumber}:`, error);
     }
 
     // Send WhatsApp message
     try {
-      await client.messages.create({
+      const whatsappResponse = await client.messages.create({
         body: messageBody,
         from: twilioWhatsAppFromNumber, // e.g., 'whatsapp:+14155238886'
         to: `whatsapp:${formattedToPhoneNumber}`,
       });
       whatsappSent = true;
-      console.log(`WhatsApp message sent successfully to whatsapp:${formattedToPhoneNumber}`);
+      console.log(`[API/send-notification] WhatsApp message sent successfully to whatsapp:${formattedToPhoneNumber}. SID: ${whatsappResponse.sid}`);
     } catch (error: any) {
       whatsappError = error.message;
-      console.error(`Error sending WhatsApp message to whatsapp:${formattedToPhoneNumber}:`, error.message);
+      console.error(`[API/send-notification] Error sending WhatsApp message to whatsapp:${formattedToPhoneNumber}:`, error);
     }
 
     if (smsSent || whatsappSent) {
@@ -84,7 +92,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error: any) {
-    console.error('Error in send-notification API route:', error);
+    console.error('[API/send-notification] Error in send-notification API route:', error);
     return NextResponse.json({ success: false, error: 'Internal server error', details: error.message }, { status: 500 });
   }
 }
