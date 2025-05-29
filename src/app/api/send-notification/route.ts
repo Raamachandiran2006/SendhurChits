@@ -4,14 +4,6 @@ import twilio from 'twilio';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { toPhoneNumber, userName, amount, receiptNumber, collectionLocation, paymentDate, paymentTime } = body;
-
-    if (!toPhoneNumber || !userName || amount === undefined || !receiptNumber) {
-      console.error('[API/send-notification] Missing required fields:', body);
-      return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
-    }
-
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
@@ -19,15 +11,21 @@ export async function POST(request: NextRequest) {
     const defaultCountryCode = process.env.DEFAULT_COUNTRY_CODE || '+91';
 
     if (!accountSid || !authToken || !twilioPhoneNumber || !twilioWhatsAppFromNumber) {
-      console.error('[API/send-notification] Twilio credentials or numbers are not configured in environment variables.');
-      return NextResponse.json({ success: false, error: 'Twilio configuration missing on server' }, { status: 500 });
+      console.error('[API/send-notification] Critical Error: Twilio environment variables are not configured correctly. Please check TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, and TWILIO_WHATSAPP_FROM_NUMBER.');
+      return NextResponse.json({ success: false, error: 'Twilio configuration missing on server. Please contact administrator.' }, { status: 500 });
+    }
+
+    const body = await request.json();
+    const { toPhoneNumber, userName, amount, receiptNumber, collectionLocation, paymentDate, paymentTime } = body;
+
+    if (!toPhoneNumber || !userName || amount === undefined || !receiptNumber) {
+      console.error('[API/send-notification] Missing required fields in request body:', body);
+      return NextResponse.json({ success: false, error: 'Missing required fields in request body' }, { status: 400 });
     }
 
     const client = twilio(accountSid, authToken);
     
-    // Ensure toPhoneNumber is just the 10 digits if defaultCountryCode is used.
-    // If toPhoneNumber already includes country code, adjust accordingly.
-    const formattedToPhoneNumber = defaultCountryCode + toPhoneNumber.replace(/^\+?91/, ''); // Example: remove +91 if present before adding default
+    const formattedToPhoneNumber = defaultCountryCode + toPhoneNumber.replace(/^\+?91/, ''); 
 
     const formattedAmount = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
     const collectionDateTime = `${paymentDate} ${paymentTime || ''}`;
@@ -36,7 +34,7 @@ export async function POST(request: NextRequest) {
     if (collectionLocation && collectionLocation !== "Office" && !collectionLocation.startsWith("http")) {
       messageBody += `Location: ${collectionLocation}\n`;
     } else if (collectionLocation && collectionLocation.startsWith("http")) {
-      messageBody += `Location: View on Map\n`; // Keep it generic for SMS/WhatsApp if it's a URL
+      messageBody += `Location: View on Map\n`;
     }
     messageBody += `\nThank you,\nSendhur Chits`;
 
@@ -65,7 +63,7 @@ export async function POST(request: NextRequest) {
     try {
       const whatsappResponse = await client.messages.create({
         body: messageBody,
-        from: twilioWhatsAppFromNumber, // e.g., 'whatsapp:+14155238886'
+        from: twilioWhatsAppFromNumber,
         to: `whatsapp:${formattedToPhoneNumber}`,
       });
       whatsappSent = true;
@@ -92,7 +90,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error: any) {
-    console.error('[API/send-notification] Error in send-notification API route:', error);
-    return NextResponse.json({ success: false, error: 'Internal server error', details: error.message }, { status: 500 });
+    console.error('[API/send-notification] General error in send-notification API route:', error);
+    return NextResponse.json({ success: false, error: 'Internal server error on notification API.', details: error.message }, { status: 500 });
   }
 }
