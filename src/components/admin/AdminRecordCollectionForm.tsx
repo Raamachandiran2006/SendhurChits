@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form"; // Removed FormMessage
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, LocateFixed } from "lucide-react";
@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { db, storage } from "@/lib/firebase";
-import { ref as storageRefFB, uploadBytes, getDownloadURL } from "firebase/storage"; 
+import { ref as storageRefFB, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, runTransaction, doc, orderBy, getDoc } from "firebase/firestore";
 import type { Group, User, Admin, CollectionRecord, AuctionRecord } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -86,7 +86,7 @@ const recordCollectionFormSchema = z.object({
   paymentType: z.enum(["Full Payment", "Partial Payment"], { required_error: "Payment type is required." }),
   paymentMode: z.enum(["Cash", "UPI", "Netbanking"], { required_error: "Payment mode is required." }),
   amount: z.coerce.number().int("Amount must be a whole number.").positive("Amount must be a positive number."),
-  collectionLocationOption: z.enum(["User Location"], { required_error: "Collection location must be User Location."}),
+  collectionLocationOption: z.literal("User Location", { errorMap: () => ({ message: "Collection location is fixed to User Location." }) }),
   remarks: z.string().optional(),
 });
 
@@ -115,50 +115,47 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: [72, 'auto'] 
+      format: [72, 135]
     });
     let y = 10;
-    const lineHeight = 5; 
-    const margin = 3; 
+    const lineHeight = 5;
+    const margin = 3;
     const pageWidth = doc.internal.pageSize.width;
     if (!pageWidth || pageWidth <= 0) {
         console.error("[PDF Generation] Invalid page width:", pageWidth);
-        return null; 
+        return null;
     }
     const centerX = pageWidth / 2;
 
-    doc.setFont('Helvetica-Bold'); 
-    doc.setFontSize(12); 
+    doc.setFont('Helvetica-Bold');
+    doc.setFontSize(12);
     doc.text(String(recordData.companyName || "Sendhur Chits"), Number(centerX), Number(y), { align: 'center' }); y += lineHeight * 1.5;
-    
-    doc.setFont('Helvetica');  
-    doc.setFontSize(10); 
+
+    doc.setFont('Helvetica');
+    doc.setFontSize(12);
     doc.text(`Receipt No: ${recordData.receiptNumber || 'N/A'}`, Number(centerX), Number(y), { align: 'center' }); y += lineHeight;
     doc.text(`Date: ${formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy")} ${recordData.paymentTime || ''}`, Number(centerX), Number(y), { align: 'center' }); y += lineHeight;
-    
-    doc.setLineDashPattern([1, 1], 0); 
-    doc.line(Number(margin), Number(y), Number(pageWidth - margin), Number(y)); y += lineHeight * 0.5; 
-    doc.setLineDashPattern([], 0); 
-    
+
+    doc.setLineDashPattern([1, 1], 0);
+    doc.line(Number(margin), Number(y), Number(pageWidth - margin), Number(y)); y += lineHeight * 0.5;
+    doc.setLineDashPattern([], 0);
+
     y += lineHeight * 0.5;
-    
-    const wrapText = (text: string, x: number, yPos: number, maxWidth: number, lHeight: number): number => {
-        const lines = doc.splitTextToSize(text, maxWidth);
-        doc.text(lines, Number(x), Number(yPos));
-        return yPos + (lines.length * lHeight);
-    };
 
     const printLine = (label: string, value: string | number | null | undefined, yPos: number, isBoldValue: boolean = false): number => {
-        doc.setFont('Helvetica-Bold'); 
-        doc.setFontSize(10);
+        doc.setFont('Helvetica-Bold');
+        doc.setFontSize(12);
         doc.text(label, Number(margin), Number(yPos));
         const labelWidth = doc.getTextWidth(label);
-        
-        doc.setFont(isBoldValue ? 'Helvetica-Bold' : 'Helvetica'); 
-        doc.setFontSize(10);
-        return wrapText(String(value || 'N/A'), Number(margin + labelWidth + 2), Number(yPos), Number(66 - labelWidth - 2), Number(lineHeight));
+
+        doc.setFont(isBoldValue ? 'Helvetica-Bold' : 'Helvetica');
+        doc.setFontSize(12);
+        const textToPrint = String(value || 'N/A');
+        const lines = doc.splitTextToSize(textToPrint, pageWidth - (margin + labelWidth + 2 + margin) );
+        doc.text(lines, Number(margin + labelWidth + 2), Number(yPos));
+        return yPos + (lines.length * lineHeight);
     };
-    
+
     y = printLine("Group:", recordData.groupName || 'N/A', y);
     y = printLine("Name:", recordData.userFullname || 'N/A', y);
     y = printLine("Chit Scheme Value:", recordData.groupTotalAmount ? formatCurrencyLocal(recordData.groupTotalAmount) : 'N/A', y);
@@ -173,8 +170,8 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
      if (recordData.totalPaidForThisDue !== null && recordData.totalPaidForThisDue !== undefined) {
         y = printLine("Paid Amount (This Inst.):", formatCurrencyLocal(recordData.totalPaidForThisDue), y);
     }
-    y = printLine("Bill Amount (This Txn.):", formatCurrencyLocal(recordData.amount), y, true); 
-    
+    y = printLine("Bill Amount (This Txn.):", formatCurrencyLocal(recordData.amount), y, true);
+
     if (recordData.balanceForThisInstallment !== null && recordData.balanceForThisInstallment !== undefined) {
         y = printLine("Balance (This Inst.):", formatCurrencyLocal(recordData.balanceForThisInstallment), y);
     }
@@ -182,16 +179,16 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
         y = printLine("User Total Balance (Overall):", formatCurrencyLocal(recordData.userTotalDueBeforeThisPayment), y);
     }
     y = printLine("Mode:", recordData.paymentMode || 'N/A', y);
-    
+
     doc.setLineDashPattern([1, 1], 0);
     doc.line(Number(margin), Number(y), Number(pageWidth - margin), Number(y)); y += lineHeight * 0.5;
     doc.setLineDashPattern([], 0);
-    
+
     y += lineHeight;
-    doc.setFont('Helvetica'); 
-    doc.setFontSize(10);
+    doc.setFont('Helvetica');
+    doc.setFontSize(12);
     doc.text("Thank You!", Number(centerX), Number(y), { align: 'center' });
-    
+
     return doc.output('blob');
   } catch (pdfError) {
     console.error("[PDF Generation] Admin: Error generating PDF blob:", pdfError);
@@ -237,7 +234,7 @@ export function AdminRecordCollectionForm() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { loggedInEntity } = useAuth(); 
+  const { loggedInEntity } = useAuth();
   const admin = loggedInEntity as Admin | null;
 
   const preselectedUserIdFromQuery = searchParams.get("userId");
@@ -247,7 +244,7 @@ export function AdminRecordCollectionForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
-  
+
   const [selectedGroupObject, setSelectedGroupObject] = useState<Group | null>(null);
   const [groupAuctions, setGroupAuctions] = useState<AuctionRecord[]>([]);
   const [loadingAuctions, setLoadingAuctions] = useState(false);
@@ -270,7 +267,7 @@ export function AdminRecordCollectionForm() {
       paymentType: undefined,
       paymentMode: undefined,
       amount: undefined,
-      collectionLocationOption: "User Location", 
+      collectionLocationOption: "User Location",
       remarks: "Auction Collection",
     },
   });
@@ -302,7 +299,7 @@ export function AdminRecordCollectionForm() {
       setGroupMembers([]);
       setGroupAuctions([]);
       setValue("selectedUserId", "");
-      setValue("selectedAuctionId", ""); 
+      setValue("selectedAuctionId", "");
       return;
     }
 
@@ -399,10 +396,11 @@ export function AdminRecordCollectionForm() {
     } else {
       setLocationError("Geolocation is not supported by this browser.");
     }
-  },[]); 
+  },[]);
 
   useEffect(() => {
-    if (watchedCollectionLocationOption === "User Location") { 
+    // Since "User Location" is the only option and default, fetch on mount or when option re-asserts.
+    if (watchedCollectionLocationOption === "User Location") {
       handleFetchLocation();
     } else {
       setCurrentLocationDisplay(null);
@@ -432,14 +430,14 @@ export function AdminRecordCollectionForm() {
       setIsSubmitting(false);
       return;
     }
-    
+
     const selectedAuction = groupAuctions.find(a => a.id === values.selectedAuctionId);
-    if (!selectedAuction) { 
+    if (!selectedAuction) {
       toast({ title: "Error", description: "Selected auction not found or is invalid.", variant: "destructive" });
       setIsSubmitting(false);
       return;
     }
-    
+
     let newReceiptNumber = "";
     let receiptPdfDownloadUrl: string | null = null;
     let newCollectionRecordId = "";
@@ -458,12 +456,12 @@ export function AdminRecordCollectionForm() {
 
         let chitAmountForDue: number | null = null;
         let dueNumberForRecord: number | null = null;
-        
+
         if (selectedAuction && selectedAuction.finalAmountToBePaid !== null && selectedAuction.finalAmountToBePaid !== undefined) {
             chitAmountForDue = selectedAuction.finalAmountToBePaid;
             dueNumberForRecord = selectedAuction.auctionNumber || null;
         } else if (selectedGroup && selectedGroup.rate !== null && selectedGroup.rate !== undefined) {
-            chitAmountForDue = selectedGroup.rate; 
+            chitAmountForDue = selectedGroup.rate;
         }
         console.log("Calculated chitAmountForDue:", chitAmountForDue, "dueNumberForRecord:", dueNumberForRecord);
 
@@ -473,7 +471,7 @@ export function AdminRecordCollectionForm() {
         }
         console.log("Calculated balanceAmountAfterPayment:", balanceAmountAfterPayment);
 
-        const collectionLocationToStore = currentLocationValue; 
+        const collectionLocationToStore = currentLocationValue;
         const virtualId = generate7DigitRandomNumber();
 
         const userDocRefForDueRead = doc(db, "users", selectedUser.id);
@@ -485,7 +483,7 @@ export function AdminRecordCollectionForm() {
           throw new Error("User document not found when trying to read current due amount.");
         }
         console.log("Fetched userTotalDueBeforeThisPayment:", userDueBeforePayment);
-        
+
         if (selectedUser.id && selectedGroup.id && dueNumberForRecord !== null) {
             const collectionsForDueQuery = query(
             collection(db, "collectionRecords"),
@@ -498,7 +496,7 @@ export function AdminRecordCollectionForm() {
             collectionsForDueSnapshot.forEach(snap => {
             sumPaidForDueAlready += (snap.data() as CollectionRecord).amount || 0;
             });
-            totalPaidForThisSpecificDue = sumPaidForDueAlready + values.amount; 
+            totalPaidForThisSpecificDue = sumPaidForDueAlready + values.amount;
             if(chitAmountForDue !== null) {
               balanceForThisSpecificInstallment = chitAmountForDue - totalPaidForThisSpecificDue;
             }
@@ -523,15 +521,15 @@ export function AdminRecordCollectionForm() {
             chitAmount: chitAmountForDue,
             amount: values.amount,
             userTotalDueBeforeThisPayment: userDueBeforePayment,
-            balanceAmount: balanceAmountAfterPayment, 
-            totalPaidForThisDue: totalPaidForThisSpecificDue, 
-            balanceForThisInstallment: balanceForThisSpecificInstallment, 
+            balanceAmount: balanceAmountAfterPayment,
+            totalPaidForThisDue: totalPaidForThisSpecificDue,
+            balanceForThisInstallment: balanceForThisSpecificInstallment,
             paymentMode: values.paymentMode,
             remarks: values.remarks || "Auction Collection",
             virtualTransactionId: virtualId,
         };
         console.log("[Admin Collection Form] Data prepared for PDF generation (tempRecordDataForPdf):", tempRecordDataForPdf);
-        
+
         receiptPdfDownloadUrl = await generateAndUploadReceiptPdf(
             tempRecordDataForPdf,
             selectedGroup.id,
@@ -550,7 +548,7 @@ export function AdminRecordCollectionForm() {
             userUsername: selectedUser.username,
             userFullname: selectedUser.fullname,
             paymentDate: format(values.paymentDate, "yyyy-MM-dd"),
-            paymentTime: values.paymentTime, 
+            paymentTime: values.paymentTime,
             paymentType: values.paymentType,
             paymentMode: values.paymentMode,
             amount: values.amount,
@@ -562,8 +560,8 @@ export function AdminRecordCollectionForm() {
             balanceForThisInstallment: balanceForThisSpecificInstallment,
             remarks: values.remarks || "Auction Collection",
             collectionLocation: collectionLocationToStore,
-            recordedByEmployeeId: admin.id, 
-            recordedByEmployeeName: `Admin: ${admin.fullname}`, 
+            recordedByEmployeeId: admin.id,
+            recordedByEmployeeName: `Admin: ${admin.fullname}`,
             virtualTransactionId: virtualId,
             receiptPdfUrl: receiptPdfDownloadUrl,
         };
@@ -576,22 +574,22 @@ export function AdminRecordCollectionForm() {
             transaction.update(userDocRef, { dueAmount: newDueAmount });
             console.log(`[Admin Collection Form] Updated user ${selectedUser.username} due amount from ${currentDueAmount} to ${newDueAmount}`);
 
-            const collectionRecordRef = doc(collection(db, "collectionRecords")); 
-            newCollectionRecordId = collectionRecordRef.id; 
+            const collectionRecordRef = doc(collection(db, "collectionRecords"));
+            newCollectionRecordId = collectionRecordRef.id;
             transaction.set(collectionRecordRef, {
                 ...finalCollectionRecordData,
                 recordedAt: serverTimestamp() as Timestamp,
             });
             console.log("[Admin Collection Form] Collection record set in transaction, newCollectionRecordId:", newCollectionRecordId);
         });
-        
+
         if (!newCollectionRecordId) {
             console.error("[Admin Collection Form] Failed to obtain new collection record ID for redirection.");
             throw new Error("Failed to obtain new collection record ID for redirection.");
         }
 
         toast({ title: "Collection Recorded", description: `Payment from ${selectedUser.fullname} recorded. ${receiptPdfDownloadUrl ? 'Receipt PDF generated.' : 'Receipt PDF generation failed.'}` });
-        
+
         router.push(`/admin/collection/receipt/${newCollectionRecordId}`);
     } catch (error) {
       console.error("[Admin Collection Form] Error recording collection in onSubmit:", error);
@@ -629,7 +627,7 @@ export function AdminRecordCollectionForm() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
+                    {/* FormMessage removed */}
                   </FormItem>
                 )}
               />
@@ -645,9 +643,9 @@ export function AdminRecordCollectionForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Auction Number</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    value={field.value} 
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
                     disabled={!watchedGroupId || loadingAuctions}
                   >
                     <FormControl>
@@ -663,7 +661,7 @@ export function AdminRecordCollectionForm() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormMessage />
+                  {/* FormMessage removed */}
                 </FormItem>
               )}
             />
@@ -677,12 +675,12 @@ export function AdminRecordCollectionForm() {
                   <Select onValueChange={field.onChange} value={field.value} disabled={!watchedGroupId || loadingMembers}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue 
+                        <SelectValue
                           placeholder={
-                            preselectedUserFullnameFromQuery && preselectedUserUsernameFromQuery ? 
+                            preselectedUserFullnameFromQuery && preselectedUserUsernameFromQuery ?
                             `${preselectedUserFullnameFromQuery} (@${preselectedUserUsernameFromQuery})` :
                             (!watchedGroupId ? "Select group first" : (loadingMembers ? "Loading members..." : "Select a user"))
-                          } 
+                          }
                         />
                       </SelectTrigger>
                     </FormControl>
@@ -694,11 +692,11 @@ export function AdminRecordCollectionForm() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormMessage />
+                  {/* FormMessage removed */}
                 </FormItem>
               )}
             />
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
@@ -719,7 +717,7 @@ export function AdminRecordCollectionForm() {
                         <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
                       </PopoverContent>
                     </Popover>
-                    <FormMessage />
+                    {/* FormMessage removed */}
                   </FormItem>
                 )}
               />
@@ -736,7 +734,7 @@ export function AdminRecordCollectionForm() {
                         onChange={(e) => field.onChange(e.target.value ? formatTimeTo12Hour(e.target.value) : "")}
                       />
                     </FormControl>
-                    <FormMessage />
+                    {/* FormMessage removed */}
                   </FormItem>
                 )}
               />
@@ -758,7 +756,7 @@ export function AdminRecordCollectionForm() {
                         <SelectItem value="Partial Payment">Partial Payment</SelectItem>
                         </SelectContent>
                     </Select>
-                    <FormMessage />
+                    {/* FormMessage removed */}
                     </FormItem>
                 )}
                 />
@@ -778,7 +776,7 @@ export function AdminRecordCollectionForm() {
                         <SelectItem value="Netbanking">Netbanking</SelectItem>
                         </SelectContent>
                     </Select>
-                    <FormMessage />
+                    {/* FormMessage removed */}
                     </FormItem>
                 )}
                 />
@@ -794,7 +792,7 @@ export function AdminRecordCollectionForm() {
                     <div className="flex items-center gap-2">
                         <DollarSign className="h-5 w-5 text-muted-foreground" />
                         <Input
-                        type="text" 
+                        type="text"
                         placeholder="e.g., 10000"
                         value={field.value === undefined ? "" : String(field.value)}
                         onChange={e => {
@@ -809,7 +807,7 @@ export function AdminRecordCollectionForm() {
                         />
                     </div>
                   </FormControl>
-                  <FormMessage />
+                  {/* FormMessage removed */}
                 </FormItem>
               )}
             />
@@ -840,7 +838,7 @@ export function AdminRecordCollectionForm() {
                       {locationError && <Alert variant="destructive"><AlertTitle>Location Error</AlertTitle><AlertDescription>{locationError}</AlertDescription></Alert>}
                     </div>
                   )}
-                  <FormMessage />
+                  {/* FormMessage removed */}
                 </FormItem>
               )}
             />
@@ -861,11 +859,11 @@ export function AdminRecordCollectionForm() {
                       <SelectItem value="Auction Collection">Auction Collection</SelectItem>
                     </SelectContent>
                   </Select>
-                  <FormMessage />
+                  {/* FormMessage removed */}
                 </FormItem>
               )}
             />
-            
+
             <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" disabled={isSubmitting || isFetchingLocation}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Record Collection
