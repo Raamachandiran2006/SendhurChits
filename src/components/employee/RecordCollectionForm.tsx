@@ -75,18 +75,17 @@ const formatTimeTo24HourInput = (timeStr?: string): string => {
     return "";
 };
 
-const NO_AUCTION_SELECTED_VALUE = "no-auction-specific-collection";
 
 const recordCollectionFormSchema = z.object({
   selectedGroupId: z.string().min(1, "Please select a Group."),
-  selectedAuctionId: z.string().optional(),
+  selectedAuctionId: z.string().min(1, "Auction number is required."), // Made compulsory
   selectedUserId: z.string().min(1, "Please select a User."),
   paymentDate: z.date({ required_error: "Payment date is required." }),
   paymentTime: z.string().min(1, "Payment time is required."),
   paymentType: z.enum(["Full Payment", "Partial Payment"], { required_error: "Payment type is required." }),
   paymentMode: z.enum(["Cash", "UPI", "Netbanking"], { required_error: "Payment mode is required." }),
   amount: z.coerce.number().int("Amount must be a whole number.").positive("Amount must be a positive number."),
-  collectionLocationOption: z.enum(["Office", "Your Location"], { required_error: "Collection location option is required."}),
+  collectionLocationOption: z.literal("User Location", { errorMap: () => ({ message: "Collection location is fixed to User Location." }) }),
   remarks: z.string().optional(),
 });
 
@@ -115,11 +114,11 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: [72, 'auto'] 
+      format: [72, 135] 
     });
     let y = 10;
-    const lineHeight = 5;
-    const margin = 3;
+    const lineHeight = 5; 
+    const margin = 3; 
     const pageWidth = doc.internal.pageSize.width;
      if (!pageWidth || pageWidth <= 0) {
         console.error("[PDF Generation] Invalid page width:", pageWidth);
@@ -128,37 +127,32 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     const centerX = pageWidth / 2;
 
     doc.setFont('Helvetica-Bold');
-    doc.setFontSize(12);
+    doc.setFontSize(11); 
     doc.text(String(recordData.companyName || "Sendhur Chits"), Number(centerX), Number(y), { align: 'center' }); y += lineHeight * 1.5;
     
     doc.setFont('Helvetica');
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.text(`Receipt No: ${recordData.receiptNumber || 'N/A'}`, Number(centerX), Number(y), { align: 'center' }); y += lineHeight;
     doc.text(`Date: ${formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy")} ${recordData.paymentTime || ''}`, Number(centerX), Number(y), { align: 'center' }); y += lineHeight;
     
-    doc.setLineDashPattern([1, 1], 0);
-    doc.line(Number(margin), Number(y), Number(pageWidth - margin), Number(y)); y += lineHeight * 0.5;
-    doc.setLineDashPattern([], 0);
+    doc.setLineDashPattern([1, 1], 0); 
+    doc.line(Number(margin), Number(y), Number(pageWidth - margin), Number(y)); y += lineHeight * 0.5; 
+    doc.setLineDashPattern([], 0); 
     
     y += lineHeight * 0.5;
     
-    const wrapText = (text: string, x: number, yPos: number, maxWidth: number, lHeight: number): number => {
-        const lines = doc.splitTextToSize(text, maxWidth);
-        doc.text(lines, Number(x), Number(yPos));
-        return yPos + (lines.length * lHeight);
-    };
-    
     const printLine = (label: string, value: string | number | null | undefined, yPos: number, isBoldValue: boolean = false): number => {
-        doc.setFont('Helvetica-Bold');
-        doc.setFontSize(10);
+        doc.setFont('Helvetica-Bold'); 
+        doc.setFontSize(11);
         doc.text(label, Number(margin), Number(yPos));
         const labelWidth = doc.getTextWidth(label);
         
-        doc.setFont(isBoldValue ? 'Helvetica-Bold' : 'Helvetica');
-        doc.setFontSize(10);
-        return wrapText(String(value || 'N/A'), Number(margin + labelWidth + 2), Number(yPos), Number(66 - labelWidth - 2), Number(lineHeight));
+        doc.setFont(isBoldValue ? 'Helvetica-Bold' : 'Helvetica'); 
+        doc.setFontSize(11);
+        doc.text(String(value || 'N/A'), Number(margin + labelWidth + 2), Number(yPos));
+        return yPos + lineHeight;
     };
-
+    
     y = printLine("Group:", recordData.groupName || 'N/A', y);
     y = printLine("Name:", recordData.userFullname || 'N/A', y);
     y = printLine("Chit Scheme Value:", recordData.groupTotalAmount ? formatCurrency(recordData.groupTotalAmount) : 'N/A', y);
@@ -189,8 +183,8 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     doc.setLineDashPattern([], 0);
     
     y += lineHeight;
-    doc.setFont('Helvetica');
-    doc.setFontSize(10);
+    doc.setFont('Helvetica'); 
+    doc.setFontSize(11);
     doc.text("Thank You!", Number(centerX), Number(y), { align: 'center' });
     
     return doc.output('blob');
@@ -264,21 +258,21 @@ export function RecordCollectionForm() {
     resolver: zodResolver(recordCollectionFormSchema),
     defaultValues: {
       selectedGroupId: "",
-      selectedAuctionId: undefined,
+      selectedAuctionId: "", // Changed from undefined
       selectedUserId: "",
       paymentDate: new Date(),
       paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
       paymentType: undefined,
       paymentMode: undefined,
       amount: undefined,
-      collectionLocationOption: undefined,
+      collectionLocationOption: "User Location",
       remarks: "Auction Collection",
     },
   });
 
   const { watch, setValue, reset } = form;
   const watchedGroupId = watch("selectedGroupId");
-  const watchedCollectionLocationOption = watch("collectionLocationOption");
+  const watchedCollectionLocationOption = watch("collectionLocationOption"); // This will always be "User Location" due to defaults and schema
 
   useEffect(() => {
     const fetchGroups = async () => {
@@ -303,7 +297,7 @@ export function RecordCollectionForm() {
       setGroupMembers([]);
       setGroupAuctions([]);
       setValue("selectedUserId", "");
-      setValue("selectedAuctionId", undefined);
+      setValue("selectedAuctionId", ""); // Reset to empty string for required field
       return;
     }
 
@@ -408,15 +402,10 @@ export function RecordCollectionForm() {
     }
   }, []);
 
+  // Automatically fetch location since "User Location" is the only option
   useEffect(() => {
-    if (watchedCollectionLocationOption === "Your Location") {
-      handleFetchLocation();
-    } else {
-      setCurrentLocationDisplay(null);
-      setCurrentLocationValue(null);
-      setLocationError(null);
-    }
-  }, [watchedCollectionLocationOption, handleFetchLocation]);
+    handleFetchLocation();
+  }, [handleFetchLocation]);
 
 
   async function onSubmit(values: RecordCollectionFormValues) {
@@ -424,8 +413,8 @@ export function RecordCollectionForm() {
       toast({ title: "Error", description: "Employee details not found. Please re-login.", variant: "destructive" });
       return;
     }
-    if (values.collectionLocationOption === "Your Location" && !currentLocationValue) {
-        toast({ title: "Location Required", description: "Please fetch your location or select 'Office'.", variant: "destructive" });
+    if (!currentLocationValue) { // Since "User Location" is fixed, this must be present
+        toast({ title: "Location Required", description: "Please fetch your location.", variant: "destructive" });
         return;
     }
 
@@ -453,9 +442,12 @@ export function RecordCollectionForm() {
       if (!newReceiptNumber) throw new Error("Failed to generate unique receipt number.");
       console.log("[Emp Collection Form] Generated Receipt Number:", newReceiptNumber);
 
-      const selectedAuction = values.selectedAuctionId && values.selectedAuctionId !== NO_AUCTION_SELECTED_VALUE
-                              ? groupAuctions.find(a => a.id === values.selectedAuctionId)
-                              : null;
+      const selectedAuction = groupAuctions.find(a => a.id === values.selectedAuctionId); // Auction is now compulsory
+      if (!selectedAuction) { // Add this check
+        toast({ title: "Error", description: "Selected auction not found or is invalid.", variant: "destructive" });
+        setIsSubmitting(false);
+        return;
+      }
       console.log("[Emp Collection Form] Selected Auction for Chit/Due Amount:", selectedAuction);
 
       let chitAmountForDue: number | null = null;
@@ -464,6 +456,7 @@ export function RecordCollectionForm() {
           chitAmountForDue = selectedAuction.finalAmountToBePaid;
           dueNumberForRecord = selectedAuction.auctionNumber || null;
       } else if (selectedGroup && selectedGroup.rate !== null && selectedGroup.rate !== undefined) {
+          // This fallback might be less relevant if auction is compulsory and always has finalAmountToBePaid
           chitAmountForDue = selectedGroup.rate; 
       }
       console.log("[Emp Collection Form] Calculated chitAmountForDue:", chitAmountForDue, "dueNumberForRecord:", dueNumberForRecord);
@@ -474,7 +467,7 @@ export function RecordCollectionForm() {
       }
       console.log("[Emp Collection Form] Calculated balanceAmountAfterCurrentPayment (for this installment based on current payment):", balanceAmountAfterCurrentPayment);
 
-      const collectionLocationToStore = values.collectionLocationOption === "Office" ? "Office" : currentLocationValue;
+      const collectionLocationToStore = currentLocationValue; // Always user location
       const virtualId = generate7DigitRandomNumber();
 
       const userDocRefForDueRead = doc(db, "users", selectedUser.id);
@@ -635,6 +628,7 @@ export function RecordCollectionForm() {
   return (
     <Card className="shadow-xl w-full max-w-2xl mx-auto">
       <CardHeader>
+        {/* Title is usually on the page itself */}
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -674,19 +668,18 @@ export function RecordCollectionForm() {
               name="selectedAuctionId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>For Auction No. (Optional)</FormLabel>
+                  <FormLabel>Auction Number</FormLabel>
                   <Select 
                     onValueChange={field.onChange} 
-                    value={field.value === NO_AUCTION_SELECTED_VALUE ? undefined : field.value} 
+                    value={field.value} 
                     disabled={!watchedGroupId || loadingAuctions}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={!watchedGroupId ? "Select group first" : (loadingAuctions ? "Loading auctions..." : "Select an auction (or general due)")} />
+                        <SelectValue placeholder={!watchedGroupId ? "Select group first" : (loadingAuctions ? "Loading auctions..." : "Select an auction")} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value={NO_AUCTION_SELECTED_VALUE}>General Due / Not for Specific Auction</SelectItem>
                       {groupAuctions.map((auction) => (
                         <SelectItem key={auction.id} value={auction.id}>
                           Auction #{auction.auctionNumber} - {auction.auctionMonth} (Due: {formatCurrency(auction.finalAmountToBePaid)})
@@ -838,36 +831,20 @@ export function RecordCollectionForm() {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="collectionLocationOption"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Collection Location</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select collection location" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Office">Office</SelectItem>
-                      <SelectItem value="Your Location">Your Location</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {watchedCollectionLocationOption === "Your Location" && (
-                    <div className="mt-2 space-y-2">
-                      <Button type="button" variant="outline" onClick={handleFetchLocation} disabled={isFetchingLocation}>
-                        {isFetchingLocation && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        <LocateFixed className="mr-2 h-4 w-4" /> Fetch Current Location
-                      </Button>
-                      {currentLocationDisplay && <p className="text-sm text-muted-foreground">Fetched: {currentLocationDisplay}</p>}
-                      {locationError && <Alert variant="destructive"><AlertTitle>Location Error</AlertTitle><AlertDescription>{locationError}</AlertDescription></Alert>}
-                    </div>
-                  )}
-                </FormItem>
-              )}
-            />
+            {/* Collection Location - now implicitly User Location */}
+            <FormItem>
+                <FormLabel>Collection Location</FormLabel>
+                <Input readOnly value="User Location" disabled className="bg-muted" />
+                 <div className="mt-2 space-y-2">
+                    <Button type="button" variant="outline" onClick={handleFetchLocation} disabled={isFetchingLocation}>
+                    {isFetchingLocation && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <LocateFixed className="mr-2 h-4 w-4" /> Fetch Current Location
+                    </Button>
+                    {currentLocationDisplay && <p className="text-sm text-muted-foreground">Fetched: {currentLocationDisplay}</p>}
+                    {locationError && <Alert variant="destructive"><AlertTitle>Location Error</AlertTitle><AlertDescription>{locationError}</AlertDescription></Alert>}
+                </div>
+            </FormItem>
+
 
             <FormField
               control={form.control}
@@ -899,3 +876,4 @@ export function RecordCollectionForm() {
     </Card>
   );
 }
+
