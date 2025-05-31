@@ -9,6 +9,7 @@ const formatCurrency = (amount: number | null | undefined) => {
 
 interface DueUserDetail {
   username: string;
+  fullname: string; // Added fullname
   phone: string;
   dueAmount: number;
 }
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     let messageBody = "Customer Due Summary:\n";
     dueUserDetails.forEach((user, index) => {
-      messageBody += `\n${index + 1}. User: ${user.username}\n`;
+      messageBody += `\n${index + 1}. User: ${user.fullname} (${user.username})\n`; // Updated to include fullname
       messageBody += `   Phone: ${user.phone}\n`;
       messageBody += `   Due: ${formatCurrency(user.dueAmount)}\n`;
     });

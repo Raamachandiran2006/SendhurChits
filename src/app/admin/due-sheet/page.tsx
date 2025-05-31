@@ -135,7 +135,7 @@ export default function AdminDueSheetPage() {
 
     const usersToSendDetails = selectedUserIds.map(id => {
       const user = allUsers.find(u => u.id === id);
-      return user ? { username: user.username, phone: user.phone, dueAmount: user.dueAmount || 0 } : null;
+      return user ? { username: user.username, fullname: user.fullname, phone: user.phone, dueAmount: user.dueAmount || 0 } : null;
     }).filter(Boolean);
 
     if (usersToSendDetails.length === 0) {
