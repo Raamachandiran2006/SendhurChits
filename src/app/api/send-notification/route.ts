@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
     const formattedAmount = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
     const collectionDateTime = `${paymentDate} ${paymentTime || ''}`;
     
+    // --- EDIT THE LINE BELOW TO CHANGE THE MESSAGE FORMAT ---
     let messageBody = `Dear ${userName},\n\nCollection Recorded:\nAmount: ${formattedAmount}\nReceipt No: ${receiptNumber}\nDate: ${collectionDateTime}\n`;
     if (collectionLocation && collectionLocation !== "Office" && !collectionLocation.startsWith("http")) {
       messageBody += `Location: ${collectionLocation}\n`;
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
       messageBody += `Location: View on Map\n`;
     }
     messageBody += `\nThank you,\nSendhur Chits`;
+    // --- END OF MESSAGE FORMAT EDITING SECTION ---
 
     console.log(`[API/send-notification] Attempting to send to ${formattedToPhoneNumber}. Message: ${messageBody}`);
 
