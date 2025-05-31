@@ -187,51 +187,7 @@ export default function EmployeeDashboardPage() {
         </Card>
       </div>
 
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle>Quick Navigation</CardTitle>
-          <CardDescription>Access key areas of your dashboard.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Button asChild variant="outline">
-            <Link href="/employee/users">
-              <Users className="mr-2 h-4 w-4" /> View Users
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/employee/groups">
-              <Layers className="mr-2 h-4 w-4" /> View Groups
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/employee/employees">
-              <Briefcase className="mr-2 h-4 w-4" /> View Colleagues
-            </Link>
-          </Button>
-           <Button asChild variant="outline">
-            <Link href="/employee/collection">
-              <ArchiveRestore className="mr-2 h-4 w-4" /> Collection Management
-            </Link>
-          </Button>
-           <Button asChild variant="outline">
-            <Link href="/employee/salary">
-              <DollarSign className="mr-2 h-4 w-4" /> My Salary
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/employee/due-sheet">
-              <SheetIcon className="mr-2 h-4 w-4" /> View Due Sheet
-            </Link>
-          </Button>
-          {isManager && (
-            <Button asChild variant="outline">
-              <Link href="/employee/payments">
-                <CreditCard className="mr-2 h-4 w-4" /> Payments Management
-              </Link>
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+      {/* Quick Navigation card removed */}
     </div>
   );
 }
