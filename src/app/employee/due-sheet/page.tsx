@@ -96,76 +96,8 @@ export default function EmployeeDueSheetPage() {
     );
   }, [allUsers, searchTerm]);
 
-  const handleRowClick = (userId: string, e: React.MouseEvent<HTMLTableRowElement, MouseEvent>) => {
-    if ((e.target as HTMLElement).closest('[data-checkbox-cell="true"]')) {
-        return;
-    }
-    router.push(`/employee/users/${userId}#due-sheet`);
-  };
-  
-  const handleSelectUser = (userId: string, checked: boolean) => {
-    setSelectedUserIds(prev => 
-      checked ? [...prev, userId] : prev.filter(id => id !== userId)
-    );
-  };
-
-  const handleOpenEmployeeDialog = () => {
-    if (selectedUserIds.length === 0) return;
-    fetchEmployeesForSms();
-    setIsEmployeeDialogOpen(true);
-  };
-
-  const handleConfirmSendSms = async () => {
-    if (!selectedEmployeeForSms) {
-      toast({ title: "Error", description: "Please select an employee to send the SMS to.", variant: "destructive" });
-      return;
-    }
-    if (selectedUserIds.length === 0) {
-      toast({ title: "Error", description: "No users selected to include in the SMS.", variant: "destructive" });
-      return;
-    }
-
-    const targetEmployee = employeesForSms.find(emp => emp.id === selectedEmployeeForSms);
-    if (!targetEmployee || !targetEmployee.phone) {
-      toast({ title: "Error", description: "Selected employee phone number not found.", variant: "destructive" });
-      return;
-    }
-
-    const usersToSendDetails = selectedUserIds.map(id => {
-      const user = allUsers.find(u => u.id === id);
-      return user ? { username: user.username, fullname: user.fullname, phone: user.phone, dueAmount: user.dueAmount || 0 } : null;
-    }).filter(Boolean);
-
-    if (usersToSendDetails.length === 0) {
-        toast({ title: "Error", description: "Could not find details for selected users.", variant: "destructive" });
-        return;
-    }
-
-    setIsSendingSms(true);
-    try {
-      const response = await fetch('/api/send-due-summary-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          employeePhoneNumber: targetEmployee.phone,
-          dueUserDetails: usersToSendDetails,
-        }),
-      });
-      const result = await response.json();
-      if (response.ok && result.success) {
-        toast({ title: "SMS Sent", description: `Due summary sent to ${targetEmployee.fullname}.` });
-        setIsEmployeeDialogOpen(false);
-        setSelectedUserIds([]);
-        setSelectedEmployeeForSms(undefined);
-      } else {
-        throw new Error(result.error || "Failed to send SMS");
-      }
-    } catch (error: any) {
-      console.error("Error sending SMS:", error);
-      toast({ title: "SMS Error", description: error.message || "Could not send SMS.", variant: "destructive" });
-    } finally {
-      setIsSendingSms(false);
-    }
+  const handleRowClick = (userId: string) => {
+    router.push(`/employee/users/${userId}#due-sheet`); // Appended #due-sheet
   };
 
   return (
