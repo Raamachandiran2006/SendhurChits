@@ -78,7 +78,7 @@ const formatTimeTo24HourInput = (timeStr?: string): string => {
 
 const recordCollectionFormSchema = z.object({
   selectedGroupId: z.string().min(1, "Please select a Group."),
-  selectedAuctionId: z.string().min(1, "Auction number is required."), // Made compulsory
+  selectedAuctionId: z.string().min(1, "Auction number is required."),
   selectedUserId: z.string().min(1, "Please select a User."),
   paymentDate: z.date({ required_error: "Payment date is required." }),
   paymentTime: z.string().min(1, "Payment time is required."),
@@ -155,7 +155,7 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
     
     y = printLine("Group:", recordData.groupName || 'N/A', y);
     y = printLine("Name:", recordData.userFullname || 'N/A', y);
-    y = printLine("Chit Scheme Value:", recordData.groupTotalAmount ? formatCurrency(recordData.groupTotalAmount) : 'N/A', y);
+    y = printLine("Chit Value:", recordData.groupTotalAmount ? formatCurrency(recordData.groupTotalAmount) : 'N/A', y);
     y = printLine("Chit Date:", recordData.auctionDateForReceipt ? formatDateLocal(recordData.auctionDateForReceipt, "dd-MMM-yyyy") : formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy"), y);
 
 
@@ -163,15 +163,15 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
          y = printLine("Due No.:", recordData.dueNumber, y);
     }
     if (recordData.chitAmount !== null && recordData.chitAmount !== undefined) {
-        y = printLine("Due Amount (This Inst.):", formatCurrency(recordData.chitAmount), y);
+        y = printLine("Due Amount:", formatCurrency(recordData.chitAmount), y);
     }
      if (recordData.totalPaidForThisDue !== null && recordData.totalPaidForThisDue !== undefined) {
-        y = printLine("Paid Amount (This Inst.):", formatCurrency(recordData.totalPaidForThisDue), y);
+        y = printLine("Paid Amount:", formatCurrency(recordData.totalPaidForThisDue), y);
     }
-    y = printLine("Bill Amount (This Txn.):", formatCurrency(recordData.amount), y, true); 
+    y = printLine("Bill Amount:", formatCurrency(recordData.amount), y, true); 
     
     if (recordData.balanceForThisInstallment !== null && recordData.balanceForThisInstallment !== undefined) {
-        y = printLine("Balance (This Inst.):", formatCurrency(recordData.balanceForThisInstallment), y);
+        y = printLine("Balance:", formatCurrency(recordData.balanceForThisInstallment), y);
     }
     if (recordData.userTotalDueBeforeThisPayment !== null && recordData.userTotalDueBeforeThisPayment !== undefined) {
         y = printLine("Total Balance:", formatCurrency(recordData.userTotalDueBeforeThisPayment), y);
@@ -258,7 +258,7 @@ export function RecordCollectionForm() {
     resolver: zodResolver(recordCollectionFormSchema),
     defaultValues: {
       selectedGroupId: "",
-      selectedAuctionId: "", // Changed from undefined
+      selectedAuctionId: "", 
       selectedUserId: "",
       paymentDate: new Date(),
       paymentTime: formatTimeTo12Hour(format(new Date(), "HH:mm")),
@@ -272,7 +272,7 @@ export function RecordCollectionForm() {
 
   const { watch, setValue, reset } = form;
   const watchedGroupId = watch("selectedGroupId");
-  const watchedCollectionLocationOption = watch("collectionLocationOption"); // This will always be "User Location" due to defaults and schema
+  const watchedCollectionLocationOption = watch("collectionLocationOption"); 
 
   useEffect(() => {
     const fetchGroups = async () => {
@@ -297,7 +297,7 @@ export function RecordCollectionForm() {
       setGroupMembers([]);
       setGroupAuctions([]);
       setValue("selectedUserId", "");
-      setValue("selectedAuctionId", ""); // Reset to empty string for required field
+      setValue("selectedAuctionId", ""); 
       return;
     }
 
@@ -402,7 +402,6 @@ export function RecordCollectionForm() {
     }
   }, []);
 
-  // Automatically fetch location since "User Location" is the only option
   useEffect(() => {
     handleFetchLocation();
   }, [handleFetchLocation]);
@@ -413,13 +412,12 @@ export function RecordCollectionForm() {
       toast({ title: "Error", description: "Employee details not found. Please re-login.", variant: "destructive" });
       return;
     }
-    if (!currentLocationValue) { // Since "User Location" is fixed, this must be present
+    if (!currentLocationValue) { 
         toast({ title: "Location Required", description: "Please fetch your location.", variant: "destructive" });
         return;
     }
 
     setIsSubmitting(true);
-    console.log("[Emp Collection Form] onSubmit - values:", values);
     const selectedGroup = groups.find(g => g.id === values.selectedGroupId);
     const selectedUser = groupMembers.find(m => m.id === values.selectedUserId);
 
@@ -429,6 +427,13 @@ export function RecordCollectionForm() {
       return;
     }
     
+    const selectedAuction = groupAuctions.find(a => a.id === values.selectedAuctionId);
+    if (!selectedAuction) { 
+      toast({ title: "Error", description: "Selected auction not found or is invalid.", variant: "destructive" });
+      setIsSubmitting(false);
+      return;
+    }
+
     let newReceiptNumber = "";
     let receiptPdfDownloadUrl: string | null = null;
     let newCollectionRecordId = ""; 
@@ -437,18 +442,8 @@ export function RecordCollectionForm() {
     let balanceForThisSpecificInstallment: number | null = null;
 
     try {
-      console.log("[Emp Collection Form] Attempting to generate unique receipt number...");
       newReceiptNumber = await generateUniqueReceiptNumber();
       if (!newReceiptNumber) throw new Error("Failed to generate unique receipt number.");
-      console.log("[Emp Collection Form] Generated Receipt Number:", newReceiptNumber);
-
-      const selectedAuction = groupAuctions.find(a => a.id === values.selectedAuctionId); // Auction is now compulsory
-      if (!selectedAuction) { // Add this check
-        toast({ title: "Error", description: "Selected auction not found or is invalid.", variant: "destructive" });
-        setIsSubmitting(false);
-        return;
-      }
-      console.log("[Emp Collection Form] Selected Auction for Chit/Due Amount:", selectedAuction);
 
       let chitAmountForDue: number | null = null;
       let dueNumberForRecord: number | null = null;
@@ -456,18 +451,15 @@ export function RecordCollectionForm() {
           chitAmountForDue = selectedAuction.finalAmountToBePaid;
           dueNumberForRecord = selectedAuction.auctionNumber || null;
       } else if (selectedGroup && selectedGroup.rate !== null && selectedGroup.rate !== undefined) {
-          // This fallback might be less relevant if auction is compulsory and always has finalAmountToBePaid
           chitAmountForDue = selectedGroup.rate; 
       }
-      console.log("[Emp Collection Form] Calculated chitAmountForDue:", chitAmountForDue, "dueNumberForRecord:", dueNumberForRecord);
 
       let balanceAmountAfterCurrentPayment: number | null = null; 
       if (chitAmountForDue !== null && typeof values.amount === 'number') {
           balanceAmountAfterCurrentPayment = chitAmountForDue - values.amount;
       }
-      console.log("[Emp Collection Form] Calculated balanceAmountAfterCurrentPayment (for this installment based on current payment):", balanceAmountAfterCurrentPayment);
 
-      const collectionLocationToStore = currentLocationValue; // Always user location
+      const collectionLocationToStore = currentLocationValue; 
       const virtualId = generate7DigitRandomNumber();
 
       const userDocRefForDueRead = doc(db, "users", selectedUser.id);
@@ -475,10 +467,9 @@ export function RecordCollectionForm() {
       if (userDocSnapshot.exists()) {
         userDueBeforePayment = userDocSnapshot.data()?.dueAmount || 0;
       } else {
-        console.error("[Emp Collection Form] User document not found for due amount read. User ID:", selectedUser.id);
+        console.error("User document not found for due amount read. User ID:", selectedUser.id);
         throw new Error("User document not found when trying to read current due amount.");
       }
-      console.log("[Emp Collection Form] Fetched userTotalDueBeforeThisPayment (Overall):", userDueBeforePayment);
       
       if (selectedUser.id && selectedGroup.id && dueNumberForRecord !== null) {
         const collectionsForDueQuery = query(
@@ -500,8 +491,6 @@ export function RecordCollectionForm() {
         totalPaidForThisSpecificDue = values.amount;
         balanceForThisSpecificInstallment = chitAmountForDue - values.amount;
       }
-      console.log("[Emp Collection Form] Calculated totalPaidForThisSpecificDue (for PDF):", totalPaidForThisSpecificDue);
-      console.log("[Emp Collection Form] Calculated balanceForThisSpecificInstallment (for PDF):", balanceForThisSpecificInstallment);
 
       const tempRecordDataForPdf: Partial<CollectionRecord> = {
         companyName: "Sendhur Chits",
@@ -526,14 +515,12 @@ export function RecordCollectionForm() {
         remarks: values.remarks || "Auction Collection",
         virtualTransactionId: virtualId,
       };
-      console.log("[Emp Collection Form] Data prepared for PDF generation (tempRecordDataForPdf):", tempRecordDataForPdf);
       
       receiptPdfDownloadUrl = await generateAndUploadReceiptPdf(
         tempRecordDataForPdf,
         selectedGroup.id,
         newReceiptNumber
       );
-      console.log("[Emp Collection Form] Receipt PDF Download URL from helper:", receiptPdfDownloadUrl);
 
       const finalCollectionRecordData: Omit<CollectionRecord, "id"> & { recordedAt?: any } = {
         receiptNumber: newReceiptNumber,
@@ -563,14 +550,12 @@ export function RecordCollectionForm() {
         virtualTransactionId: virtualId,
         receiptPdfUrl: receiptPdfDownloadUrl,
       };
-      console.log("[Emp Collection Form] Final data being saved to Firestore (finalCollectionRecordData):", finalCollectionRecordData);
 
       await runTransaction(db, async (transaction) => {
           const userDocRef = doc(db, "users", selectedUser.id);
           const currentDueAmount = userDueBeforePayment !== null ? userDueBeforePayment : (userDocSnapshot.data()?.dueAmount || 0);
           const newDueAmount = currentDueAmount - values.amount;
           transaction.update(userDocRef, { dueAmount: newDueAmount });
-          console.log(`[Emp Collection Form] Updated user ${selectedUser.username} overall due amount from ${currentDueAmount} to ${newDueAmount}`);
 
           const collectionRecordRef = doc(collection(db, "collectionRecords"));
           newCollectionRecordId = collectionRecordRef.id; 
@@ -579,22 +564,27 @@ export function RecordCollectionForm() {
             ...finalCollectionRecordData,
             recordedAt: serverTimestamp() as Timestamp,
           });
-          console.log("[Emp Collection Form] Collection record set in transaction, newCollectionRecordId:", newCollectionRecordId);
       });
       
       if (!newCollectionRecordId) {
-        console.error("[Emp Collection Form] Failed to obtain new collection record ID for redirection.");
         throw new Error("Failed to obtain new collection record ID for redirection.");
       }
 
       const notificationPayload = {
         toPhoneNumber: selectedUser.phone,
         userName: selectedUser.fullname,
-        amount: values.amount,
         receiptNumber: newReceiptNumber,
-        collectionLocation: collectionLocationToStore,
         paymentDate: format(values.paymentDate, "yyyy-MM-dd"),
         paymentTime: values.paymentTime,
+        groupName: selectedGroup.groupName,
+        groupTotalAmount: selectedGroup.totalAmount,
+        auctionDateForReceipt: selectedAuction ? selectedAuction.auctionDate : null,
+        dueNumber: dueNumberForRecord,
+        chitAmount: chitAmountForDue,
+        totalPaidForThisDue: totalPaidForThisSpecificDue,
+        amount: values.amount, 
+        balanceForThisInstallment: balanceForThisSpecificInstallment,
+        paymentMode: values.paymentMode,
       };
 
       try {
@@ -618,7 +608,7 @@ export function RecordCollectionForm() {
       
       router.push(`/employee/collection/receipt/${newCollectionRecordId}`);
     } catch (error) {
-      console.error("[Emp Collection Form] Error recording collection in onSubmit:", error);
+      console.error("Error recording collection:", error);
       toast({ title: "Error", description: "Could not record collection. " + (error as Error).message, variant: "destructive" });
     } finally {
       setIsSubmitting(false); 
@@ -628,7 +618,6 @@ export function RecordCollectionForm() {
   return (
     <Card className="shadow-xl w-full max-w-2xl mx-auto">
       <CardHeader>
-        {/* Title is usually on the page itself */}
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -831,7 +820,6 @@ export function RecordCollectionForm() {
               )}
             />
 
-            {/* Collection Location - now implicitly User Location */}
             <FormItem>
                 <FormLabel>Collection Location</FormLabel>
                 <Input readOnly value="User Location" disabled className="bg-muted" />
@@ -876,4 +864,3 @@ export function RecordCollectionForm() {
     </Card>
   );
 }
-

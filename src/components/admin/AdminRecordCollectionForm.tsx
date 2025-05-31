@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form"; // Removed FormMessage
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form"; 
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarIconLucide, Loader2, DollarSign, Save, LocateFixed } from "lucide-react";
@@ -158,25 +158,25 @@ async function generateReceiptPdfBlob(recordData: Partial<CollectionRecord>): Pr
 
     y = printLine("Group:", recordData.groupName || 'N/A', y);
     y = printLine("Name:", recordData.userFullname || 'N/A', y);
-    y = printLine("Chit Scheme Value:", recordData.groupTotalAmount ? formatCurrencyLocal(recordData.groupTotalAmount) : 'N/A', y);
+    y = printLine("Chit Value:", recordData.groupTotalAmount ? formatCurrencyLocal(recordData.groupTotalAmount) : 'N/A', y);
     y = printLine("Chit Date:", recordData.auctionDateForReceipt ? formatDateLocal(recordData.auctionDateForReceipt, "dd-MMM-yyyy") : formatDateLocal(recordData.paymentDate, "dd-MMM-yyyy"), y);
 
     if (recordData.dueNumber) {
         y = printLine("Due No.:", recordData.dueNumber, y);
     }
     if (recordData.chitAmount !== null && recordData.chitAmount !== undefined) {
-        y = printLine("Due Amount (This Inst.):", formatCurrencyLocal(recordData.chitAmount), y);
+        y = printLine("Due Amount:", formatCurrencyLocal(recordData.chitAmount), y);
     }
      if (recordData.totalPaidForThisDue !== null && recordData.totalPaidForThisDue !== undefined) {
-        y = printLine("Paid Amount (This Inst.):", formatCurrencyLocal(recordData.totalPaidForThisDue), y);
+        y = printLine("Paid Amount:", formatCurrencyLocal(recordData.totalPaidForThisDue), y);
     }
-    y = printLine("Bill Amount (This Txn.):", formatCurrencyLocal(recordData.amount), y, true);
+    y = printLine("Bill Amount:", formatCurrencyLocal(recordData.amount), y, true);
 
     if (recordData.balanceForThisInstallment !== null && recordData.balanceForThisInstallment !== undefined) {
-        y = printLine("Balance (This Inst.):", formatCurrencyLocal(recordData.balanceForThisInstallment), y);
+        y = printLine("Balance:", formatCurrencyLocal(recordData.balanceForThisInstallment), y);
     }
     if (recordData.userTotalDueBeforeThisPayment !== null && recordData.userTotalDueBeforeThisPayment !== undefined) {
-        y = printLine("User Total Balance (Overall):", formatCurrencyLocal(recordData.userTotalDueBeforeThisPayment), y);
+        y = printLine("User Total Bal:", formatCurrencyLocal(recordData.userTotalDueBeforeThisPayment), y);
     }
     y = printLine("Mode:", recordData.paymentMode || 'N/A', y);
 
@@ -399,7 +399,6 @@ export function AdminRecordCollectionForm() {
   },[]);
 
   useEffect(() => {
-    // Since "User Location" is the only option and default, fetch on mount or when option re-asserts.
     if (watchedCollectionLocationOption === "User Location") {
       handleFetchLocation();
     } else {
@@ -421,7 +420,6 @@ export function AdminRecordCollectionForm() {
     }
 
     setIsSubmitting(true);
-    console.log("[Admin Collection Form] onSubmit - values:", values);
     const selectedGroup = groups.find(g => g.id === values.selectedGroupId);
     const selectedUser = groupMembers.find(m => m.id === values.selectedUserId);
 
@@ -447,12 +445,8 @@ export function AdminRecordCollectionForm() {
 
 
     try {
-        console.log("Attempting to generate unique receipt number...");
         newReceiptNumber = await generateUniqueReceiptNumber();
         if (!newReceiptNumber) throw new Error("Failed to generate unique receipt number.");
-        console.log("Generated Receipt Number:", newReceiptNumber);
-
-        console.log("Selected Auction for Chit/Due Amount:", selectedAuction);
 
         let chitAmountForDue: number | null = null;
         let dueNumberForRecord: number | null = null;
@@ -463,13 +457,11 @@ export function AdminRecordCollectionForm() {
         } else if (selectedGroup && selectedGroup.rate !== null && selectedGroup.rate !== undefined) {
             chitAmountForDue = selectedGroup.rate;
         }
-        console.log("Calculated chitAmountForDue:", chitAmountForDue, "dueNumberForRecord:", dueNumberForRecord);
 
         let balanceAmountAfterPayment: number | null = null;
         if (chitAmountForDue !== null && typeof values.amount === 'number') {
             balanceAmountAfterPayment = chitAmountForDue - values.amount;
         }
-        console.log("Calculated balanceAmountAfterPayment:", balanceAmountAfterPayment);
 
         const collectionLocationToStore = currentLocationValue;
         const virtualId = generate7DigitRandomNumber();
@@ -482,8 +474,7 @@ export function AdminRecordCollectionForm() {
           console.error("User document not found for due amount read, user ID:", selectedUser.id);
           throw new Error("User document not found when trying to read current due amount.");
         }
-        console.log("Fetched userTotalDueBeforeThisPayment:", userDueBeforePayment);
-
+        
         if (selectedUser.id && selectedGroup.id && dueNumberForRecord !== null) {
             const collectionsForDueQuery = query(
             collection(db, "collectionRecords"),
@@ -528,14 +519,12 @@ export function AdminRecordCollectionForm() {
             remarks: values.remarks || "Auction Collection",
             virtualTransactionId: virtualId,
         };
-        console.log("[Admin Collection Form] Data prepared for PDF generation (tempRecordDataForPdf):", tempRecordDataForPdf);
-
+        
         receiptPdfDownloadUrl = await generateAndUploadReceiptPdf(
             tempRecordDataForPdf,
             selectedGroup.id,
             newReceiptNumber
         );
-        console.log("[Admin Collection Form] Receipt PDF Download URL from helper:", receiptPdfDownloadUrl);
 
         const finalCollectionRecordData: Omit<CollectionRecord, "id" | "recordedAt"> & { recordedAt?: any } = {
             receiptNumber: newReceiptNumber,
@@ -565,14 +554,12 @@ export function AdminRecordCollectionForm() {
             virtualTransactionId: virtualId,
             receiptPdfUrl: receiptPdfDownloadUrl,
         };
-        console.log("[Admin Collection Form] Final data being saved to Firestore (finalCollectionRecordData):", finalCollectionRecordData);
 
         await runTransaction(db, async (transaction) => {
             const userDocRef = doc(db, "users", selectedUser.id);
             const currentDueAmount = userDueBeforePayment !== null ? userDueBeforePayment : (userDocSnapshot.data()?.dueAmount || 0);
             const newDueAmount = currentDueAmount - values.amount;
             transaction.update(userDocRef, { dueAmount: newDueAmount });
-            console.log(`[Admin Collection Form] Updated user ${selectedUser.username} due amount from ${currentDueAmount} to ${newDueAmount}`);
 
             const collectionRecordRef = doc(collection(db, "collectionRecords"));
             newCollectionRecordId = collectionRecordRef.id;
@@ -580,19 +567,51 @@ export function AdminRecordCollectionForm() {
                 ...finalCollectionRecordData,
                 recordedAt: serverTimestamp() as Timestamp,
             });
-            console.log("[Admin Collection Form] Collection record set in transaction, newCollectionRecordId:", newCollectionRecordId);
         });
 
         if (!newCollectionRecordId) {
-            console.error("[Admin Collection Form] Failed to obtain new collection record ID for redirection.");
             throw new Error("Failed to obtain new collection record ID for redirection.");
+        }
+
+        const notificationPayload = {
+          toPhoneNumber: selectedUser.phone,
+          userName: selectedUser.fullname,
+          receiptNumber: newReceiptNumber,
+          paymentDate: format(values.paymentDate, "yyyy-MM-dd"),
+          paymentTime: values.paymentTime,
+          groupName: selectedGroup.groupName,
+          groupTotalAmount: selectedGroup.totalAmount,
+          auctionDateForReceipt: selectedAuction ? selectedAuction.auctionDate : null,
+          dueNumber: dueNumberForRecord,
+          chitAmount: chitAmountForDue,
+          totalPaidForThisDue: totalPaidForThisSpecificDue,
+          amount: values.amount, // Bill Amount
+          balanceForThisInstallment: balanceForThisSpecificInstallment,
+          paymentMode: values.paymentMode,
+        };
+  
+        try {
+          const response = await fetch('/api/send-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(notificationPayload),
+          });
+          const result = await response.json();
+          if (result.success) {
+            toast({ title: "Notification Sent", description: "SMS and WhatsApp notifications initiated."});
+          } else {
+            toast({ title: "Notification Failed", description: result.error || "Could not send notifications.", variant: "destructive"});
+          }
+        } catch (notifError) {
+          console.error("Error sending notification:", notifError);
+          toast({ title: "Notification Error", description: "Failed to trigger notifications.", variant: "destructive"});
         }
 
         toast({ title: "Collection Recorded", description: `Payment from ${selectedUser.fullname} recorded. ${receiptPdfDownloadUrl ? 'Receipt PDF generated.' : 'Receipt PDF generation failed.'}` });
 
         router.push(`/admin/collection/receipt/${newCollectionRecordId}`);
     } catch (error) {
-      console.error("[Admin Collection Form] Error recording collection in onSubmit:", error);
+      console.error("Error recording collection:", error);
       toast({ title: "Error", description: "Could not record collection. " + (error as Error).message, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
@@ -627,7 +646,6 @@ export function AdminRecordCollectionForm() {
                         ))}
                       </SelectContent>
                     </Select>
-                    {/* FormMessage removed */}
                   </FormItem>
                 )}
               />
@@ -661,7 +679,6 @@ export function AdminRecordCollectionForm() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {/* FormMessage removed */}
                 </FormItem>
               )}
             />
@@ -692,7 +709,6 @@ export function AdminRecordCollectionForm() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {/* FormMessage removed */}
                 </FormItem>
               )}
             />
@@ -717,7 +733,6 @@ export function AdminRecordCollectionForm() {
                         <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
                       </PopoverContent>
                     </Popover>
-                    {/* FormMessage removed */}
                   </FormItem>
                 )}
               />
@@ -734,7 +749,6 @@ export function AdminRecordCollectionForm() {
                         onChange={(e) => field.onChange(e.target.value ? formatTimeTo12Hour(e.target.value) : "")}
                       />
                     </FormControl>
-                    {/* FormMessage removed */}
                   </FormItem>
                 )}
               />
@@ -756,7 +770,6 @@ export function AdminRecordCollectionForm() {
                         <SelectItem value="Partial Payment">Partial Payment</SelectItem>
                         </SelectContent>
                     </Select>
-                    {/* FormMessage removed */}
                     </FormItem>
                 )}
                 />
@@ -776,7 +789,6 @@ export function AdminRecordCollectionForm() {
                         <SelectItem value="Netbanking">Netbanking</SelectItem>
                         </SelectContent>
                     </Select>
-                    {/* FormMessage removed */}
                     </FormItem>
                 )}
                 />
@@ -807,41 +819,22 @@ export function AdminRecordCollectionForm() {
                         />
                     </div>
                   </FormControl>
-                  {/* FormMessage removed */}
                 </FormItem>
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="collectionLocationOption"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Collection Location</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} defaultValue="User Location">
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select collection location" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="User Location">User Location</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {watchedCollectionLocationOption === "User Location" && (
-                    <div className="mt-2 space-y-2">
-                      <Button type="button" variant="outline" onClick={handleFetchLocation} disabled={isFetchingLocation}>
-                        {isFetchingLocation && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        <LocateFixed className="mr-2 h-4 w-4" /> Fetch User Location
-                      </Button>
-                      {currentLocationDisplay && <p className="text-sm text-muted-foreground">Fetched: {currentLocationDisplay}</p>}
-                      {locationError && <Alert variant="destructive"><AlertTitle>Location Error</AlertTitle><AlertDescription>{locationError}</AlertDescription></Alert>}
-                    </div>
-                  )}
-                  {/* FormMessage removed */}
-                </FormItem>
-              )}
-            />
+            <FormItem>
+                <FormLabel>Collection Location</FormLabel>
+                <Input readOnly value="User Location" disabled className="bg-muted" />
+                <div className="mt-2 space-y-2">
+                  <Button type="button" variant="outline" onClick={handleFetchLocation} disabled={isFetchingLocation}>
+                    {isFetchingLocation && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <LocateFixed className="mr-2 h-4 w-4" /> Fetch User Location
+                  </Button>
+                  {currentLocationDisplay && <p className="text-sm text-muted-foreground">Fetched: {currentLocationDisplay}</p>}
+                  {locationError && <Alert variant="destructive"><AlertTitle>Location Error</AlertTitle><AlertDescription>{locationError}</AlertDescription></Alert>}
+                </div>
+            </FormItem>
 
            <FormField
               control={form.control}
@@ -859,7 +852,6 @@ export function AdminRecordCollectionForm() {
                       <SelectItem value="Auction Collection">Auction Collection</SelectItem>
                     </SelectContent>
                   </Select>
-                  {/* FormMessage removed */}
                 </FormItem>
               )}
             />
