@@ -1,17 +1,30 @@
 
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import type { User } from "@/types";
+import React, { useEffect, useState, useMemo } from "react"; // Added React for Fragment
+import type { User, Employee } from "@/types"; // Added Employee type
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, ArrowLeft, Sheet as SheetIcon, UserCircle, Phone, Search } from "lucide-react";
+import { Loader2, ArrowLeft, Sheet as SheetIcon, UserCircle, Phone, Search, Send as SendIcon } from "lucide-react"; // Added SendIcon
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 
 const formatCurrency = (amount: number | null | undefined) => {
   if (amount === null || amount === undefined || isNaN(amount)) return "₹0.00";
@@ -23,6 +36,14 @@ export default function EmployeeDueSheetPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const router = useRouter();
+  const { toast } = useToast();
+
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false);
+  const [employeesForSms, setEmployeesForSms] = useState<Employee[]>([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const [selectedEmployeeForSms, setSelectedEmployeeForSms] = useState<string | undefined>(undefined);
+  const [isSendingSms, setIsSendingSms] = useState(false);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -48,6 +69,21 @@ export default function EmployeeDueSheetPage() {
     fetchUsers();
   }, []);
 
+  const fetchEmployeesForSms = async () => {
+    if (employeesForSms.length > 0) return; 
+    setLoadingEmployees(true);
+    try {
+      const employeesSnapshot = await getDocs(query(collection(db, "employees"), orderBy("fullname")));
+      const fetchedEmployees = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+      setEmployeesForSms(fetchedEmployees);
+    } catch (error) {
+      console.error("Error fetching employees:", error);
+      toast({ title: "Error", description: "Could not load employees list.", variant: "destructive" });
+    } finally {
+      setLoadingEmployees(false);
+    }
+  };
+
   const filteredUsers = useMemo(() => {
     if (!searchTerm) {
       return allUsers;
@@ -60,8 +96,76 @@ export default function EmployeeDueSheetPage() {
     );
   }, [allUsers, searchTerm]);
 
-  const handleRowClick = (userId: string) => {
-    router.push(`/employee/users/${userId}#due-sheet`); // Appended #due-sheet
+  const handleRowClick = (userId: string, e: React.MouseEvent<HTMLTableRowElement, MouseEvent>) => {
+    if ((e.target as HTMLElement).closest('[data-checkbox-cell="true"]')) {
+        return;
+    }
+    router.push(`/employee/users/${userId}#due-sheet`);
+  };
+  
+  const handleSelectUser = (userId: string, checked: boolean) => {
+    setSelectedUserIds(prev => 
+      checked ? [...prev, userId] : prev.filter(id => id !== userId)
+    );
+  };
+
+  const handleOpenEmployeeDialog = () => {
+    if (selectedUserIds.length === 0) return;
+    fetchEmployeesForSms();
+    setIsEmployeeDialogOpen(true);
+  };
+
+  const handleConfirmSendSms = async () => {
+    if (!selectedEmployeeForSms) {
+      toast({ title: "Error", description: "Please select an employee to send the SMS to.", variant: "destructive" });
+      return;
+    }
+    if (selectedUserIds.length === 0) {
+      toast({ title: "Error", description: "No users selected to include in the SMS.", variant: "destructive" });
+      return;
+    }
+
+    const targetEmployee = employeesForSms.find(emp => emp.id === selectedEmployeeForSms);
+    if (!targetEmployee || !targetEmployee.phone) {
+      toast({ title: "Error", description: "Selected employee phone number not found.", variant: "destructive" });
+      return;
+    }
+
+    const usersToSendDetails = selectedUserIds.map(id => {
+      const user = allUsers.find(u => u.id === id);
+      return user ? { username: user.username, phone: user.phone, dueAmount: user.dueAmount || 0 } : null;
+    }).filter(Boolean);
+
+    if (usersToSendDetails.length === 0) {
+        toast({ title: "Error", description: "Could not find details for selected users.", variant: "destructive" });
+        return;
+    }
+
+    setIsSendingSms(true);
+    try {
+      const response = await fetch('/api/send-due-summary-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeePhoneNumber: targetEmployee.phone,
+          dueUserDetails: usersToSendDetails,
+        }),
+      });
+      const result = await response.json();
+      if (response.ok && result.success) {
+        toast({ title: "SMS Sent", description: `Due summary sent to ${targetEmployee.fullname}.` });
+        setIsEmployeeDialogOpen(false);
+        setSelectedUserIds([]);
+        setSelectedEmployeeForSms(undefined);
+      } else {
+        throw new Error(result.error || "Failed to send SMS");
+      }
+    } catch (error: any) {
+      console.error("Error sending SMS:", error);
+      toast({ title: "SMS Error", description: error.message || "Could not send SMS.", variant: "destructive" });
+    } finally {
+      setIsSendingSms(false);
+    }
   };
 
   return (
@@ -82,24 +186,31 @@ export default function EmployeeDueSheetPage() {
         </Button>
       </div>
 
-      <div className="mb-6">
-        <div className="relative">
+      <div className="mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
             placeholder="Search by User ID, Name, or Phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 w-full max-w-md shadow-sm"
+            className="pl-10 w-full shadow-sm"
           />
         </div>
+        <Button 
+          onClick={handleOpenEmployeeDialog} 
+          disabled={selectedUserIds.length === 0}
+          className="w-full sm:w-auto bg-accent text-accent-foreground hover:bg-accent/90"
+        >
+          <SendIcon className="mr-2 h-4 w-4" /> Send to Employee
+        </Button>
       </div>
 
       <Card className="shadow-xl">
         <CardHeader>
           <CardTitle>Outstanding Due Amounts</CardTitle>
           <CardDescription>
-            List of customers with positive due amounts (excluding admins).
+            List of customers with positive due amounts. Select users to send their due details via SMS to an employee.
             {searchTerm && ` Showing results for "${searchTerm}".`}
           </CardDescription>
         </CardHeader>
@@ -120,6 +231,7 @@ export default function EmployeeDueSheetPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[50px]">Select</TableHead>
                     <TableHead>S.No</TableHead>
                     <TableHead>Username (ID)</TableHead>
                     <TableHead>Full Name</TableHead>
@@ -131,9 +243,17 @@ export default function EmployeeDueSheetPage() {
                   {filteredUsers.map((user, index) => (
                     <TableRow 
                       key={user.id} 
-                      onClick={() => handleRowClick(user.id)}
+                      onClick={(e) => handleRowClick(user.id, e)}
                       className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      data-state={selectedUserIds.includes(user.id) ? "selected" : ""}
                     >
+                      <TableCell data-checkbox-cell="true" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedUserIds.includes(user.id)}
+                          onCheckedChange={(checked) => handleSelectUser(user.id, !!checked)}
+                          aria-label={`Select user ${user.fullname}`}
+                        />
+                      </TableCell>
                       <TableCell>{index + 1}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -157,6 +277,48 @@ export default function EmployeeDueSheetPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={isEmployeeDialogOpen} onOpenChange={setIsEmployeeDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Select Employee to Send SMS</AlertDialogTitle>
+            <AlertDialogDescription>
+              Choose an employee who will receive the due details for the selected {selectedUserIds.length} user(s).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {loadingEmployees ? (
+            <div className="flex justify-center items-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <p className="ml-2">Loading employees...</p>
+            </div>
+          ) : employeesForSms.length === 0 ? (
+             <p className="text-muted-foreground text-center">No employees found.</p>
+          ) : (
+            <Select onValueChange={setSelectedEmployeeForSms} value={selectedEmployeeForSms}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select an employee" />
+              </SelectTrigger>
+              <SelectContent>
+                {employeesForSms.map(emp => (
+                  <SelectItem key={emp.id} value={emp.id}>
+                    {emp.fullname} ({emp.employeeId}) - {emp.phone}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSelectedEmployeeForSms(undefined)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmSendSms}
+              disabled={!selectedEmployeeForSms || loadingEmployees || isSendingSms || employeesForSms.length === 0}
+            >
+              {isSendingSms && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirm & Send SMS
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
