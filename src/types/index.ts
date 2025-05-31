@@ -38,6 +38,7 @@ export interface Group {
   auctionScheduledTime?: string; // e.g., "03:00 PM"
   lastAuctionWinner?: string; // e.g., username or "To be determined"
   lastWinningBidAmount?: number;
+  logoType?: "gold" | "silver" | "diamond" | "emerald" | "ruby" | null; // Added for group logo
 }
 
 export interface Employee {

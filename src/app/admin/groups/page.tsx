@@ -4,36 +4,70 @@
 import { useEffect, useState } from "react";
 import type { Group } from "@/types";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, doc, updateDoc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import Image from "next/image"; // Import next/image
-import { Loader2, Layers, PlusCircle, Users, Landmark } from "lucide-react";
+import Image from "next/image";
+import { Loader2, Layers, PlusCircle, Users, Landmark, Edit2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+
+const logoOptions: Array<{ value: Group['logoType']; label: string; src?: string }> = [
+  { value: "gold", label: "Gold", src: "/gold.png" },
+  { value: "silver", label: "Silver", src: "/silver.png" },
+  { value: "diamond", label: "Diamond", src: "/diamond.png" },
+  { value: "emerald", label: "Emerald", src: "/emerald.png" },
+  { value: "ruby", label: "Ruby", src: "/ruby.png" },
+];
 
 export default function AdminGroupsPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  const fetchGroups = async () => {
+    setLoading(true);
+    try {
+      const groupsRef = collection(db, "groups");
+      const q = query(groupsRef, orderBy("groupName"));
+      const querySnapshot = await getDocs(q);
+      const fetchedGroups = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group));
+      setGroups(fetchedGroups);
+    } catch (error) {
+      console.error("Error fetching groups:", error);
+      toast({ title: "Error", description: "Failed to fetch groups.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchGroups = async () => {
-      setLoading(true);
-      try {
-        const groupsRef = collection(db, "groups");
-        const q = query(groupsRef, orderBy("groupName"));
-        const querySnapshot = await getDocs(q);
-        const fetchedGroups = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group));
-        setGroups(fetchedGroups);
-      } catch (error) {
-        console.error("Error fetching groups:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchGroups();
   }, []);
+
+  const handleLogoChange = async (groupId: string, logoType: Group['logoType']) => {
+    try {
+      const groupDocRef = doc(db, "groups", groupId);
+      await updateDoc(groupDocRef, { logoType: logoType });
+      setGroups(prevGroups =>
+        prevGroups.map(g => (g.id === groupId ? { ...g, logoType } : g))
+      );
+      toast({ title: "Logo Updated", description: `Group logo set to ${logoType ? logoType : 'default'}.` });
+    } catch (error) {
+      console.error("Error updating group logo:", error);
+      toast({ title: "Error", description: "Failed to update group logo.", variant: "destructive" });
+    }
+  };
 
   if (loading) {
     return (
@@ -76,21 +110,52 @@ export default function AdminGroupsPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {groups.map((group) => (
-            <Link key={group.id} href={`/admin/groups/${group.id}`} className="block h-full">
-              <Card className="shadow-lg flex flex-col h-full hover:shadow-xl transition-shadow duration-300 cursor-pointer overflow-hidden">
+          {groups.map((group) => {
+            const selectedLogo = logoOptions.find(opt => opt.value === group.logoType);
+            const groupImageUrl = selectedLogo?.src || `https://placehold.co/600x400.png?text=${encodeURIComponent(group.groupName)}`;
+            const dataAiHint = selectedLogo?.value || "community group";
+
+            return (
+              <Card key={group.id} className="shadow-lg flex flex-col h-full hover:shadow-xl transition-shadow duration-300 overflow-hidden">
                 <div className="relative w-full h-40">
-                  <Image
-                    src={`https://placehold.co/600x400.png?text=${encodeURIComponent(group.groupName)}`}
-                    alt={`${group.groupName} group image`}
-                    layout="fill"
-                    objectFit="cover"
-                    data-ai-hint="community group"
-                  />
+                  <Link href={`/admin/groups/${group.id}`} className="block w-full h-full">
+                    <Image
+                      src={groupImageUrl}
+                      alt={`${group.groupName} group image`}
+                      layout="fill"
+                      objectFit="cover"
+                      data-ai-hint={dataAiHint}
+                    />
+                  </Link>
                 </div>
-                <CardHeader className="pt-4">
-                  <CardTitle className="text-xl text-primary">{group.groupName}</CardTitle>
-                  <CardDescription className="h-16 overflow-y-auto text-sm">{group.description}</CardDescription>
+                <CardHeader className="pt-4 flex flex-row justify-between items-start">
+                  <div>
+                    <Link href={`/admin/groups/${group.id}`}>
+                      <CardTitle className="text-xl text-primary hover:underline">{group.groupName}</CardTitle>
+                    </Link>
+                    <CardDescription className="h-16 overflow-y-auto text-sm">{group.description}</CardDescription>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="ml-auto flex-shrink-0">
+                        <Edit2 className="h-4 w-4" />
+                        <span className="sr-only">Edit Logo</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Set Group Logo</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {logoOptions.map(opt => (
+                        <DropdownMenuItem key={opt.value} onClick={() => handleLogoChange(group.id, opt.value)}>
+                          {opt.label}
+                        </DropdownMenuItem>
+                      ))}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleLogoChange(group.id, null)} className="text-destructive">
+                        Remove Logo
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </CardHeader>
                 <CardContent className="space-y-3 flex-grow">
                   <div className="flex items-center text-sm">
@@ -120,8 +185,8 @@ export default function AdminGroupsPage() {
                   <p className="text-xs text-muted-foreground">Group ID: {group.id}</p>
                 </CardFooter>
               </Card>
-            </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
