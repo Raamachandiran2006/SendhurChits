@@ -11,9 +11,19 @@ export interface UserGroupCardProps {
   group: Group;
 }
 
+const logoOptions: Array<{ value: Group['logoType']; label: string; src?: string }> = [
+  { value: "gold", label: "Gold", src: "/gold.png" },
+  { value: "silver", label: "Silver", src: "/silver.png" },
+  { value: "diamond", label: "Diamond", src: "/diamond.png" },
+  { value: "emerald", label: "Emerald", src: "/emerald.png" },
+  { value: "ruby", label: "Ruby", src: "/ruby.png" },
+];
+
 export function UserGroupCard({ group }: UserGroupCardProps) {
-  // Placeholder image, replace with actual group image logic if available
-  const groupImageUrl = `https://placehold.co/600x400.png?text=${encodeURIComponent(group.groupName)}`;
+  const selectedLogo = logoOptions.find(opt => opt.value === group.logoType);
+  const groupImageUrl = selectedLogo?.src || `https://placehold.co/600x400.png?text=${encodeURIComponent(group.groupName)}`;
+  const dataAiHint = selectedLogo?.value || "group discussion";
+
 
   return (
     <Link href={`/dashboard/groups/${group.id}`} className="block h-full">
@@ -25,7 +35,7 @@ export function UserGroupCard({ group }: UserGroupCardProps) {
               layout="fill" 
               objectFit="cover" 
               className="rounded-t-lg"
-              data-ai-hint="group discussion"
+              data-ai-hint={dataAiHint}
           />
         </div>
         <CardHeader className="pt-4">

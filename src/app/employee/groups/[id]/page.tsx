@@ -51,6 +51,14 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+const logoOptions: Array<{ value: Group['logoType']; label: string; src?: string }> = [
+  { value: "gold", label: "Gold", src: "/gold.png" },
+  { value: "silver", label: "Silver", src: "/silver.png" },
+  { value: "diamond", label: "Diamond", src: "/diamond.png" },
+  { value: "emerald", label: "Emerald", src: "/emerald.png" },
+  { value: "ruby", label: "Ruby", src: "/ruby.png" },
+];
+
 // Helper function to format date safely
 const formatDateSafe = (dateInput: string | Date | Timestamp | undefined | null, outputFormat: string = "dd MMM yyyy") => {
   if (!dateInput) return "N/A";
@@ -402,6 +410,11 @@ export default function EmployeeViewGroupDetailPage() {
   if (!group) {
     return <div className="container mx-auto py-8 text-center text-muted-foreground">Group data not available.</div>;
   }
+  
+  const selectedLogo = logoOptions.find(opt => opt.value === group.logoType);
+  const groupBannerImageUrl = selectedLogo?.src || `https://placehold.co/1200x300.png?text=${encodeURIComponent(group.groupName)}`;
+  const bannerDataAiHint = selectedLogo?.value || "team collaboration";
+
 
   const AuctionDetailItemReadOnly = ({ icon: Icon, label, value }: { icon: React.ElementType, label: string, value?: string }) => (
     <div className="flex items-center p-3 bg-secondary/50 rounded-md">
@@ -426,11 +439,11 @@ export default function EmployeeViewGroupDetailPage() {
       <Card className="shadow-xl overflow-hidden">
         <div className="relative w-full h-48 md:h-64">
           <Image
-            src={`https://placehold.co/1200x300.png?text=${encodeURIComponent(group.groupName)}`}
+            src={groupBannerImageUrl}
             alt={`${group.groupName} banner`}
             layout="fill"
             objectFit="cover"
-            data-ai-hint="team collaboration"
+            data-ai-hint={bannerDataAiHint}
             priority
           />
         </div>

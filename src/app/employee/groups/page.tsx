@@ -13,6 +13,14 @@ import { Loader2, Layers as LayersIcon, Users, Landmark, ArrowLeft } from "lucid
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 
+const logoOptions: Array<{ value: Group['logoType']; label: string; src?: string }> = [
+  { value: "gold", label: "Gold", src: "/gold.png" },
+  { value: "silver", label: "Silver", src: "/silver.png" },
+  { value: "diamond", label: "Diamond", src: "/diamond.png" },
+  { value: "emerald", label: "Emerald", src: "/emerald.png" },
+  { value: "ruby", label: "Ruby", src: "/ruby.png" },
+];
+
 export default function EmployeeViewGroupsPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,52 +81,58 @@ export default function EmployeeViewGroupsPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {groups.map((group) => (
-            <Link key={group.id} href={`/employee/groups/${group.id}`} className="block h-full">
-              <Card className="shadow-lg flex flex-col h-full hover:shadow-xl transition-shadow duration-300 cursor-pointer overflow-hidden">
-                <div className="relative w-full h-40">
-                   <Image
-                    src={`https://placehold.co/600x400.png?text=${encodeURIComponent(group.groupName)}`}
-                    alt={`${group.groupName} group image`}
-                    layout="fill"
-                    objectFit="cover"
-                    data-ai-hint="community group"
-                  />
-                </div>
-                <CardHeader className="pt-4">
-                  <CardTitle className="text-xl text-primary">{group.groupName}</CardTitle>
-                  <CardDescription className="h-16 overflow-y-auto text-sm">{group.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3 flex-grow">
-                  <div className="flex items-center text-sm">
-                    <Users className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <span>Capacity: {group.totalPeople} members</span>
+          {groups.map((group) => {
+            const selectedLogo = logoOptions.find(opt => opt.value === group.logoType);
+            const groupImageUrl = selectedLogo?.src || `https://placehold.co/600x400.png?text=${encodeURIComponent(group.groupName)}`;
+            const dataAiHint = selectedLogo?.value || "community group";
+
+            return (
+              <Link key={group.id} href={`/employee/groups/${group.id}`} className="block h-full">
+                <Card className="shadow-lg flex flex-col h-full hover:shadow-xl transition-shadow duration-300 cursor-pointer overflow-hidden">
+                  <div className="relative w-full h-40">
+                    <Image
+                      src={groupImageUrl}
+                      alt={`${group.groupName} group image`}
+                      layout="fill"
+                      objectFit="cover"
+                      data-ai-hint={dataAiHint}
+                    />
                   </div>
-                  <div className="flex items-center text-sm">
-                    <Landmark className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <span>Total Amount: ₹{group.totalAmount.toLocaleString()}</span>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-medium mb-1">Members ({group.members.length}):</h4>
-                    {group.members.length > 0 ? (
-                      <ScrollArea className="h-20 rounded-md border p-2">
-                        <div className="flex flex-wrap gap-1">
-                          {group.members.map(memberUsername => (
-                            <Badge key={memberUsername} variant="secondary">{memberUsername}</Badge>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">No members yet.</p>
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter className="border-t pt-4 mt-auto">
-                  <p className="text-xs text-muted-foreground">Group ID: {group.id}</p>
-                </CardFooter>
-              </Card>
-            </Link>
-          ))}
+                  <CardHeader className="pt-4">
+                    <CardTitle className="text-xl text-primary">{group.groupName}</CardTitle>
+                    <CardDescription className="h-16 overflow-y-auto text-sm">{group.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3 flex-grow">
+                    <div className="flex items-center text-sm">
+                      <Users className="mr-2 h-4 w-4 text-muted-foreground" />
+                      <span>Capacity: {group.totalPeople} members</span>
+                    </div>
+                    <div className="flex items-center text-sm">
+                      <Landmark className="mr-2 h-4 w-4 text-muted-foreground" />
+                      <span>Total Amount: ₹{group.totalAmount.toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium mb-1">Members ({group.members.length}):</h4>
+                      {group.members.length > 0 ? (
+                        <ScrollArea className="h-20 rounded-md border p-2">
+                          <div className="flex flex-wrap gap-1">
+                            {group.members.map(memberUsername => (
+                              <Badge key={memberUsername} variant="secondary">{memberUsername}</Badge>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">No members yet.</p>
+                      )}
+                    </div>
+                  </CardContent>
+                  <CardFooter className="border-t pt-4 mt-auto">
+                    <p className="text-xs text-muted-foreground">Group ID: {group.id}</p>
+                  </CardFooter>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
