@@ -8,6 +8,7 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import Image from "next/image";
 import { 
   Loader2, 
   ArrowLeft, 
@@ -169,8 +170,18 @@ export default function UserGroupDetailPage() {
         </Button>
       </div>
 
-      <Card className="shadow-xl">
-        <CardHeader>
+      <Card className="shadow-xl overflow-hidden">
+        <div className="relative w-full h-48 md:h-64">
+          <Image
+            src={`https://placehold.co/1200x300.png?text=${encodeURIComponent(group.groupName)}`}
+            alt={`${group.groupName} banner`}
+            layout="fill"
+            objectFit="cover"
+            data-ai-hint="team collaboration"
+            priority
+          />
+        </div>
+        <CardHeader className="pt-4">
           <div className="flex items-center gap-3">
             <UsersIconLucide className="h-8 w-8 text-primary" />
             <div>
@@ -298,4 +309,3 @@ export default function UserGroupDetailPage() {
     </div>
   );
 }
-

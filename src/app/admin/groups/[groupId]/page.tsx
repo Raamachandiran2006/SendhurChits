@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Loader2,
   ArrowLeft,
@@ -638,8 +639,18 @@ export default function AdminGroupDetailPage() {
         </AlertDialog>
       </div>
 
-      <Card className="shadow-xl">
-        <CardHeader>
+      <Card className="shadow-xl overflow-hidden">
+        <div className="relative w-full h-48 md:h-64">
+          <Image
+            src={`https://placehold.co/1200x300.png?text=${encodeURIComponent(group.groupName)}`}
+            alt={`${group.groupName} banner`}
+            layout="fill"
+            objectFit="cover"
+            data-ai-hint="team collaboration"
+            priority
+          />
+        </div>
+        <CardHeader className="pt-4">
           <div className="flex items-center gap-3">
             <UsersIconLucide className="h-8 w-8 text-primary" />
             <div>
@@ -1005,4 +1016,3 @@ export default function AdminGroupDetailPage() {
     </div>
   );
 }
-

@@ -8,10 +8,10 @@ import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import Image from "next/image"; // Import next/image
 import { Loader2, Layers as LayersIcon, Users, Landmark, ArrowLeft } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-// Removed cn and format imports as they are not used here
 
 export default function EmployeeViewGroupsPage() {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -74,9 +74,18 @@ export default function EmployeeViewGroupsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {groups.map((group) => (
-            <Link key={group.id} href={`/employee/groups/${group.id}`} className="block">
-              <Card className="shadow-lg flex flex-col h-full hover:shadow-xl transition-shadow duration-300 cursor-pointer">
-                <CardHeader>
+            <Link key={group.id} href={`/employee/groups/${group.id}`} className="block h-full">
+              <Card className="shadow-lg flex flex-col h-full hover:shadow-xl transition-shadow duration-300 cursor-pointer overflow-hidden">
+                <div className="relative w-full h-40">
+                   <Image
+                    src={`https://placehold.co/600x400.png?text=${encodeURIComponent(group.groupName)}`}
+                    alt={`${group.groupName} group image`}
+                    layout="fill"
+                    objectFit="cover"
+                    data-ai-hint="community group"
+                  />
+                </div>
+                <CardHeader className="pt-4">
                   <CardTitle className="text-xl text-primary">{group.groupName}</CardTitle>
                   <CardDescription className="h-16 overflow-y-auto text-sm">{group.description}</CardDescription>
                 </CardHeader>

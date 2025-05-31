@@ -8,11 +8,10 @@ import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Loader2, Layers, PlusCircle, Users, Landmark, CalendarClock, Megaphone, Clock, CalendarDays, Info } from "lucide-react";
+import Image from "next/image"; // Import next/image
+import { Loader2, Layers, PlusCircle, Users, Landmark } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import { format } from "date-fns";
 
 export default function AdminGroupsPage() {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -62,8 +61,6 @@ export default function AdminGroupsPage() {
         </Button>
       </div>
 
-      {/* Removed Upcoming Auctions Details card from here */}
-
       {groups.length === 0 ? (
         <Card className="text-center py-10 shadow-lg">
           <CardHeader>
@@ -80,9 +77,18 @@ export default function AdminGroupsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {groups.map((group) => (
-            <Link key={group.id} href={`/admin/groups/${group.id}`} className="block">
-              <Card className="shadow-lg flex flex-col h-full hover:shadow-xl transition-shadow duration-300 cursor-pointer">
-                <CardHeader>
+            <Link key={group.id} href={`/admin/groups/${group.id}`} className="block h-full">
+              <Card className="shadow-lg flex flex-col h-full hover:shadow-xl transition-shadow duration-300 cursor-pointer overflow-hidden">
+                <div className="relative w-full h-40">
+                  <Image
+                    src={`https://placehold.co/600x400.png?text=${encodeURIComponent(group.groupName)}`}
+                    alt={`${group.groupName} group image`}
+                    layout="fill"
+                    objectFit="cover"
+                    data-ai-hint="community group"
+                  />
+                </div>
+                <CardHeader className="pt-4">
                   <CardTitle className="text-xl text-primary">{group.groupName}</CardTitle>
                   <CardDescription className="h-16 overflow-y-auto text-sm">{group.description}</CardDescription>
                 </CardHeader>
