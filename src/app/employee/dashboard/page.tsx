@@ -4,7 +4,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Briefcase, Users, Layers, Eye, TrendingUp, Loader2, AlertTriangle, Banknote, Wallet, ArchiveRestore, Sheet as SheetIcon, DollarSign } from "lucide-react"; // Added ArchiveRestore and DollarSign
+import { Briefcase, Users, Layers, Eye, TrendingUp, Loader2, AlertTriangle, Banknote, Wallet, ArchiveRestore, Sheet as SheetIcon, DollarSign, CreditCard } from "lucide-react";
 import Link from "next/link";
 import type { Employee, Group, CollectionRecord, PaymentRecord, SalaryRecord, ExpenseRecord, CreditRecord } from "@/types";
 import { useEffect, useState } from "react";
@@ -19,6 +19,7 @@ const formatCurrency = (amount: number | null | undefined) => {
 export default function EmployeeDashboardPage() {
   const { loggedInEntity } = useAuth();
   const employee = loggedInEntity as Employee | null;
+  const isManager = employee?.role === "Manager";
 
   const [userCount, setUserCount] = useState(0);
   const [groupCount, setGroupCount] = useState(0);
@@ -34,7 +35,6 @@ export default function EmployeeDashboardPage() {
     const fetchData = async () => {
       setLoadingStats(true);
       try {
-        // Fetch non-admin users
         const usersQuery = query(collection(db, "users"), where("isAdmin", "!=", true));
         const usersSnapshot = await getDocs(usersQuery);
         setUserCount(usersSnapshot.size);
@@ -99,7 +99,7 @@ export default function EmployeeDashboardPage() {
         });
         
         setCurrentBalance(totalReceived - totalSent);
-        setTotalPenaltyAmount(0); // Placeholder
+        setTotalPenaltyAmount(0); 
 
       } catch (error) {
         console.error("Error fetching dashboard data for employee:", error);
@@ -116,7 +116,7 @@ export default function EmployeeDashboardPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground">Employee Dashboard</h1>
         {employee && (
-          <p className="text-muted-foreground">Welcome, {employee.fullname}! (ID: {employee.employeeId})</p>
+          <p className="text-muted-foreground">Welcome, {employee.fullname}! (ID: {employee.employeeId}) {isManager && <span className="font-semibold text-primary">(Manager)</span>}</p>
         )}
       </div>
 
@@ -223,6 +223,13 @@ export default function EmployeeDashboardPage() {
               <SheetIcon className="mr-2 h-4 w-4" /> View Due Sheet
             </Link>
           </Button>
+          {isManager && (
+            <Button asChild variant="outline">
+              <Link href="/employee/payments">
+                <CreditCard className="mr-2 h-4 w-4" /> Payments Management
+              </Link>
+            </Button>
+          )}
         </CardContent>
       </Card>
     </div>

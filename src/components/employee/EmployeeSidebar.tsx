@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Layers, Briefcase, LogOut, DollarSign, ArchiveRestore, Sheet as SheetIcon } from "lucide-react";
+import { Home, Users, Layers, Briefcase, LogOut, DollarSign, ArchiveRestore, Sheet as SheetIcon, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 import type { Employee } from "@/types";
 
-const navItems = [
+const baseNavItems = [
   { href: "/employee/dashboard", label: "Dashboard", icon: Home },
   { href: "/employee/users", label: "View Users", icon: Users },
   { href: "/employee/groups", label: "View Groups", icon: Layers },
@@ -28,12 +28,19 @@ const navItems = [
   { href: "/employee/due-sheet", label: "Due Sheet", icon: SheetIcon },
 ];
 
+const managerNavItems = [
+  ...baseNavItems,
+  { href: "/employee/payments", label: "Payments", icon: CreditCard },
+];
+
 export function EmployeeSidebar() {
   const pathname = usePathname();
   const { logout, loggedInEntity, userType } = useAuth();
   const { state: sidebarState } = useSidebar(); 
 
   const employee = userType === 'employee' ? loggedInEntity as Employee : null;
+  const isManager = employee?.role === "Manager";
+  const navItems = isManager ? managerNavItems : baseNavItems;
 
   return (
      <Sidebar className="border-r" collapsible="icon">
