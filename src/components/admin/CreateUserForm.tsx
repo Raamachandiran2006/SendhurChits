@@ -130,6 +130,7 @@ export function CreateUserForm() {
     if (showCamera && hasCameraPermission === null) { 
       requestCameraPermission();
     }
+    
     return () => {
       if (videoRef.current && videoRef.current.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
@@ -260,6 +261,30 @@ export function CreateUserForm() {
       await setDoc(newUserDocRef, newUserPayload);
       
       toast({ title: "User Created", description: `User ${values.fullname} created successfully (Username: ${newUsername})` });
+      
+      // Send SMS
+      const messageBody = `Dear user your Account in Sendhur Chits has been created Successfully !\n\nyour , Username : ${values.phone}\nPassword : ${values.password}\n\nஅன்புள்ள பயனரே, செந்தூர் சிட்ஸில் உங்கள் அக்கௌன்ட் வெற்றிகரமாக உருவாக்கப்பட்டது!\n\nஉங்கள் , பயனர்பெயர் : ${values.phone}\nகடவுச்சொல் : ${values.password}`;
+
+      try {
+        const response = await fetch('/api/send-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            toPhoneNumber: values.phone,
+            customMessageBody: messageBody,
+          }),
+        });
+        const result = await response.json();
+        if (result.success) {
+          toast({ title: "Welcome SMS Sent", description: `Notification sent to ${values.fullname}.`});
+        } else {
+          toast({ title: "SMS Failed", description: result.error || "Could not send welcome SMS.", variant: "destructive"});
+        }
+      } catch (notifError) {
+        console.error("Error sending welcome SMS:", notifError);
+        toast({ title: "SMS Error", description: "Failed to send welcome SMS.", variant: "destructive"});
+      }
+
       router.push("/admin/users");
 
     } catch (error) {
@@ -396,7 +421,7 @@ export function CreateUserForm() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Document Uploads</CardTitle>
-                <CardDescription>Please upload PDF or image files (max {MAX_FILE_SIZE_MB}MB each).</CardDescription>
+                <CardDescription>Please upload PDF or image files (max ${MAX_FILE_SIZE_MB}MB each).</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <FormField control={form.control} name="aadhaarCard" render={({ field: { onChange, value, ...rest }}) => (
@@ -464,9 +489,11 @@ export function CreateUserForm() {
                   </div>
                 )}
                  <canvas ref={canvasRef} className="hidden"></canvas>
+                 
                  {form.formState.errors.recentPhotographFile && !form.formState.errors.recentPhotographFile.message?.includes("Expected file, received null") && (
                     <p className="text-sm font-medium text-destructive">{form.formState.errors.recentPhotographFile.message}</p>
                  )}
+
               </CardContent>
             </Card>
 
@@ -481,10 +508,15 @@ export function CreateUserForm() {
               )}
             />
 
-            <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create User</Button>
+            <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Create User
+            </Button>
           </form>
         </Form>
       </CardContent>
     </Card>
   );
 }
+
+    
