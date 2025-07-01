@@ -534,7 +534,7 @@ export default function AdminGroupDetailPage() {
       toast({ title: "Auction Details Updated", description: "Successfully saved. Now sending notifications to members..." });
       setIsEditingAuctionDetails(false);
 
-      const formattedDate = values.auctionScheduledDate ? formatDate(parseISO(values.auctionScheduledDate), "dd-MMM-yyyy") : "N/A";
+      const formattedDate = values.auctionScheduledDate ? format(parseISO(values.auctionScheduledDate), "dd-MMM-yyyy") : "N/A";
       const messageBody = `Auction details:\n` +
                           `Auction month: ${values.auctionMonth || 'N/A'}\n` +
                           `Scheduled date: ${formattedDate}\n` +
