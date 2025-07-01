@@ -510,7 +510,10 @@ export default function AdminGroupDetailPage() {
   };
 
   const onSaveAuctionDetails = async (values: AuctionDetailsFormValues) => {
-    if (!group) return;
+    if (!group || !membersDetails) {
+        toast({ title: "Error", description: "Group or member data is not available.", variant: "destructive" });
+        return;
+    }
     setIsSavingAuctionDetails(true);
     try {
       const groupDocRef = doc(db, "groups", groupId);
@@ -528,8 +531,48 @@ export default function AdminGroupDetailPage() {
         auctionScheduledTime: values.auctionScheduledTime || "",
         lastAuctionWinner: values.lastAuctionWinner || ""
       } : null);
-      toast({ title: "Auction Details Updated", description: "Successfully saved auction details." });
+      toast({ title: "Auction Details Updated", description: "Successfully saved. Now sending notifications to members..." });
       setIsEditingAuctionDetails(false);
+
+      const formattedDate = values.auctionScheduledDate ? formatDate(parseISO(values.auctionScheduledDate), "dd-MMM-yyyy") : "N/A";
+      const messageBody = `Auction details:\n` +
+                          `Auction month: ${values.auctionMonth || 'N/A'}\n` +
+                          `Scheduled date: ${formattedDate}\n` +
+                          `Scheduled time: ${values.auctionScheduledTime || 'N/A'}\n\n` +
+                          `ஏல விவரங்கள்:\n` +
+                          `ஏல மாதம்: ${values.auctionMonth || 'N/A'}\n` +
+                          `திட்டமிடப்பட்ட தேதி: ${formattedDate}\n` +
+                          `திட்டமிடப்பட்ட நேரம்: ${values.auctionScheduledTime || 'N/A'}`;
+                          
+      let sentCount = 0;
+      for (const member of membersDetails) {
+        if (member.phone) {
+          try {
+            const response = await fetch('/api/send-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                toPhoneNumber: member.phone,
+                customMessageBody: messageBody,
+              }),
+            });
+            const result = await response.json();
+            if (result.success) {
+              sentCount++;
+            } else {
+               console.warn(`Failed to send SMS to ${member.fullname}: ${result.error}`);
+            }
+          } catch (notifError) {
+             console.error(`Error sending notification to ${member.fullname}:`, notifError);
+          }
+        }
+      }
+
+      if (sentCount > 0) {
+        toast({ title: "Notifications Sent", description: `Auction details sent to ${sentCount} members.` });
+      } else if (membersDetails.length > 0) {
+        toast({ title: "Notification Failed", description: "Could not send notifications to any members.", variant: "destructive" });
+      }
     } catch (error) {
       console.error("Error updating auction details:", error);
       toast({ title: "Error", description: "Could not update auction details. " + (error as Error).message, variant: "destructive" });
