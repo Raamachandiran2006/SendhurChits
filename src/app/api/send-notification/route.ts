@@ -30,50 +30,41 @@ export async function POST(request: NextRequest) {
     const defaultCountryCode = process.env.DEFAULT_COUNTRY_CODE || '+91';
 
     if (!accountSid || !authToken || !twilioPhoneNumber || !twilioWhatsAppFromNumber) {
-      console.error('[API/send-notification] Critical Error: Twilio environment variables are not configured correctly. Please check TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, and TWILIO_WHATSAPP_FROM_NUMBER.');
-      return NextResponse.json({ success: false, error: 'Twilio configuration missing on server. Please contact administrator.' }, { status: 500 });
+      console.error('[API/send-notification] Critical Error: Twilio environment variables are not configured correctly.');
+      return NextResponse.json({ success: false, error: 'Twilio configuration missing on server.' }, { status: 500 });
     }
 
     const body = await request.json();
-    const { 
-      toPhoneNumber, 
-      userName, 
-      receiptNumber,
-      paymentDate, // YYYY-MM-DD string
-      paymentTime, // HH:MM AM/PM string
-      groupName,
-      groupTotalAmount,
-      auctionDateForReceipt, // YYYY-MM-DD string or null
-      dueNumber,
-      chitAmount, // Due Amount for this installment
-      totalPaidForThisDue, // Total paid for this specific due
-      amount, // Bill Amount (current transaction amount)
-      balanceForThisInstallment, // Balance for this installment
-      paymentMode,
-      // collectionLocation // Not used in the new format, but kept in destructuring if other logic uses it
-    } = body;
+    const { toPhoneNumber, customMessageBody } = body;
 
-    const requiredFields: Record<string, any> = { 
-        toPhoneNumber, userName, receiptNumber, paymentDate, paymentTime, groupName, 
-        groupTotalAmount, /* auctionDateForReceipt can be null */ dueNumber, chitAmount, totalPaidForThisDue, amount, 
-        balanceForThisInstallment, paymentMode 
-    };
-
-    const missingFields = Object.entries(requiredFields)
-      .filter(([key, value]) => value === undefined || value === null && key !== 'auctionDateForReceipt' && key !== 'dueNumber' && key !== 'chitAmount' && key !== 'balanceForThisInstallment' && key !== 'totalPaidForThisDue'  ) // Allow some fields to be null/undefined if they are truly optional for the message
-      .map(([key]) => key);
-
-    if (missingFields.length > 0) {
-      console.error('[API/send-notification] Missing required fields in request body:', missingFields.join(', '), 'Full body:', body);
-      return NextResponse.json({ success: false, error: `Missing required fields: ${missingFields.join(', ')}` }, { status: 400 });
+    if (!toPhoneNumber) {
+        return NextResponse.json({ success: false, error: 'toPhoneNumber is a required field.' }, { status: 400 });
     }
 
-    const client = twilio(accountSid, authToken);
-    
-    const formattedToPhoneNumber = defaultCountryCode + String(toPhoneNumber).replace(/^\+?91/, ''); 
+    let finalMessageBody = "";
 
-    // --- NEW MESSAGE FORMAT ---
-    const messageBody = `Receipt No: ${receiptNumber}\n` +
+    if (customMessageBody) {
+      // Use the provided custom message body directly
+      finalMessageBody = customMessageBody;
+    } else {
+      // If no custom body, assume it's a receipt and validate/construct the message
+      const { 
+        userName, receiptNumber, paymentDate, paymentTime, groupName, 
+        groupTotalAmount, auctionDateForReceipt, dueNumber, chitAmount, 
+        totalPaidForThisDue, amount, balanceForThisInstallment, paymentMode 
+      } = body;
+      
+      const requiredFields = { userName, receiptNumber, paymentDate, paymentTime, groupName, groupTotalAmount, amount, paymentMode };
+      const missingFields = Object.entries(requiredFields)
+        .filter(([, value]) => value === undefined || value === null)
+        .map(([key]) => key);
+
+      if (missingFields.length > 0) {
+        console.error('[API/send-notification] Missing required fields for receipt notification:', missingFields.join(', '));
+        return NextResponse.json({ success: false, error: `Missing required receipt fields: ${missingFields.join(', ')}` }, { status: 400 });
+      }
+
+      finalMessageBody = `Receipt No: ${receiptNumber}\n` +
                         `Date: ${formatDateForMessage(paymentDate)} ${paymentTime || ''}\n\n` +
                         `Group : ${groupName || 'N/A'}\n` +
                         `Name : ${userName || 'N/A'}\n` +
@@ -86,9 +77,12 @@ export async function POST(request: NextRequest) {
                         `Balance : ${formatCurrency(balanceForThisInstallment)}\n` +
                         `Payment Mode : ${paymentMode || 'N/A'}\n\n` +
                         `Thank you,\nSendhur Chits`;
-    // --- END OF MESSAGE FORMAT EDITING SECTION ---
+    }
 
-    console.log(`[API/send-notification] Attempting to send to ${formattedToPhoneNumber}. Message: ${messageBody}`);
+    const client = twilio(accountSid, authToken);
+    const formattedToPhoneNumber = defaultCountryCode + String(toPhoneNumber).replace(/^\+?91/, '');
+
+    console.log(`[API/send-notification] Attempting to send to ${formattedToPhoneNumber}. Message: ${finalMessageBody}`);
 
     let smsSent = false;
     let whatsappSent = false;
@@ -98,7 +92,7 @@ export async function POST(request: NextRequest) {
     // Send SMS
     try {
       const smsResponse = await client.messages.create({
-        body: messageBody,
+        body: finalMessageBody,
         from: twilioPhoneNumber,
         to: formattedToPhoneNumber,
       });
@@ -112,7 +106,7 @@ export async function POST(request: NextRequest) {
     // Send WhatsApp message
     try {
       const whatsappResponse = await client.messages.create({
-        body: messageBody,
+        body: finalMessageBody,
         from: twilioWhatsAppFromNumber,
         to: `whatsapp:${formattedToPhoneNumber}`,
       });
